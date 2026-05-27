@@ -1,0 +1,66 @@
+import { createClient } from "@/lib/supabase/server";
+import type { User, UserRole } from "@/types";
+
+function resolveRole(appMetadata: Record<string, unknown> | undefined): UserRole {
+  return appMetadata?.role === "admin" ? "admin" : "member";
+}
+
+/**
+ * Garante que existe linha em public.users para o usuário autenticado.
+ * Necessário quando o usuário foi criado no Auth antes do trigger ou via seed/API.
+ */
+export async function ensureUserProfile(): Promise<string | null> {
+  const supabase = await createClient();
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser();
+
+  if (!authUser?.email) return null;
+
+  const { data: existing } = await supabase
+    .from("users")
+    .select("id")
+    .eq("id", authUser.id)
+    .maybeSingle();
+
+  if (existing) return authUser.id;
+
+  const fullName =
+    (authUser.user_metadata?.full_name as string | undefined) ??
+    (authUser.user_metadata?.name as string | undefined) ??
+    null;
+
+  const { error } = await supabase.from("users").insert({
+    id: authUser.id,
+    email: authUser.email,
+    full_name: fullName,
+    avatar_url: (authUser.user_metadata?.avatar_url as string | undefined) ?? null,
+    role: resolveRole(authUser.app_metadata as Record<string, unknown> | undefined),
+  });
+
+  if (error) {
+    throw new Error(`Não foi possível criar o perfil: ${error.message}`);
+  }
+
+  return authUser.id;
+}
+
+export async function getCurrentUserProfile(): Promise<User | null> {
+  const supabase = await createClient();
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser();
+
+  if (!authUser) return null;
+
+  await ensureUserProfile().catch(() => null);
+
+  const { data, error } = await supabase
+    .from("users")
+    .select("*")
+    .eq("id", authUser.id)
+    .single();
+
+  if (error || !data) return null;
+  return data;
+}
