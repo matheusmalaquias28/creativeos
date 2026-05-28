@@ -17,26 +17,21 @@ export async function ensureUserProfile(): Promise<string | null> {
 
   if (!authUser?.email) return null;
 
-  const { data: existing } = await supabase
-    .from("users")
-    .select("id")
-    .eq("id", authUser.id)
-    .maybeSingle();
-
-  if (existing) return authUser.id;
-
   const fullName =
     (authUser.user_metadata?.full_name as string | undefined) ??
     (authUser.user_metadata?.name as string | undefined) ??
     null;
 
-  const { error } = await supabase.from("users").insert({
-    id: authUser.id,
-    email: authUser.email,
-    full_name: fullName,
-    avatar_url: (authUser.user_metadata?.avatar_url as string | undefined) ?? null,
-    role: resolveRole(authUser.app_metadata as Record<string, unknown> | undefined),
-  });
+  const { error } = await supabase.from("users").upsert(
+    {
+      id: authUser.id,
+      email: authUser.email,
+      full_name: fullName,
+      avatar_url: (authUser.user_metadata?.avatar_url as string | undefined) ?? null,
+      role: resolveRole(authUser.app_metadata as Record<string, unknown> | undefined),
+    },
+    { onConflict: "id", ignoreDuplicates: true }
+  );
 
   if (error) {
     throw new Error(`Não foi possível criar o perfil: ${error.message}`);

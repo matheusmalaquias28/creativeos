@@ -1,4 +1,5 @@
 import type { BrandDna } from "./creative-brain";
+import type { GeneratedCreative } from "./creative";
 
 export type ClientStatus = "draft" | "onboarding" | "active" | "archived";
 
@@ -23,6 +24,11 @@ export type Client = {
   company_info: Record<string, unknown>;
   created_at: string;
   updated_at: string;
+};
+
+/** Cliente com logo do onboarding para listagens (cards, dashboard). */
+export type ClientListItem = Client & {
+  logoUrl?: string | null;
 };
 
 export type ClientReference = {
@@ -107,8 +113,12 @@ export type Database = {
       };
       onboarding_answers: {
         Row: OnboardingAnswers;
-        Insert: Omit<OnboardingAnswers, "id" | "created_at" | "updated_at"> & {
+        Insert: Omit<
+          OnboardingAnswers,
+          "id" | "created_at" | "updated_at" | "completed_at"
+        > & {
           id?: string;
+          completed_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -118,6 +128,35 @@ export type Database = {
             foreignKeyName: "onboarding_answers_client_id_fkey";
             columns: ["client_id"];
             isOneToOne: true;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      generated_creatives: {
+        Row: GeneratedCreative;
+        Insert: {
+          id?: string;
+          client_id: string;
+          creative_brain_id?: string | null;
+          template_name?: string | null;
+          prompt_payload?: Record<string, unknown> | Json;
+          storage_path: string;
+          public_url: string;
+          mime_type?: string;
+          aspect_ratio?: string | null;
+          model: string;
+          status?: string;
+          error_message?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Omit<GeneratedCreative, "id" | "created_at">>;
+        Relationships: [
+          {
+            foreignKeyName: "generated_creatives_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
             referencedRelation: "clients";
             referencedColumns: ["id"];
           },
@@ -169,7 +208,8 @@ export type Database = {
         | "generating"
         | "draft"
         | "approved"
-        | "archived";
+        | "archived"
+        | "failed";
       user_role: UserRole;
     };
     CompositeTypes: Record<string, never>;

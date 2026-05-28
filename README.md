@@ -83,17 +83,16 @@ npm run dev
 
 Acesse [http://localhost:3000](http://localhost:3000).
 
-## Fluxo MVP (fase atual)
+## Fluxo MVP
 
 - [x] Login / cadastro (Supabase Auth)
 - [x] Dashboard com métricas
-- [x] CRUD inicial de clientes (criar + listar + detalhe)
-- [x] Schema completo (users, clients, references, onboarding, creative_brains)
-- [x] Service layer de IA (`lib/ai/generateCreativeBrain.ts`)
-- [ ] Onboarding criativo (formulário)
-- [ ] Upload de referências (Storage)
-- [ ] Geração e revisão de Creative Brain
-- [ ] Reprocessar Brand DNA
+- [x] CRUD de clientes
+- [x] Onboarding criativo (`/clients/[id]/onboarding`) — auto-save
+- [x] Upload de referências (`/clients/[id]/references`)
+- [x] Geração Creative Brain com Claude (`/clients/[id]/brain`)
+- [x] Revisão, aprovação e reprocessar Brand DNA
+- [ ] Geração de criativos (fase 3)
 
 ## Deploy (Vercel)
 

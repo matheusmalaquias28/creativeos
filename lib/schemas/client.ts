@@ -1,4 +1,10 @@
 import { z } from "zod";
+import { isValidHexColor, normalizeHexColor } from "@/lib/utils/color";
+
+const hexColorSchema = z
+  .string()
+  .refine((v) => isValidHexColor(v), "Cor inválida. Use formato hex (#RRGGBB)")
+  .transform((v) => normalizeHexColor(v)!);
 
 export const createClientSchema = z.object({
   name: z
@@ -18,6 +24,15 @@ export const onboardingSchema = z.object({
   toneOfVoice: z.string().min(3, "Defina o tom de voz"),
   visualInspirations: z.string().optional(),
   avoidStyles: z.string().optional(),
+  brandColors: z
+    .array(hexColorSchema)
+    .min(1, "Selecione ao menos 1 cor da identidade visual")
+    .max(5, "Máximo de 5 cores"),
+  fontStyles: z
+    .string()
+    .min(3, "Defina os estilos tipográficos da marca"),
+  logoUrl: z.string().optional(),
+  logoStoragePath: z.string().optional(),
 });
 
 export type OnboardingFormValues = z.infer<typeof onboardingSchema>;

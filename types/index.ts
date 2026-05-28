@@ -1,6 +1,18 @@
-export type { BrandDna, CreativeBrain, CreativeBrainStatus } from "./creative-brain";
+export type { GeneratedCreative, GeneratedCreativeStatus } from "./creative";
+export type {
+  BrandDna,
+  CreativeBrain,
+  CreativeBrainStatus,
+  NanoBananaProConfig,
+  NanoBananaPromptJson,
+  NanoBananaPromptTemplate,
+  NanoBananaScene,
+  ProductionRules,
+  ReferenceInsight,
+} from "./creative-brain";
 export type {
   Client,
+  ClientListItem,
   ClientReference,
   ClientStatus,
   Database,

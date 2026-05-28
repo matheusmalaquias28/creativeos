@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { isSchemaMissingError, schemaNotReadyError } from "@/lib/errors/database";
-import type { Client, ClientReference, CreativeBrain } from "@/types";
+import type { Client, ClientListItem, ClientReference, CreativeBrain } from "@/types";
 
 function throwIfDbError(error: { message: string }) {
   if (isSchemaMissingError(error.message)) {
@@ -9,16 +9,37 @@ function throwIfDbError(error: { message: string }) {
   throw new Error(error.message);
 }
 
-export async function getClientsForUser(userId: string): Promise<Client[]> {
+function extractLogoUrl(answers: unknown): string | null {
+  if (!answers || typeof answers !== "object") return null;
+  const logoUrl = (answers as { logoUrl?: unknown }).logoUrl;
+  return typeof logoUrl === "string" && logoUrl.trim() ? logoUrl : null;
+}
+
+export async function getClientsForUser(userId: string): Promise<ClientListItem[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("clients")
-    .select("*")
+    .select("*, onboarding_answers(answers)")
     .eq("user_id", userId)
     .order("updated_at", { ascending: false });
 
   if (error) throwIfDbError(error);
-  return data ?? [];
+
+  return (data ?? []).map((client) => {
+    const ob = client.onboarding_answers as { answers?: unknown } | { answers?: unknown }[] | null;
+    const answers = Array.isArray(ob) ? ob[0]?.answers : ob?.answers;
+    return {
+      id: client.id,
+      user_id: client.user_id,
+      name: client.name,
+      slug: client.slug,
+      status: client.status,
+      company_info: client.company_info,
+      created_at: client.created_at,
+      updated_at: client.updated_at,
+      logoUrl: extractLogoUrl(answers ?? null),
+    };
+  });
 }
 
 export async function getClientById(
@@ -70,28 +91,20 @@ export async function getLatestCreativeBrain(
 export async function getDashboardStats(userId: string) {
   const supabase = await createClient();
 
-  const { data: clients } = await supabase
+  const { data } = await supabase
     .from("clients")
-    .select("id, status")
+    .select("id, status, creative_brains(id, status)")
     .eq("user_id", userId);
 
-  const clientList = clients ?? [];
-  const clientIds = clientList.map((c) => c.id);
-
-  let brains: { status: string }[] = [];
-  if (clientIds.length > 0) {
-    const { data } = await supabase
-      .from("creative_brains")
-      .select("id, status")
-      .in("client_id", clientIds);
-    brains = data ?? [];
-  }
+  const clientList = data ?? [];
+  const brains = clientList.flatMap(
+    (c) => (c.creative_brains as { id: string; status: string }[] ?? [])
+  );
 
   return {
     totalClients: clientList.length,
     activeClients: clientList.filter((c) => c.status === "active").length,
-    onboardingClients: clientList.filter((c) => c.status === "onboarding")
-      .length,
+    onboardingClients: clientList.filter((c) => c.status === "onboarding").length,
     creativeBrains: brains.length,
     approvedBrains: brains.filter((b) => b.status === "approved").length,
   };

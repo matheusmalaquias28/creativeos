@@ -9,6 +9,11 @@ import {
 } from "lucide-react";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { WorkflowModuleCard } from "@/components/clients/workflow-module-card";
+import { GenerateBrainButton } from "@/components/creative-brain/generate-brain-button";
+import {
+  ClientStatusIndicator,
+  getClientStatusConfig,
+} from "@/components/clients/client-status-indicator";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -19,14 +24,12 @@ import {
   getClientReferences,
   getLatestCreativeBrain,
 } from "@/services/clients";
-import type { Client } from "@/types";
-
-const statusLabels: Record<Client["status"], string> = {
-  draft: "Rascunho",
-  onboarding: "Onboarding",
-  active: "Ativo",
-  archived: "Arquivado",
-};
+import {
+  getOnboardingAnswers,
+  parseOnboardingAnswers,
+  isOnboardingComplete,
+} from "@/services/onboarding";
+import type { BrandDna } from "@/types";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -44,10 +47,19 @@ export default async function ClientDetailPage({ params }: PageProps) {
   const client = await getClientById(id, user.id);
   if (!client) notFound();
 
-  const [references, creativeBrain] = await Promise.all([
+  const [references, creativeBrain, onboarding] = await Promise.all([
     getClientReferences(id),
     getLatestCreativeBrain(id),
+    getOnboardingAnswers(id),
   ]);
+
+  const onboardingComplete = isOnboardingComplete(
+    parseOnboardingAnswers(onboarding)
+  );
+  const onboardingDone = Boolean(onboarding?.completed_at);
+  const brandDna = creativeBrain?.brand_dna as BrandDna | undefined;
+  const hasPromptTemplates =
+    (brandDna?.nanoBananaPro?.promptTemplates?.length ?? 0) > 0;
 
   return (
     <DashboardShell
@@ -56,7 +68,13 @@ export default async function ClientDetailPage({ params }: PageProps) {
     >
       <div className={layout.sectionGap}>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline">{statusLabels[client.status]}</Badge>
+          <Badge variant="outline" className="gap-2 pr-2.5">
+            <ClientStatusIndicator status={client.status} size="sm" />
+            {getClientStatusConfig(client.status).label}
+          </Badge>
+          {onboardingDone && (
+            <Badge variant="secondary">Onboarding concluído</Badge>
+          )}
           {creativeBrain && (
             <Badge variant="secondary">
               Creative Brain v{creativeBrain.version}
@@ -67,55 +85,107 @@ export default async function ClientDetailPage({ params }: PageProps) {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <WorkflowModuleCard
             title="Onboarding"
-            description="Formulário criativo e contexto da marca"
+            description={
+              onboardingDone
+                ? "Briefing criativo preenchido"
+                : "Formulário criativo e contexto da marca"
+            }
             icon={ClipboardList}
-            actionLabel="Em breve"
+            actionLabel={onboardingDone ? "Editar briefing" : "Iniciar onboarding"}
+            href={`/clients/${id}/onboarding`}
           />
           <WorkflowModuleCard
             title="Referências"
             description={`${references.length} imagem(ns) enviada(s)`}
             icon={ImageIcon}
-            actionLabel="Upload em breve"
+            actionLabel="Gerenciar referências"
+            href={`/clients/${id}/references`}
           />
-          <WorkflowModuleCard
-            title="Creative Brain"
-            description={
-              creativeBrain
-                ? `Status: ${creativeBrain.status}`
-                : "Brand DNA ainda não gerado"
-            }
-            icon={Brain}
-            actionLabel="Gerar com IA"
-          />
+          <div className="surface-panel flex flex-col gap-6 p-6 hover-lift md:col-span-2 xl:col-span-1">
+            <div className="flex items-start gap-4">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border/45 bg-muted/30">
+                <Brain className="size-4 text-muted-foreground" strokeWidth={1.5} />
+              </div>
+              <div className="min-w-0 space-y-1">
+                <h3 className="text-sm font-medium tracking-heading text-foreground">
+                  Creative Brain
+                </h3>
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  {creativeBrain
+                    ? `Status: ${creativeBrain.status}`
+                    : "Brand DNA ainda não gerado"}
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <GenerateBrainButton
+                clientId={id}
+                disabled={!onboardingComplete}
+              />
+              {creativeBrain && (
+                <Link
+                  href={`/clients/${id}/brain`}
+                  className={cn(
+                    buttonVariants({ variant: "outline", size: "sm" })
+                  )}
+                >
+                  Ver Brand DNA
+                </Link>
+              )}
+            </div>
+            {!onboardingComplete && (
+              <p className="text-xs text-muted-foreground">
+                Complete o onboarding para habilitar a geração.
+              </p>
+            )}
+          </div>
           <WorkflowModuleCard
             title="Criativos"
-            description="Estrutura preparada para geração futura"
+            description={
+              hasPromptTemplates
+                ? "Gerar imagens com Nano Banana"
+                : "Requer Creative Brain com templates"
+            }
             icon={Sparkles}
-            actionLabel="Fase 2"
+            actionLabel="Gerar criativos"
+            href={
+              hasPromptTemplates ? `/clients/${id}/creatives` : undefined
+            }
+            disabled={!hasPromptTemplates}
           />
         </div>
 
         {references.length > 0 && (
           <section className="space-y-5">
-            <div>
-              <h2 className="text-lg font-medium tracking-heading">
-                Referências visuais
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Inspirações e assets de referência do cliente
-              </p>
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-medium tracking-heading">
+                  Referências visuais
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Prévia das últimas referências
+                </p>
+              </div>
+              <Link
+                href={`/clients/${id}/references`}
+                className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+              >
+                Ver todas
+              </Link>
             </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 md:grid-cols-6">
-              {references.map((ref) => (
+              {references.slice(0, 6).map((ref) => (
                 <div
                   key={ref.id}
-                  className="group aspect-square overflow-hidden rounded-lg border border-border/50 bg-card/30 transition-premium hover:border-border/70"
+                  className="aspect-square overflow-hidden rounded-lg border border-border/50 bg-card/30"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={ref.public_url}
                     alt={ref.file_name}
-                    className="size-full object-cover opacity-90 transition-premium group-hover:opacity-100 group-hover:scale-[1.02]"
+                    className="size-full object-cover"
+                    loading="lazy"
+                    decoding="async"
                   />
                 </div>
               ))}

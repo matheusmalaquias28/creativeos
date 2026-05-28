@@ -16,7 +16,8 @@ create type public.creative_brain_status as enum (
   'generating',
   'draft',
   'approved',
-  'archived'
+  'archived',
+  'failed'
 );
 
 -- Users (profiles linked to auth.users)
