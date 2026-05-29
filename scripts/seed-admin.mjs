@@ -39,9 +39,16 @@ loadEnvFile(".env");
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const email = process.env.DEV_ADMIN_EMAIL ?? "admin@creativeos.dev";
-const password = process.env.DEV_ADMIN_PASSWORD ?? "CreativeOS2025!";
+const email = process.env.DEV_ADMIN_EMAIL;
+const password = process.env.DEV_ADMIN_PASSWORD;
 const fullName = process.env.DEV_ADMIN_NAME ?? "Administrador";
+
+if (!email || !password) {
+  console.error(
+    "\n❌ Defina DEV_ADMIN_EMAIL e DEV_ADMIN_PASSWORD no .env.local\n"
+  );
+  process.exit(1);
+}
 
 if (!url || !serviceKey) {
   console.error(

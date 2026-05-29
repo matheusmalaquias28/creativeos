@@ -35,4 +35,6 @@ export const onboardingSchema = z.object({
   logoStoragePath: z.string().optional(),
 });
 
+export type ClientPhoto = { url: string; storagePath: string };
+
 export type OnboardingFormValues = z.infer<typeof onboardingSchema>;

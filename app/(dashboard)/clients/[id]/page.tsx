@@ -58,8 +58,7 @@ export default async function ClientDetailPage({ params }: PageProps) {
   );
   const onboardingDone = Boolean(onboarding?.completed_at);
   const brandDna = creativeBrain?.brand_dna as BrandDna | undefined;
-  const hasPromptTemplates =
-    (brandDna?.nanoBananaPro?.promptTemplates?.length ?? 0) > 0;
+  const hasBrandDna = Boolean(brandDna);
 
   return (
     <DashboardShell
@@ -140,18 +139,16 @@ export default async function ClientDetailPage({ params }: PageProps) {
             )}
           </div>
           <WorkflowModuleCard
-            title="Criativos"
+            title="Prompts"
             description={
-              hasPromptTemplates
-                ? "Gerar imagens com Nano Banana"
-                : "Requer Creative Brain com templates"
+              hasBrandDna
+                ? "Gerar prompt para Magnific Spaces"
+                : "Requer Creative Brain"
             }
             icon={Sparkles}
-            actionLabel="Gerar criativos"
-            href={
-              hasPromptTemplates ? `/clients/${id}/creatives` : undefined
-            }
-            disabled={!hasPromptTemplates}
+            actionLabel="Gerar prompt"
+            href={hasBrandDna ? `/clients/${id}/creatives` : undefined}
+            disabled={!hasBrandDna}
           />
         </div>
 

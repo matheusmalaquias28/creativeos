@@ -59,18 +59,11 @@ Preencha:
 
 ### Admin de teste
 
-No `.env.local`, adicione a **service role key** (Settings → API → `service_role` — nunca commite).
+No `.env.local`, configure as variáveis `DEV_ADMIN_EMAIL`, `DEV_ADMIN_PASSWORD` e `DEV_ADMIN_NAME` e a `SUPABASE_SERVICE_ROLE_KEY` (Settings → API → `service_role` — nunca commite).
 
 ```bash
 npm run seed:admin
 ```
-
-Credenciais padrão (ou sobrescreva com `DEV_ADMIN_*` no `.env.local`):
-
-| Campo | Valor |
-|-------|--------|
-| E-mail | `admin@creativeos.dev` |
-| Senha | `CreativeOS2025!` |
 
 Login em [http://localhost:3000/login](http://localhost:3000/login).
 

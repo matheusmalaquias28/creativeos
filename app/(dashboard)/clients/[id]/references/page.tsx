@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { ReferenceUpload } from "@/components/clients/reference-upload";
 import { ReferenceGallery } from "@/components/clients/reference-gallery";
+import { ClientPhotosPanel } from "@/components/clients/client-photos-panel";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Surface,
@@ -16,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { layout } from "@/lib/design/tokens";
 import { createClient } from "@/lib/supabase/server";
 import { getClientById, getClientReferences } from "@/services/clients";
+import { getOnboardingAnswers, parseOnboardingAnswers } from "@/services/onboarding";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -33,7 +35,13 @@ export default async function ReferencesPage({ params }: PageProps) {
   const client = await getClientById(id, user.id);
   if (!client) notFound();
 
-  const references = await getClientReferences(id);
+  const [references, onboarding] = await Promise.all([
+    getClientReferences(id),
+    getOnboardingAnswers(id),
+  ]);
+
+  const answers = parseOnboardingAnswers(onboarding);
+  const clientPhotos = answers.clientPhotos ?? [];
 
   return (
     <DashboardShell
@@ -41,27 +49,43 @@ export default async function ReferencesPage({ params }: PageProps) {
       description={`${client.name} · inspirações para o Brand DNA`}
     >
       <div className={layout.sectionGap}>
-        <Surface variant="elevated">
-          <SurfaceHeader>
-            <SurfaceTitle>Upload</SurfaceTitle>
-            <SurfaceDescription>
-              Envie múltiplas imagens de referência. Elas serão usadas como
-              contexto na geração do Creative Brain.
-            </SurfaceDescription>
-          </SurfaceHeader>
-          <SurfaceContent>
-            <ReferenceUpload clientId={id} />
-          </SurfaceContent>
-        </Surface>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="space-y-6">
+            <Surface variant="elevated">
+              <SurfaceHeader>
+                <SurfaceTitle>Upload de referências</SurfaceTitle>
+                <SurfaceDescription>
+                  Envie imagens de referência do Behance ou outras fontes.
+                  Usadas como contexto na geração do Creative Brain.
+                </SurfaceDescription>
+              </SurfaceHeader>
+              <SurfaceContent>
+                <ReferenceUpload clientId={id} />
+              </SurfaceContent>
+            </Surface>
 
-        <Surface>
-          <SurfaceHeader>
-            <SurfaceTitle>Galeria ({references.length})</SurfaceTitle>
-          </SurfaceHeader>
-          <SurfaceContent>
-            <ReferenceGallery clientId={id} references={references} />
-          </SurfaceContent>
-        </Surface>
+            <Surface>
+              <SurfaceHeader>
+                <SurfaceTitle>Referências ({references.length})</SurfaceTitle>
+              </SurfaceHeader>
+              <SurfaceContent>
+                <ReferenceGallery clientId={id} references={references} />
+              </SurfaceContent>
+            </Surface>
+          </div>
+
+          <Surface>
+            <SurfaceHeader>
+              <SurfaceTitle>Fotos do cliente ({clientPhotos.length}/5)</SurfaceTitle>
+              <SurfaceDescription>
+                Fotos do cliente, produto ou espaço. Copie as URLs para usar no Spaces.
+              </SurfaceDescription>
+            </SurfaceHeader>
+            <SurfaceContent>
+              <ClientPhotosPanel clientId={id} photos={clientPhotos} />
+            </SurfaceContent>
+          </Surface>
+        </div>
 
         <Link
           href={`/clients/${id}`}

@@ -5,9 +5,6 @@ import { Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 import type { BrandDna } from "@/types";
 import { Button } from "@/components/ui/button";
-import { JsonCodeViewer } from "@/components/ui/json-code-viewer";
-import { buildNanoBananaPromptFromTemplate } from "@/lib/ai/build-nano-banana-prompt";
-import { formatPromptJson } from "@/lib/utils/prompt-json";
 import { cn } from "@/lib/utils";
 
 type CoreBrandDnaKey =
@@ -130,7 +127,6 @@ function SectionCard({
 
 export function BrainViewer({ brandDna }: { brandDna: BrandDna }) {
   const hasProduction = Boolean(brandDna.productionRules);
-  const hasNano = Boolean(brandDna.nanoBananaPro);
   const hasReferenceInsights =
     Array.isArray(brandDna.referenceInsights) &&
     brandDna.referenceInsights.length > 0;
@@ -190,8 +186,7 @@ export function BrainViewer({ brandDna }: { brandDna: BrandDna }) {
               Regras de produção gráfica
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Espaçamento, respiros, tipografia e hierarquia — obrigatórios em
-              toda arte
+              Espaçamento, respiros, tipografia e hierarquia — referência para toda arte
             </p>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
@@ -206,81 +201,6 @@ export function BrainViewer({ brandDna }: { brandDna: BrandDna }) {
             ))}
           </div>
         </section>
-      )}
-
-      {hasNano && brandDna.nanoBananaPro && (
-        <section className="space-y-4">
-          <div>
-            <h2 className="text-lg font-medium tracking-heading">
-              Nano Banana Pro
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              JSON para Nano Banana: <strong className="font-medium text-foreground/80">render</strong> vai para a cena;{" "}
-              <strong className="font-medium text-foreground/80">applySilently</strong> são regras que não devem virar texto na arte
-            </p>
-          </div>
-
-          <SectionCard
-            title="Superfícies de trabalho"
-            type="list"
-            value={brandDna.nanoBananaPro.workSurfaces}
-            fullWidth
-          />
-
-          <div className="surface-panel space-y-2 p-5">
-            <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-              Fórmula de prompt
-            </h3>
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              {brandDna.nanoBananaPro.sixComponentFormula}
-            </p>
-          </div>
-
-          <SectionCard
-            title="Constraints obrigatórias"
-            type="list"
-            value={brandDna.nanoBananaPro.mandatoryConstraints}
-            fullWidth
-          />
-
-          <div className="space-y-4">
-            <h3 className="text-sm font-medium text-foreground">
-              Templates de prompt
-            </h3>
-            {brandDna.nanoBananaPro.promptTemplates.map((template) => {
-              const runtimeJson = JSON.parse(
-                buildNanoBananaPromptFromTemplate(template, brandDna)
-              ) as Record<string, unknown>;
-              return (
-                <div
-                  key={template.name}
-                  className="surface-panel space-y-3 p-5"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium">{template.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {template.workSurface} · {template.aspectRatio} · payload NB Pro
-                      </p>
-                    </div>
-                    <CopyButton
-                      text={formatPromptJson(runtimeJson)}
-                    />
-                  </div>
-                  <JsonCodeViewer value={runtimeJson} />
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      {!hasProduction && (
-        <p className="text-sm text-muted-foreground">
-          Este Creative Brain foi gerado antes da atualização de regras de
-          produção. Use &quot;Reprocessar&quot; para incluir layout, tipografia e
-          prompts Nano Banana Pro.
-        </p>
       )}
     </div>
   );

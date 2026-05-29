@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:docs.nanobananaapi.ai)"
+      "WebFetch(domain:docs.nanobananaapi.ai)",
+      "Bash(npx tsc:*)",
+      "Bash(npx supabase:*)"
     ]
   }
 }

@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import type { OnboardingFormValues } from "@/lib/schemas/client";
+import type { OnboardingFormValues, ClientPhoto } from "@/lib/schemas/client";
 import { isSchemaMissingError, schemaNotReadyError } from "@/lib/errors/database";
 import type { OnboardingAnswers } from "@/types";
 
@@ -24,17 +24,26 @@ export async function getOnboardingAnswers(
   return data;
 }
 
+export type ParsedOnboardingAnswers = Partial<OnboardingFormValues> & {
+  clientPhotos: ClientPhoto[];
+};
+
 export function parseOnboardingAnswers(
   record: OnboardingAnswers | null
-): Partial<OnboardingFormValues> {
-  if (!record?.answers || typeof record.answers !== "object") return {};
-  const raw = record.answers as Partial<OnboardingFormValues>;
+): ParsedOnboardingAnswers {
+  if (!record?.answers || typeof record.answers !== "object") {
+    return { brandColors: [], fontStyles: "", clientPhotos: [] };
+  }
+  const raw = record.answers as Partial<OnboardingFormValues> & {
+    clientPhotos?: ClientPhoto[];
+  };
   return {
     ...raw,
     brandColors: Array.isArray(raw.brandColors) ? raw.brandColors : [],
     fontStyles: raw.fontStyles ?? "",
     logoUrl: raw.logoUrl,
     logoStoragePath: raw.logoStoragePath,
+    clientPhotos: Array.isArray(raw.clientPhotos) ? raw.clientPhotos : [],
   };
 }
 

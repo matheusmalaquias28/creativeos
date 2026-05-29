@@ -11,11 +11,12 @@ import {
   saveOnboardingDraft,
   type OnboardingActionState,
 } from "@/actions/onboarding";
-import { onboardingSchema, type OnboardingFormValues } from "@/lib/schemas/client";
+import { onboardingSchema, type OnboardingFormValues, type ClientPhoto } from "@/lib/schemas/client";
 import { splitFontStyles } from "@/lib/utils/font-styles";
 import { BrandColorPicker } from "@/components/clients/brand-color-picker";
 import { FontStyleSelector } from "@/components/clients/font-style-selector";
 import { LogoUploadField } from "@/components/clients/logo-upload-field";
+import { ClientPhotosField } from "@/components/clients/client-photos-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,7 +25,7 @@ import { Separator } from "@/components/ui/separator";
 
 type OnboardingFormProps = {
   clientId: string;
-  defaultValues: Partial<OnboardingFormValues>;
+  defaultValues: Partial<OnboardingFormValues> & { clientPhotos?: ClientPhoto[] };
   completedAt: string | null;
 };
 
@@ -104,6 +105,9 @@ export function OnboardingForm({
   const savedFont = splitFontStyles(defaultValues.fontStyles);
   const [fontPresets, setFontPresets] = useState<string[]>(savedFont.presetIds);
   const [fontNotes, setFontNotes] = useState(savedFont.notes);
+  const [clientPhotos, setClientPhotos] = useState(
+    defaultValues.clientPhotos ?? []
+  );
 
   const form = useForm<OnboardingFormValues>({
     resolver: zodResolver(onboardingSchema),
@@ -239,6 +243,12 @@ export function OnboardingForm({
               logoStoragePath: path,
             });
           }}
+        />
+
+        <ClientPhotosField
+          clientId={clientId}
+          photos={clientPhotos}
+          onChange={(photos) => setClientPhotos(photos)}
         />
       </section>
 

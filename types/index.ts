@@ -3,10 +3,6 @@ export type {
   BrandDna,
   CreativeBrain,
   CreativeBrainStatus,
-  NanoBananaProConfig,
-  NanoBananaPromptJson,
-  NanoBananaPromptTemplate,
-  NanoBananaScene,
   ProductionRules,
   ReferenceInsight,
 } from "./creative-brain";
