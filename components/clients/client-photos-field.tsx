@@ -3,7 +3,7 @@
 import { useTransition } from "react";
 import { ImageIcon, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { uploadClientPhotoAction, removeClientPhotoAction } from "@/actions/onboarding";
+import { uploadClientPhotoAction, deleteClientPhotoAction } from "@/actions/client-photos";
 import { ImageDropzone } from "@/components/ui/image-dropzone";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 const MAX_PHOTOS = 5;
 const ACCEPT = "image/jpeg,image/png,image/webp";
 
-type Photo = { url: string; storagePath: string };
+type Photo = { id: string; public_url: string; storage_path: string };
 
 type ClientPhotosFieldProps = {
   clientId: string;
@@ -46,14 +46,14 @@ export function ClientPhotosField({
     }
   };
 
-  const handleRemove = (storagePath: string) => {
+  const handleRemove = (id: string) => {
     startTransition(async () => {
-      const result = await removeClientPhotoAction(clientId, storagePath);
+      const result = await deleteClientPhotoAction(clientId, id);
       if (result.error) {
         toast.error(result.error);
         return;
       }
-      onChange(photos.filter((p) => p.storagePath !== storagePath));
+      onChange(photos.filter((p) => p.id !== id));
       toast.success("Foto removida");
     });
   };
@@ -71,12 +71,12 @@ export function ClientPhotosField({
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
           {photos.map((photo) => (
             <div
-              key={photo.storagePath}
+              key={photo.id}
               className="group relative aspect-square overflow-hidden rounded-lg border border-border/50 bg-card/30"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={photo.url}
+                src={photo.public_url}
                 alt="Foto do cliente"
                 className="size-full object-cover"
                 loading="lazy"
@@ -88,7 +88,7 @@ export function ClientPhotosField({
                   size="icon-xs"
                   variant="destructive"
                   disabled={isPending}
-                  onClick={() => handleRemove(photo.storagePath)}
+                  onClick={() => handleRemove(photo.id)}
                   aria-label="Remover foto"
                 >
                   <Trash2 className="size-3" />

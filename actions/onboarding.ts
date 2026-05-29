@@ -2,13 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { onboardingSchema, type OnboardingFormValues, type ClientPhoto } from "@/lib/schemas/client";
+import { onboardingSchema, type OnboardingFormValues } from "@/lib/schemas/client";
 import { getOwnedClient } from "@/lib/auth/verify-client";
 import { buildLogoStoragePath } from "@/lib/utils/logo-filename";
 import { isAllowedLogoFile, isSvgLogoFile } from "@/lib/utils/logo-file";
 import { isOnboardingComplete } from "@/services/onboarding";
 
-type StoredAnswers = Partial<OnboardingFormValues> & { clientPhotos?: ClientPhoto[] };
+type StoredAnswers = Partial<OnboardingFormValues>;
 
 export type OnboardingActionState = {
   error?: string;
@@ -76,7 +76,6 @@ async function mergeWithExistingAnswers(
     ...incoming,
     logoUrl: incoming.logoUrl ?? existing.logoUrl,
     logoStoragePath: incoming.logoStoragePath ?? existing.logoStoragePath,
-    clientPhotos: existing.clientPhotos,
   };
 }
 
@@ -247,100 +246,6 @@ export async function uploadClientLogoAction(
   return { success: true, logoUrl, logoStoragePath: storagePath };
 }
 
-const PHOTO_MAX_SIZE = 2 * 1024 * 1024;
-const PHOTO_MAX_COUNT = 5;
-
-export async function uploadClientPhotoAction(
-  clientId: string,
-  formData: FormData
-): Promise<{ error?: string; photo?: { url: string; storagePath: string } }> {
-  const owned = await getOwnedClient(clientId);
-  if (!owned) return { error: "Cliente não encontrado" };
-
-  const file = formData.get("photo");
-  if (!(file instanceof File) || file.size === 0) {
-    return { error: "Selecione um arquivo" };
-  }
-  if (!isAllowedLogoFile(file)) {
-    return { error: "Use PNG, JPG ou WebP" };
-  }
-  if (file.size > PHOTO_MAX_SIZE) {
-    return { error: "Foto muito grande (máx. 10MB)" };
-  }
-
-  const supabase = await createClient();
-  const { data: existing } = await supabase
-    .from("onboarding_answers")
-    .select("answers")
-    .eq("client_id", clientId)
-    .maybeSingle();
-
-  const prevAnswers =
-    existing?.answers && typeof existing.answers === "object"
-      ? (existing.answers as StoredAnswers)
-      : {};
-
-  const currentPhotos = Array.isArray(prevAnswers.clientPhotos)
-    ? prevAnswers.clientPhotos
-    : [];
-
-  if (currentPhotos.length >= PHOTO_MAX_COUNT) {
-    return { error: `Máximo de ${PHOTO_MAX_COUNT} fotos por cliente` };
-  }
-
-  const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
-  const storagePath = `${owned.userId}/${clientId}/photos/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-
-  const { error: uploadError } = await supabase.storage
-    .from("client-photos")
-    .upload(storagePath, file, { upsert: false, contentType: file.type });
-
-  if (uploadError) return { error: `Falha no upload: ${uploadError.message}` };
-
-  const url = `${baseUrl}/storage/v1/object/public/client-photos/${storagePath}`;
-  const photo = { url, storagePath };
-  const merged = {
-    ...prevAnswers,
-    clientPhotos: [...currentPhotos, photo],
-  };
-
-  await persistAnswers(clientId, merged);
-  revalidatePath(`/clients/${clientId}/references`);
-
-  return { photo };
-}
-
-export async function removeClientPhotoAction(
-  clientId: string,
-  storagePath: string
-): Promise<{ error?: string; success?: boolean }> {
-  const owned = await getOwnedClient(clientId);
-  if (!owned) return { error: "Cliente não encontrado" };
-
-  const supabase = await createClient();
-  const { data: existing } = await supabase
-    .from("onboarding_answers")
-    .select("answers")
-    .eq("client_id", clientId)
-    .maybeSingle();
-
-  const prevAnswers =
-    existing?.answers && typeof existing.answers === "object"
-      ? (existing.answers as StoredAnswers)
-      : {};
-
-  await supabase.storage.from("client-photos").remove([storagePath]);
-
-  const filtered = (prevAnswers.clientPhotos ?? []).filter(
-    (p) => p.storagePath !== storagePath
-  );
-  await persistAnswers(clientId, { ...prevAnswers, clientPhotos: filtered });
-  revalidatePath(`/clients/${clientId}/references`);
-  revalidatePath(`/clients/${clientId}/onboarding`);
-
-  return { success: true };
-}
 
 export async function removeClientLogoAction(
   clientId: string

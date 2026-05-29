@@ -19,6 +19,7 @@ import {
   getOnboardingAnswers,
   parseOnboardingAnswers,
 } from "@/services/onboarding";
+import { getClientPhotos } from "@/services/client-photos";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -36,7 +37,10 @@ export default async function OnboardingPage({ params }: PageProps) {
   const client = await getClientById(id, user.id);
   if (!client) notFound();
 
-  const onboarding = await getOnboardingAnswers(id);
+  const [onboarding, clientPhotos] = await Promise.all([
+    getOnboardingAnswers(id),
+    getClientPhotos(id),
+  ]);
   const answers = parseOnboardingAnswers(onboarding);
 
   return (
@@ -56,7 +60,7 @@ export default async function OnboardingPage({ params }: PageProps) {
           <SurfaceContent>
             <OnboardingForm
               clientId={id}
-              defaultValues={answers}
+              defaultValues={{ ...answers, clientPhotos }}
               completedAt={onboarding?.completed_at ?? null}
             />
           </SurfaceContent>

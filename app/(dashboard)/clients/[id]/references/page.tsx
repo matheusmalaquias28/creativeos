@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { layout } from "@/lib/design/tokens";
 import { createClient } from "@/lib/supabase/server";
 import { getClientById, getClientReferences } from "@/services/clients";
-import { getOnboardingAnswers, parseOnboardingAnswers } from "@/services/onboarding";
+import { getClientPhotos } from "@/services/client-photos";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -35,13 +35,10 @@ export default async function ReferencesPage({ params }: PageProps) {
   const client = await getClientById(id, user.id);
   if (!client) notFound();
 
-  const [references, onboarding] = await Promise.all([
+  const [references, clientPhotos] = await Promise.all([
     getClientReferences(id),
-    getOnboardingAnswers(id),
+    getClientPhotos(id),
   ]);
-
-  const answers = parseOnboardingAnswers(onboarding);
-  const clientPhotos = answers.clientPhotos ?? [];
 
   return (
     <DashboardShell

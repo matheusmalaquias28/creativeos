@@ -29,6 +29,8 @@ import {
   parseOnboardingAnswers,
   isOnboardingComplete,
 } from "@/services/onboarding";
+import { getClientPhotos } from "@/services/client-photos";
+import { ClientPhotosPanel } from "@/components/clients/client-photos-panel";
 import type { BrandDna } from "@/types";
 
 type PageProps = {
@@ -47,16 +49,17 @@ export default async function ClientDetailPage({ params }: PageProps) {
   const client = await getClientById(id, user.id);
   if (!client) notFound();
 
-  const [references, creativeBrain, onboarding] = await Promise.all([
+  const [references, creativeBrain, onboarding, clientPhotos] = await Promise.all([
     getClientReferences(id),
     getLatestCreativeBrain(id),
     getOnboardingAnswers(id),
+    getClientPhotos(id),
   ]);
 
-  const onboardingComplete = isOnboardingComplete(
-    parseOnboardingAnswers(onboarding)
-  );
+  const parsedOnboarding = parseOnboardingAnswers(onboarding);
+  const onboardingComplete = isOnboardingComplete(parsedOnboarding);
   const onboardingDone = Boolean(onboarding?.completed_at);
+  const logoUrl = parsedOnboarding.logoUrl ?? null;
   const brandDna = creativeBrain?.brand_dna as BrandDna | undefined;
   const hasBrandDna = Boolean(brandDna);
 
@@ -189,6 +192,20 @@ export default async function ClientDetailPage({ params }: PageProps) {
             </div>
           </section>
         )}
+
+        <section className="space-y-5">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-medium tracking-heading">
+                Fotos do cliente
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Imagens de produto, espaço e contexto da marca
+              </p>
+            </div>
+          </div>
+          <ClientPhotosPanel clientId={id} photos={clientPhotos} logoUrl={logoUrl} />
+        </section>
 
         <Link
           href="/clients"

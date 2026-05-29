@@ -5,6 +5,7 @@ export type SpacesPromptInput = {
   subheadline?: string;
   cta?: string;
   extraContext?: string;
+  logoReference?: string;
 };
 
 export function buildSpacesPrompt(
@@ -48,6 +49,12 @@ export function buildSpacesPrompt(
     if (copy.subheadline) copyParts.push(`Subheadline: ${copy.subheadline}`);
     if (copy.cta) copyParts.push(`CTA: ${copy.cta}`);
     parts.push(`Utilize a copy — ${copyParts.join("  ")}.`);
+  }
+
+  if (copy.logoReference) {
+    parts.push(
+      `Adicione a logo da marca usando ${copy.logoReference} posicionada conforme a identidade visual.`
+    );
   }
 
   if (copy.extraContext?.trim()) {

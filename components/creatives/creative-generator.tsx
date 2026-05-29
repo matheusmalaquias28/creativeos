@@ -12,9 +12,13 @@ import type { BrandDna } from "@/types";
 
 type CreativeGeneratorProps = {
   brandDna: BrandDna;
+  clientName?: string;
 };
 
-export function CreativeGenerator({ brandDna }: CreativeGeneratorProps) {
+export function CreativeGenerator({ brandDna, clientName }: CreativeGeneratorProps) {
+  const logoReference = clientName
+    ? `@logo(${clientName.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, "") || "cliente"})`
+    : undefined;
   const [headline, setHeadline] = useState("");
   const [subheadline, setSubheadline] = useState("");
   const [cta, setCta] = useState("");
@@ -28,6 +32,7 @@ export function CreativeGenerator({ brandDna }: CreativeGeneratorProps) {
       subheadline: subheadline.trim() || undefined,
       cta: cta.trim() || undefined,
       extraContext: extraContext.trim() || undefined,
+      logoReference,
     });
     setPrompt(result);
     setCopied(false);
@@ -124,7 +129,7 @@ export function CreativeGenerator({ brandDna }: CreativeGeneratorProps) {
             className="resize-none font-mono text-sm"
           />
           <p className="text-xs text-muted-foreground">
-            Cole no Magnific Spaces e adicione suas referências manualmente.
+            Cole no Magnific Spaces.{logoReference ? ` O prompt já inclui ${logoReference} — certifique-se de ter enviado a logo no Spaces.` : " Adicione suas referências manualmente."}
           </p>
         </div>
       )}

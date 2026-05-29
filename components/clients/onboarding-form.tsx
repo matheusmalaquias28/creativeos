@@ -11,7 +11,8 @@ import {
   saveOnboardingDraft,
   type OnboardingActionState,
 } from "@/actions/onboarding";
-import { onboardingSchema, type OnboardingFormValues, type ClientPhoto } from "@/lib/schemas/client";
+import { onboardingSchema, type OnboardingFormValues } from "@/lib/schemas/client";
+import type { ClientPhotoRow } from "@/services/client-photos";
 import { splitFontStyles } from "@/lib/utils/font-styles";
 import { BrandColorPicker } from "@/components/clients/brand-color-picker";
 import { FontStyleSelector } from "@/components/clients/font-style-selector";
@@ -25,7 +26,7 @@ import { Separator } from "@/components/ui/separator";
 
 type OnboardingFormProps = {
   clientId: string;
-  defaultValues: Partial<OnboardingFormValues> & { clientPhotos?: ClientPhoto[] };
+  defaultValues: Partial<OnboardingFormValues> & { clientPhotos?: ClientPhotoRow[] };
   completedAt: string | null;
 };
 

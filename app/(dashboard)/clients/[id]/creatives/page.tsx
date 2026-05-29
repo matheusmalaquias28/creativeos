@@ -63,7 +63,7 @@ export default async function ClientCreativesPage({ params }: PageProps) {
             </Link>
           </div>
         ) : (
-          <CreativeGenerator brandDna={brandDna} />
+          <CreativeGenerator brandDna={brandDna} clientName={client.name} />
         )}
       </div>
     </DashboardShell>
