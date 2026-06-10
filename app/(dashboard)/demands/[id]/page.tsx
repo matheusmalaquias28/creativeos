@@ -1,0 +1,185 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { AlertTriangle, ArrowLeft, ExternalLink } from "lucide-react";
+import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
+import {
+  Surface,
+  SurfaceContent,
+  SurfaceDescription,
+  SurfaceHeader,
+  SurfaceTitle,
+} from "@/components/ui/surface";
+import { cn } from "@/lib/utils";
+import { layout } from "@/lib/design/tokens";
+import { getDemandById } from "@/services/demands";
+
+type PageProps = {
+  params: Promise<{ id: string }>;
+};
+
+function formatDate(value: string | null): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("pt-BR");
+}
+
+function InfoRow({ label, value }: { label: string; value: string | null | undefined }) {
+  if (!value) return null;
+  return (
+    <div className="grid gap-1 sm:grid-cols-[140px_1fr]">
+      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
+      <dd className="text-sm text-foreground">{value}</dd>
+    </div>
+  );
+}
+
+function ExternalHref({ href, label }: { href: string; label: string }) {
+  if (!href) return null;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={cn(
+        buttonVariants({ variant: "outline", size: "sm" }),
+        "inline-flex gap-2"
+      )}
+    >
+      {label}
+      <ExternalLink className="size-3.5" />
+    </a>
+  );
+}
+
+export default async function DemandDetailPage({ params }: PageProps) {
+  const { id } = await params;
+  const demand = await getDemandById(id);
+  if (!demand) notFound();
+
+  const title = demand.briefing.titulo || demand.client_name_external;
+
+  return (
+    <DashboardShell title={title} description="Detalhes da demanda recebida via Make">
+      <div className={layout.sectionGap}>
+        <div className="flex flex-wrap items-center gap-2">
+          {demand.client_not_found ? (
+            <Badge
+              variant="outline"
+              className="gap-1 border-amber-500/40 text-amber-700 dark:text-amber-400"
+            >
+              <AlertTriangle className="size-3.5" />
+              Cliente não encontrado no CreativeOS
+            </Badge>
+          ) : (
+            demand.client_id && (
+              <Link
+                href={`/clients/${demand.client_id}`}
+                className={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
+              >
+                Ver cliente: {demand.client_name}
+              </Link>
+            )
+          )}
+          {demand.status && <Badge variant="outline">{demand.status}</Badge>}
+        </div>
+
+        <Surface variant="elevated">
+          <SurfaceHeader>
+            <SurfaceTitle>Informações gerais</SurfaceTitle>
+            <SurfaceDescription>
+              Dados enviados pelos gestores na plataforma externa
+            </SurfaceDescription>
+          </SurfaceHeader>
+          <SurfaceContent>
+            <dl className="space-y-3">
+              <InfoRow label="Cliente (externo)" value={demand.client_name_external} />
+              <InfoRow label="Tipo" value={demand.tipo} />
+              <InfoRow label="Squad" value={demand.squad} />
+              <InfoRow label="Gestor" value={demand.gestor} />
+              <InfoRow label="Webdesigner" value={demand.webdesigner} />
+              <InfoRow label="Solicitante" value={demand.solicitante} />
+              <InfoRow
+                label="Criada em"
+                value={formatDate(demand.external_created_at ?? demand.created_at)}
+              />
+              <InfoRow label="Prazo" value={formatDate(demand.due_date)} />
+            </dl>
+          </SurfaceContent>
+        </Surface>
+
+        <Surface variant="elevated">
+          <SurfaceHeader>
+            <SurfaceTitle>Briefing</SurfaceTitle>
+          </SurfaceHeader>
+          <SurfaceContent className="space-y-4">
+            <dl className="space-y-3">
+              <InfoRow label="Título" value={demand.briefing.titulo} />
+              <InfoRow label="Instagram" value={demand.briefing.instagramCliente} />
+              <InfoRow label="Tipo de arte" value={demand.briefing.tipo} />
+              <InfoRow
+                label="Quantidade"
+                value={
+                  demand.briefing.quantidadeArtes != null
+                    ? String(demand.briefing.quantidadeArtes)
+                    : null
+                }
+              />
+            </dl>
+            <div className="flex flex-wrap gap-2">
+              <ExternalHref href={demand.briefing.materiaisEditados} label="Materiais editados" />
+              <ExternalHref href={demand.briefing.driveMateriais} label="Drive de materiais" />
+            </div>
+          </SurfaceContent>
+        </Surface>
+
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-lg font-medium tracking-heading">Artes ({demand.artes.length})</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Headlines e CTAs definidos no briefing
+            </p>
+          </div>
+
+          <div className="grid gap-4">
+            {demand.artes.map((arte, index) => (
+              <Surface key={`${arte.headline}-${index}`} variant="elevated">
+                <SurfaceHeader>
+                  <SurfaceTitle className="text-base">Arte {index + 1}</SurfaceTitle>
+                  {arte.cta && <SurfaceDescription>CTA: {arte.cta}</SurfaceDescription>}
+                </SurfaceHeader>
+                <SurfaceContent className="space-y-2">
+                  {arte.headline && (
+                    <p className="text-sm font-medium text-foreground">{arte.headline}</p>
+                  )}
+                  {arte.subheadline && (
+                    <p className="text-sm text-muted-foreground">{arte.subheadline}</p>
+                  )}
+                  {arte.informacoesExtras && (
+                    <p className="text-xs text-muted-foreground">{arte.informacoesExtras}</p>
+                  )}
+                  {arte.linkReferencias && (
+                    <ExternalHref href={arte.linkReferencias} label="Referências" />
+                  )}
+                </SurfaceContent>
+              </Surface>
+            ))}
+          </div>
+        </section>
+
+        <Link
+          href="/demands"
+          className={cn(
+            buttonVariants({ variant: "ghost", size: "sm" }),
+            "inline-flex gap-2 text-muted-foreground"
+          )}
+        >
+          <ArrowLeft className="size-4" />
+          Voltar para demandas
+        </Link>
+      </div>
+    </DashboardShell>
+  );
+}

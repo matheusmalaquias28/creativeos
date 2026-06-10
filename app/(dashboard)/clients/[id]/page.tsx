@@ -31,6 +31,8 @@ import {
 } from "@/services/onboarding";
 import { getClientPhotos } from "@/services/client-photos";
 import { ClientPhotosPanel } from "@/components/clients/client-photos-panel";
+import { ClientDemandsPanel } from "@/components/demands/client-demands-panel";
+import { getDemandsByClientId } from "@/services/demands";
 import type { BrandDna } from "@/types";
 
 type PageProps = {
@@ -49,11 +51,12 @@ export default async function ClientDetailPage({ params }: PageProps) {
   const client = await getClientById(id, user.id);
   if (!client) notFound();
 
-  const [references, creativeBrain, onboarding, clientPhotos] = await Promise.all([
+  const [references, creativeBrain, onboarding, clientPhotos, demands] = await Promise.all([
     getClientReferences(id),
     getLatestCreativeBrain(id),
     getOnboardingAnswers(id),
     getClientPhotos(id),
+    getDemandsByClientId(id),
   ]);
 
   const parsedOnboarding = parseOnboardingAnswers(onboarding);
@@ -83,6 +86,51 @@ export default async function ClientDetailPage({ params }: PageProps) {
             </Badge>
           )}
         </div>
+
+        {(parsedOnboarding.logoQualityOk === false ||
+          parsedOnboarding.hasClientImages === false ||
+          parsedOnboarding.hasSite === false ||
+          parsedOnboarding.hasGMB === false) && (
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground">
+              Oportunidades identificadas
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {parsedOnboarding.logoQualityOk === false && (
+                <Badge
+                  variant="outline"
+                  className="border-amber-500/30 text-amber-600 dark:text-amber-400"
+                >
+                  Vetorização de logo
+                </Badge>
+              )}
+              {parsedOnboarding.hasClientImages === false && (
+                <Badge
+                  variant="outline"
+                  className="border-amber-500/30 text-amber-600 dark:text-amber-400"
+                >
+                  Ensaio de IA
+                </Badge>
+              )}
+              {parsedOnboarding.hasSite === false && (
+                <Badge
+                  variant="outline"
+                  className="border-amber-500/30 text-amber-600 dark:text-amber-400"
+                >
+                  LP ou Site Institucional
+                </Badge>
+              )}
+              {parsedOnboarding.hasGMB === false && (
+                <Badge
+                  variant="outline"
+                  className="border-amber-500/30 text-amber-600 dark:text-amber-400"
+                >
+                  Google Meu Negócio
+                </Badge>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <WorkflowModuleCard
@@ -192,6 +240,8 @@ export default async function ClientDetailPage({ params }: PageProps) {
             </div>
           </section>
         )}
+
+        <ClientDemandsPanel clientId={id} demands={demands} />
 
         <section className="space-y-5">
           <div className="flex items-end justify-between gap-4">

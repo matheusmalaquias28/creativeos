@@ -16,3 +16,9 @@ export type {
   User,
   UserRole,
 } from "./database";
+export type {
+  CreativeDemand,
+  CreativeDemandListItem,
+  DemandArte,
+  DemandBriefing,
+} from "./demand";

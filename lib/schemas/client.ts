@@ -16,23 +16,36 @@ export const createClientSchema = z.object({
 export type CreateClientFormValues = z.infer<typeof createClientSchema>;
 
 export const onboardingSchema = z.object({
-  businessDescription: z.string().min(10, "Descreva o negócio com mais detalhes"),
-  targetAudience: z.string().min(5, "Descreva o público-alvo"),
-  brandPersonality: z.string().min(3, "Descreva a personalidade da marca"),
-  competitors: z.string().optional(),
-  goals: z.string().min(5, "Descreva os objetivos da campanha"),
-  toneOfVoice: z.string().min(3, "Defina o tom de voz"),
-  visualInspirations: z.string().optional(),
-  avoidStyles: z.string().optional(),
-  brandColors: z
-    .array(hexColorSchema)
-    .min(1, "Selecione ao menos 1 cor da identidade visual")
-    .max(5, "Máximo de 5 cores"),
-  fontStyles: z
-    .string()
-    .min(3, "Defina os estilos tipográficos da marca"),
+  // [1] Paleta de cores
+  brandColors: z.array(hexColorSchema).max(5, "Máximo de 5 cores").optional(),
+  fontStyles: z.string().optional(),
   logoUrl: z.string().optional(),
   logoStoragePath: z.string().optional(),
+  // [2] Logo com qualidade?
+  logoQualityOk: z.boolean().nullable().optional(),
+  // [3] Imagens do cliente?
+  hasClientImages: z.boolean().nullable().optional(),
+  // [4] Referências (até 5)
+  references: z.array(z.string()).max(5).optional(),
+  // [5] Site?
+  hasSite: z.boolean().nullable().optional(),
+  siteUrl: z.string().optional(),
+  // [6] Instagram
+  instagramHandle: z.string().optional(),
+  // [7] Google Meu Negócio?
+  hasGMB: z.boolean().nullable().optional(),
+  // [8] ID Visual?
+  hasVisualIdentity: z.boolean().nullable().optional(),
+  visualIdentityOption: z.enum(["sell", "name_only"]).nullable().optional(),
+  // Briefing Criativo — todos opcionais
+  businessDescription: z.string().optional(),
+  targetAudience: z.string().optional(),
+  brandPersonality: z.string().optional(),
+  competitors: z.string().optional(),
+  goals: z.string().optional(),
+  toneOfVoice: z.string().optional(),
+  visualInspirations: z.string().optional(),
+  avoidStyles: z.string().optional(),
 });
 
 

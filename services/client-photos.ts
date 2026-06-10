@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { isSchemaMissingError, schemaNotReadyError } from "@/lib/errors/database";
 
@@ -7,7 +8,7 @@ export type ClientPhotoRow = {
   storage_path: string;
 };
 
-export async function getClientPhotos(clientId: string): Promise<ClientPhotoRow[]> {
+export const getClientPhotos = cache(async function getClientPhotos(clientId: string): Promise<ClientPhotoRow[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("client_photos")
@@ -21,4 +22,4 @@ export async function getClientPhotos(clientId: string): Promise<ClientPhotoRow[
   }
 
   return data ?? [];
-}
+});

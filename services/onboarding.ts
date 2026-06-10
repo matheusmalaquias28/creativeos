@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { OnboardingFormValues } from "@/lib/schemas/client";
 import { isSchemaMissingError, schemaNotReadyError } from "@/lib/errors/database";
@@ -10,9 +11,9 @@ function throwIfDbError(error: { message: string }) {
   throw new Error(error.message);
 }
 
-export async function getOnboardingAnswers(
+export const getOnboardingAnswers = cache(async (
   clientId: string
-): Promise<OnboardingAnswers | null> {
+): Promise<OnboardingAnswers | null> => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("onboarding_answers")
@@ -22,7 +23,7 @@ export async function getOnboardingAnswers(
 
   if (error) throwIfDbError(error);
   return data;
-}
+});
 
 export type ParsedOnboardingAnswers = Partial<OnboardingFormValues>;
 
@@ -39,6 +40,7 @@ export function parseOnboardingAnswers(
     fontStyles: raw.fontStyles ?? "",
     logoUrl: raw.logoUrl,
     logoStoragePath: raw.logoStoragePath,
+    references: Array.isArray(raw.references) ? raw.references : [],
   };
 }
 

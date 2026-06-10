@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Brain, LayoutDashboard, LogOut, Users } from "lucide-react";
+import { Brain, ClipboardList, LayoutDashboard, LogOut, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { signOut } from "@/actions/auth";
@@ -11,6 +11,7 @@ import { layout } from "@/lib/design/tokens";
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/clients", label: "Clientes", icon: Users },
+  { href: "/demands", label: "Demandas", icon: ClipboardList },
 ];
 
 type AppSidebarProps = {

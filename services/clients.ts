@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { isSchemaMissingError, schemaNotReadyError } from "@/lib/errors/database";
 import type { Client, ClientListItem, ClientReference, CreativeBrain } from "@/types";
@@ -15,11 +16,11 @@ function extractLogoUrl(answers: unknown): string | null {
   return typeof logoUrl === "string" && logoUrl.trim() ? logoUrl : null;
 }
 
-export async function getClientsForUser(userId: string): Promise<ClientListItem[]> {
+export const getClientsForUser = cache(async (userId: string): Promise<ClientListItem[]> => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("clients")
-    .select("*, onboarding_answers(answers)")
+    .select("id, user_id, name, slug, status, company_info, created_at, updated_at, onboarding_answers(answers)")
     .eq("user_id", userId)
     .order("updated_at", { ascending: false });
 
@@ -40,12 +41,12 @@ export async function getClientsForUser(userId: string): Promise<ClientListItem[
       logoUrl: extractLogoUrl(answers ?? null),
     };
   });
-}
+});
 
-export async function getClientById(
+export const getClientById = cache(async (
   clientId: string,
   userId: string
-): Promise<Client | null> {
+): Promise<Client | null> => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("clients")
@@ -56,11 +57,11 @@ export async function getClientById(
 
   if (error) return null;
   return data;
-}
+});
 
-export async function getClientReferences(
+export const getClientReferences = cache(async (
   clientId: string
-): Promise<ClientReference[]> {
+): Promise<ClientReference[]> => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("client_references")
@@ -70,11 +71,11 @@ export async function getClientReferences(
 
   if (error) throwIfDbError(error);
   return data ?? [];
-}
+});
 
-export async function getLatestCreativeBrain(
+export const getLatestCreativeBrain = cache(async (
   clientId: string
-): Promise<CreativeBrain | null> {
+): Promise<CreativeBrain | null> => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("creative_brains")
@@ -86,7 +87,7 @@ export async function getLatestCreativeBrain(
 
   if (error) return null;
   return data as CreativeBrain | null;
-}
+});
 
 export async function getDashboardStats(userId: string) {
   const supabase = await createClient();
@@ -97,15 +98,22 @@ export async function getDashboardStats(userId: string) {
     .eq("user_id", userId);
 
   const clientList = data ?? [];
-  const brains = clientList.flatMap(
-    (c) => (c.creative_brains as { id: string; status: string }[] ?? [])
-  );
+  let totalClients = 0;
+  let activeClients = 0;
+  let onboardingClients = 0;
+  let creativeBrains = 0;
+  let approvedBrains = 0;
 
-  return {
-    totalClients: clientList.length,
-    activeClients: clientList.filter((c) => c.status === "active").length,
-    onboardingClients: clientList.filter((c) => c.status === "onboarding").length,
-    creativeBrains: brains.length,
-    approvedBrains: brains.filter((b) => b.status === "approved").length,
-  };
+  for (const c of clientList) {
+    totalClients++;
+    if (c.status === "active") activeClients++;
+    if (c.status === "onboarding") onboardingClients++;
+    const brains = c.creative_brains as { status: string }[] ?? [];
+    for (const b of brains) {
+      creativeBrains++;
+      if (b.status === "approved") approvedBrains++;
+    }
+  }
+
+  return { totalClients, activeClients, onboardingClients, creativeBrains, approvedBrains };
 }

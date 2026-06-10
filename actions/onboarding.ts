@@ -6,7 +6,6 @@ import { onboardingSchema, type OnboardingFormValues } from "@/lib/schemas/clien
 import { getOwnedClient } from "@/lib/auth/verify-client";
 import { buildLogoStoragePath } from "@/lib/utils/logo-filename";
 import { isAllowedLogoFile, isSvgLogoFile } from "@/lib/utils/logo-file";
-import { isOnboardingComplete } from "@/services/onboarding";
 
 type StoredAnswers = Partial<OnboardingFormValues>;
 
@@ -35,11 +34,40 @@ function parseBrandColors(raw: FormDataEntryValue | null): string[] {
   }
 }
 
+function parseBooleanField(raw: FormDataEntryValue | null): boolean | null {
+  if (!raw || typeof raw !== "string" || raw === "") return null;
+  return raw === "true";
+}
+
+function parseJsonStringArray(raw: FormDataEntryValue | null): string[] {
+  if (!raw || typeof raw !== "string") return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
 function parseFormToAnswers(formData: FormData): Partial<OnboardingFormValues> {
   const logoUrl = String(formData.get("logoUrl") ?? "").trim();
   const logoStoragePath = String(formData.get("logoStoragePath") ?? "").trim();
+  const viOption = String(formData.get("visualIdentityOption") ?? "").trim();
 
   return {
+    brandColors: parseBrandColors(formData.get("brandColors")),
+    fontStyles: String(formData.get("fontStyles") ?? ""),
+    logoUrl: logoUrl || undefined,
+    logoStoragePath: logoStoragePath || undefined,
+    logoQualityOk: parseBooleanField(formData.get("logoQualityOk")),
+    hasClientImages: parseBooleanField(formData.get("hasClientImages")),
+    references: parseJsonStringArray(formData.get("references")),
+    hasSite: parseBooleanField(formData.get("hasSite")),
+    siteUrl: String(formData.get("siteUrl") ?? "").trim() || undefined,
+    instagramHandle: String(formData.get("instagramHandle") ?? "").trim() || undefined,
+    hasGMB: parseBooleanField(formData.get("hasGMB")),
+    hasVisualIdentity: parseBooleanField(formData.get("hasVisualIdentity")),
+    visualIdentityOption: (viOption as "sell" | "name_only") || undefined,
     businessDescription: String(formData.get("businessDescription") ?? ""),
     targetAudience: String(formData.get("targetAudience") ?? ""),
     brandPersonality: String(formData.get("brandPersonality") ?? ""),
@@ -48,10 +76,6 @@ function parseFormToAnswers(formData: FormData): Partial<OnboardingFormValues> {
     toneOfVoice: String(formData.get("toneOfVoice") ?? ""),
     visualInspirations: String(formData.get("visualInspirations") ?? "") || undefined,
     avoidStyles: String(formData.get("avoidStyles") ?? "") || undefined,
-    brandColors: parseBrandColors(formData.get("brandColors")),
-    fontStyles: String(formData.get("fontStyles") ?? ""),
-    logoUrl: logoUrl || undefined,
-    logoStoragePath: logoStoragePath || undefined,
   };
 }
 
@@ -71,9 +95,16 @@ async function mergeWithExistingAnswers(
       ? (data.answers as StoredAnswers)
       : {};
 
+  // Strip `undefined` values before spreading — spreading `undefined` would
+  // overwrite existing DB values for fields absent from FormData (e.g. siteUrl
+  // when the site input is conditionally hidden).
+  const defined = Object.fromEntries(
+    Object.entries(incoming).filter(([, v]) => v !== undefined)
+  ) as StoredAnswers;
+
   return {
     ...existing,
-    ...incoming,
+    ...defined,
     logoUrl: incoming.logoUrl ?? existing.logoUrl,
     logoStoragePath: incoming.logoStoragePath ?? existing.logoStoragePath,
   };
@@ -158,12 +189,8 @@ export async function completeOnboardingAction(
 
   if (!parsed.success) {
     return {
-      error: parsed.error.issues[0]?.message ?? "Preencha todos os campos obrigatórios",
+      error: parsed.error.issues[0]?.message ?? "Erro ao validar os dados",
     };
-  }
-
-  if (!isOnboardingComplete(parsed.data)) {
-    return { error: "Complete todos os campos obrigatórios antes de finalizar" };
   }
 
   const now = new Date().toISOString();

@@ -162,6 +162,73 @@ export type Database = {
           },
         ];
       };
+      creative_demands: {
+        Row: {
+          id: string;
+          external_id: string;
+          client_id: string | null;
+          client_name_external: string;
+          client_not_found: boolean;
+          tipo: string | null;
+          squad: string | null;
+          gestor: string | null;
+          webdesigner: string | null;
+          solicitante: string | null;
+          briefing: Json;
+          artes: Json;
+          status: string | null;
+          due_date: string | null;
+          external_created_at: string | null;
+          raw_payload: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          external_id: string;
+          client_id?: string | null;
+          client_name_external: string;
+          client_not_found?: boolean;
+          tipo?: string | null;
+          squad?: string | null;
+          gestor?: string | null;
+          webdesigner?: string | null;
+          solicitante?: string | null;
+          briefing?: Json;
+          artes?: Json;
+          status?: string | null;
+          due_date?: string | null;
+          external_created_at?: string | null;
+          raw_payload?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<{
+          client_id: string | null;
+          client_name_external: string;
+          client_not_found: boolean;
+          tipo: string | null;
+          squad: string | null;
+          gestor: string | null;
+          webdesigner: string | null;
+          solicitante: string | null;
+          briefing: Json;
+          artes: Json;
+          status: string | null;
+          due_date: string | null;
+          external_created_at: string | null;
+          raw_payload: Json;
+        }>;
+        Relationships: [
+          {
+            foreignKeyName: "creative_demands_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       creative_brains: {
         Row: {
           id: string;

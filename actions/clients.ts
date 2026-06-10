@@ -42,19 +42,17 @@ export async function createClientAction(
 
   const baseSlug = slugify(parsed.data.name);
   let slug = baseSlug;
+
+  const { data: existingSlugs } = await supabase
+    .from("clients")
+    .select("slug")
+    .eq("user_id", user.id)
+    .like("slug", `${baseSlug}%`);
+
+  const slugSet = new Set(existingSlugs?.map((r) => r.slug) ?? []);
   let suffix = 1;
-
-  while (true) {
-    const { data: existing } = await supabase
-      .from("clients")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("slug", slug)
-      .maybeSingle();
-
-    if (!existing) break;
-    slug = `${baseSlug}-${suffix}`;
-    suffix += 1;
+  while (slugSet.has(slug)) {
+    slug = `${baseSlug}-${suffix++}`;
   }
 
   const { data, error } = await supabase
