@@ -9,6 +9,7 @@ export type {
 export type {
   Client,
   ClientListItem,
+  ClientPhoto,
   ClientReference,
   ClientStatus,
   Database,

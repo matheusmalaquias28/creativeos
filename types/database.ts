@@ -43,6 +43,18 @@ export type ClientReference = {
   created_at: string;
 };
 
+export type ClientPhoto = {
+  id: string;
+  client_id: string;
+  storage_path: string;
+  public_url: string;
+  file_name: string;
+  mime_type: string | null;
+  file_size: number | null;
+  sort_order: number;
+  created_at: string;
+};
+
 export type OnboardingAnswers = {
   id: string;
   client_id: string;
@@ -104,6 +116,23 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "client_references_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      client_photos: {
+        Row: ClientPhoto;
+        Insert: Omit<ClientPhoto, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Omit<ClientPhoto, "id">>;
+        Relationships: [
+          {
+            foreignKeyName: "client_photos_client_id_fkey";
             columns: ["client_id"];
             isOneToOne: false;
             referencedRelation: "clients";

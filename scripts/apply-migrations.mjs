@@ -88,13 +88,77 @@ async function main() {
   console.log("\n📦 Creative OS — aplicando schema no Supabase\n");
 
   try {
+    // Garante tabela de controle de migrations
+    await sql.unsafe(`
+      create table if not exists public.schema_migrations (
+        version text primary key,
+        applied_at timestamptz not null default now()
+      );
+    `);
+
+    const [{ count: trackCount }] =
+      await sql`select count(*)::int as count from public.schema_migrations`;
+
+    // Bootstrap: se a tabela de controle está vazia mas o schema principal já existe,
+    // registra todas as migrations como aplicadas (evita re-rodar o schema inicial).
+    if (trackCount === 0) {
+      const [{ exists: schemaExists }] = await sql`
+        select exists (
+          select 1 from information_schema.tables
+          where table_schema = 'public' and table_name = 'clients'
+        ) as exists
+      `;
+      if (schemaExists) {
+        console.log("   ℹ️  Detectado schema existente — registrando migrations já aplicadas...");
+        // Determina quais estão aplicadas verificando objetos concretos no banco
+        const checks = {
+          "20250527000000_initial_schema.sql": sql`select exists (select 1 from pg_type where typname = 'client_status') as e`,
+          "20250527100000_user_roles.sql": sql`select exists (select 1 from pg_type where typname = 'user_role') as e`,
+          "20250527200000_users_insert_policy.sql": sql`select exists (select 1 from pg_policies where policyname = 'Users can insert own profile') as e`,
+          "20250527300000_client_logos_bucket.sql": sql`select exists (select 1 from storage.buckets where id = 'client-logos') as e`,
+          "20250528100000_generated_creatives.sql": sql`select exists (select 1 from information_schema.tables where table_name = 'generated_creatives') as e`,
+          "20250528200000_client_photos_bucket.sql": sql`select exists (select 1 from storage.buckets where id = 'client-photos') as e`,
+          "20250528300000_client_photos_table.sql": sql`select exists (select 1 from information_schema.tables where table_name = 'client_photos') as e`,
+          "20250529100000_creative_brain_failed_status.sql": sql`select exists (select 1 from pg_enum where enumlabel = 'failed') as e`,
+          "20250609100000_creative_demands.sql": sql`select exists (select 1 from information_schema.tables where table_name = 'creative_demands') as e`,
+        };
+        for (const [file, query] of Object.entries(checks)) {
+          const [{ e }] = await query;
+          if (e && files.includes(file)) {
+            await sql`insert into public.schema_migrations (version) values (${file}) on conflict do nothing`;
+            console.log(`      ✓ ${file}`);
+          }
+        }
+      }
+    }
+
+    const applied = await sql`select version from public.schema_migrations`;
+    const appliedSet = new Set(applied.map((r) => r.version));
+
+    let count = 0;
     for (const file of files) {
+      if (appliedSet.has(file)) {
+        console.log(`   ✓ ${file} (já aplicada)`);
+        continue;
+      }
       const path = join(migrationsDir, file);
       const content = readFileSync(path, "utf8");
       console.log(`   → ${file}`);
       await sql.unsafe(content);
+      await sql`insert into public.schema_migrations (version) values (${file})`;
+      count++;
     }
-    console.log("\n✅ Schema aplicado com sucesso!");
+
+    // Recarrega schema cache do PostgREST após mudanças
+    if (count > 0) {
+      await sql.unsafe("NOTIFY pgrst, 'reload schema'");
+    }
+
+    console.log(
+      count > 0
+        ? `\n✅ ${count} migration(s) aplicada(s) com sucesso!`
+        : "\n✅ Banco já atualizado — nenhuma migration pendente."
+    );
     console.log("   Rode: npm run seed:admin (se ainda não criou o admin)\n");
   } finally {
     await sql.end({ timeout: 5 });
