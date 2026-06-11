@@ -206,6 +206,11 @@ export type Database = {
           briefing: Json;
           artes: Json;
           status: string | null;
+          is_archived: boolean;
+          is_new: boolean;
+          started_at: string | null;
+          completed_at: string | null;
+          elapsed_seconds: number | null;
           due_date: string | null;
           external_created_at: string | null;
           raw_payload: Json;
@@ -226,6 +231,11 @@ export type Database = {
           briefing?: Json;
           artes?: Json;
           status?: string | null;
+          is_archived?: boolean;
+          is_new?: boolean;
+          started_at?: string | null;
+          completed_at?: string | null;
+          elapsed_seconds?: number | null;
           due_date?: string | null;
           external_created_at?: string | null;
           raw_payload?: Json;
@@ -244,9 +254,15 @@ export type Database = {
           briefing: Json;
           artes: Json;
           status: string | null;
+          is_archived: boolean;
+          is_new: boolean;
+          started_at: string | null;
+          completed_at: string | null;
+          elapsed_seconds: number | null;
           due_date: string | null;
           external_created_at: string | null;
           raw_payload: Json;
+          updated_at: string;
         }>;
         Relationships: [
           {

@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { isSchemaMissingError, schemaNotReadyError } from "@/lib/errors/database";
+import { getCurrentUserProfile } from "@/services/users";
 import type { Client, ClientListItem, ClientReference, CreativeBrain } from "@/types";
 
 function throwIfDbError(error: { message: string }) {
@@ -42,6 +43,16 @@ export const getClientsForUser = cache(async (userId: string): Promise<ClientLis
     };
   });
 });
+
+export async function getClientOptionsForCurrentUser(): Promise<
+  { id: string; name: string }[]
+> {
+  const profile = await getCurrentUserProfile();
+  if (!profile) return [];
+
+  const clients = await getClientsForUser(profile.id);
+  return clients.map(({ id, name }) => ({ id, name }));
+}
 
 export const getClientById = cache(async (
   clientId: string,

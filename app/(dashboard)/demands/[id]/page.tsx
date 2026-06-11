@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AlertTriangle, ArrowLeft, ExternalLink } from "lucide-react";
+import { ArrowLeft, ExternalLink } from "lucide-react";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
-import { Badge } from "@/components/ui/badge";
+import { DemandDetailStatusBar } from "@/components/demands/demand-detail-status-bar";
+import { CopyArteTextsButton } from "@/components/demands/copy-arte-texts-button";
+import { DemandClientLinker } from "@/components/demands/demand-client-linker";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Surface,
@@ -14,6 +16,8 @@ import {
 import { cn } from "@/lib/utils";
 import { layout } from "@/lib/design/tokens";
 import { getDemandById } from "@/services/demands";
+import { getClientOptionsForCurrentUser } from "@/services/clients";
+import { markDemandAsReadAction } from "@/actions/demands";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -56,35 +60,50 @@ function ExternalHref({ href, label }: { href: string; label: string }) {
 
 export default async function DemandDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const demand = await getDemandById(id);
+  const [demand, clients] = await Promise.all([
+    getDemandById(id),
+    getClientOptionsForCurrentUser(),
+  ]);
   if (!demand) notFound();
+
+  // Marca como lida ao abrir
+  if (demand.is_new) {
+    await markDemandAsReadAction(id);
+  }
 
   const title = demand.briefing.titulo || demand.client_name_external;
 
   return (
     <DashboardShell title={title} description="Detalhes da demanda recebida via Make">
       <div className={layout.sectionGap}>
-        <div className="flex flex-wrap items-center gap-2">
-          {demand.client_not_found ? (
-            <Badge
-              variant="outline"
-              className="gap-1 border-amber-500/40 text-amber-700 dark:text-amber-400"
-            >
-              <AlertTriangle className="size-3.5" />
-              Cliente não encontrado no CreativeOS
-            </Badge>
-          ) : (
-            demand.client_id && (
-              <Link
-                href={`/clients/${demand.client_id}`}
-                className={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
-              >
-                Ver cliente: {demand.client_name}
-              </Link>
-            )
-          )}
-          {demand.status && <Badge variant="outline">{demand.status}</Badge>}
+        {/* Status + timer */}
+        <div className="flex flex-wrap items-center gap-3">
+          <DemandDetailStatusBar
+            demandId={demand.id}
+            status={demand.status}
+            startedAt={demand.started_at}
+            elapsedSeconds={demand.elapsed_seconds}
+          />
         </div>
+
+        <Surface variant="elevated">
+          <SurfaceHeader>
+            <SurfaceTitle>Cliente</SurfaceTitle>
+            <SurfaceDescription>
+              Vínculo automático pelo nome externo ou seleção manual
+            </SurfaceDescription>
+          </SurfaceHeader>
+          <SurfaceContent>
+            <DemandClientLinker
+              demandId={demand.id}
+              currentClientId={demand.client_id}
+              currentClientName={demand.client_name}
+              externalClientName={demand.client_name_external}
+              clientNotFound={demand.client_not_found}
+              clients={clients}
+            />
+          </SurfaceContent>
+        </Surface>
 
         <Surface variant="elevated">
           <SurfaceHeader>
@@ -146,9 +165,14 @@ export default async function DemandDetailPage({ params }: PageProps) {
           <div className="grid gap-4">
             {demand.artes.map((arte, index) => (
               <Surface key={`${arte.headline}-${index}`} variant="elevated">
-                <SurfaceHeader>
-                  <SurfaceTitle className="text-base">Arte {index + 1}</SurfaceTitle>
-                  {arte.cta && <SurfaceDescription>CTA: {arte.cta}</SurfaceDescription>}
+                <SurfaceHeader className="flex-row items-start justify-between gap-3 space-y-0">
+                  <div className="min-w-0 space-y-1">
+                    <SurfaceTitle className="text-base">Arte {index + 1}</SurfaceTitle>
+                    {arte.cta && (
+                      <SurfaceDescription>CTA: {arte.cta}</SurfaceDescription>
+                    )}
+                  </div>
+                  <CopyArteTextsButton arte={arte} arteIndex={index} />
                 </SurfaceHeader>
                 <SurfaceContent className="space-y-2">
                   {arte.headline && (

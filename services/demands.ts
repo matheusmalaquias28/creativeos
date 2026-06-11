@@ -1,7 +1,25 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { isSchemaMissingError, schemaNotReadyError } from "@/lib/errors/database";
-import type { CreativeDemand, CreativeDemandListItem, DemandArte, DemandBriefing } from "@/types/demand";
+import type {
+  CreativeDemand,
+  CreativeDemandListItem,
+  DemandArte,
+  DemandBriefing,
+  DemandMonthStat,
+} from "@/types/demand";
+
+export async function getNewDemandsCount(): Promise<number> {
+  const supabase = await createClient();
+  const { count, error } = await supabase
+    .from("creative_demands")
+    .select("id", { count: "exact", head: true })
+    .eq("is_new", true)
+    .eq("is_archived", false);
+
+  if (error) return 0;
+  return count ?? 0;
+}
 
 function throwIfDbError(error: { message: string }) {
   if (isSchemaMissingError(error.message)) {
@@ -62,6 +80,11 @@ function mapDemandRow(
     briefing: parseBriefing(row.briefing),
     artes: parseArtes(row.artes),
     status: row.status ? String(row.status) : null,
+    is_archived: Boolean(row.is_archived),
+    is_new: Boolean(row.is_new),
+    started_at: row.started_at ? String(row.started_at) : null,
+    completed_at: row.completed_at ? String(row.completed_at) : null,
+    elapsed_seconds: typeof row.elapsed_seconds === "number" ? row.elapsed_seconds : null,
     due_date: row.due_date ? String(row.due_date) : null,
     external_created_at: row.external_created_at
       ? String(row.external_created_at)
@@ -72,21 +95,24 @@ function mapDemandRow(
   };
 }
 
-export const getDemandsForUser = cache(async (): Promise<CreativeDemandListItem[]> => {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("creative_demands")
-    .select("*, clients(name)")
-    .order("created_at", { ascending: false });
+export const getDemandsForUser = cache(
+  async (archived = false): Promise<CreativeDemandListItem[]> => {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("creative_demands")
+      .select("*, clients(name)")
+      .eq("is_archived", archived)
+      .order("created_at", { ascending: false });
 
-  if (error) throwIfDbError(error);
+    if (error) throwIfDbError(error);
 
-  return (data ?? []).map((row) => {
-    const clients = row.clients as { name?: string } | { name?: string }[] | null;
-    const clientName = Array.isArray(clients) ? clients[0]?.name : clients?.name;
-    return mapDemandRow(row as Record<string, unknown>, clientName);
-  });
-});
+    return (data ?? []).map((row) => {
+      const clients = row.clients as { name?: string } | { name?: string }[] | null;
+      const clientName = Array.isArray(clients) ? clients[0]?.name : clients?.name;
+      return mapDemandRow(row as Record<string, unknown>, clientName);
+    });
+  }
+);
 
 export const getDemandsByClientId = cache(
   async (clientId: string): Promise<CreativeDemand[]> => {
@@ -117,6 +143,68 @@ export const getDemandById = cache(async (demandId: string): Promise<CreativeDem
   const clientName = Array.isArray(clients) ? clients[0]?.name : clients?.name;
   return mapDemandRow(data as Record<string, unknown>, clientName);
 });
+
+export async function getDemandsMonthlyStats(): Promise<DemandMonthStat[]> {
+  const supabase = await createClient();
+
+  // Busca demands dos últimos 12 meses com campos necessários
+  const since = new Date();
+  since.setMonth(since.getMonth() - 11);
+  since.setDate(1);
+  since.setHours(0, 0, 0, 0);
+
+  const { data, error } = await supabase
+    .from("creative_demands")
+    .select("created_at, artes, elapsed_seconds")
+    .gte("created_at", since.toISOString())
+    .order("created_at", { ascending: true });
+
+  if (error) return [];
+
+  const byMonth: Record<
+    string,
+    { demands: number; artes: number; elapsedList: number[] }
+  > = {};
+
+  for (const row of data ?? []) {
+    const d = new Date(row.created_at);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    if (!byMonth[key]) {
+      byMonth[key] = { demands: 0, artes: 0, elapsedList: [] };
+    }
+    byMonth[key].demands += 1;
+    const artes = Array.isArray(row.artes) ? row.artes.length : 0;
+    byMonth[key].artes += artes;
+    if (typeof row.elapsed_seconds === "number") {
+      byMonth[key].elapsedList.push(row.elapsed_seconds);
+    }
+  }
+
+  return Object.entries(byMonth).map(([month, stats]) => {
+    const [year, m] = month.split("-");
+    const date = new Date(Number(year), Number(m) - 1);
+    const label = date.toLocaleDateString("pt-BR", {
+      month: "short",
+      year: "2-digit",
+    });
+    const avgElapsed =
+      stats.elapsedList.length > 0
+        ? Math.round(
+            stats.elapsedList.reduce((a, b) => a + b, 0) /
+              stats.elapsedList.length /
+              60
+          )
+        : null;
+
+    return {
+      month,
+      label,
+      total_demands: stats.demands,
+      total_artes: stats.artes,
+      avg_elapsed_minutes: avgElapsed,
+    };
+  });
+}
 
 export async function getUnmatchedDemandsCount(): Promise<number> {
   const supabase = await createClient();

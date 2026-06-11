@@ -15,6 +15,16 @@ export type DemandBriefing = {
   driveMateriais: string;
 };
 
+export const DEMAND_STATUSES = [
+  "Nova",
+  "Fazendo",
+  "Revisão",
+  "Concluída",
+  "Cancelada",
+] as const;
+
+export type DemandStatus = (typeof DEMAND_STATUSES)[number];
+
 export type CreativeDemand = {
   id: string;
   external_id: string;
@@ -29,6 +39,11 @@ export type CreativeDemand = {
   briefing: DemandBriefing;
   artes: DemandArte[];
   status: string | null;
+  is_archived: boolean;
+  is_new: boolean;
+  started_at: string | null;
+  completed_at: string | null;
+  elapsed_seconds: number | null;
   due_date: string | null;
   external_created_at: string | null;
   created_at: string;
@@ -37,4 +52,12 @@ export type CreativeDemand = {
 
 export type CreativeDemandListItem = CreativeDemand & {
   client_name?: string | null;
+};
+
+export type DemandMonthStat = {
+  month: string;
+  label: string;
+  total_demands: number;
+  total_artes: number;
+  avg_elapsed_minutes: number | null;
 };

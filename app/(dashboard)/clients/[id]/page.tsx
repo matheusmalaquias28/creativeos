@@ -6,8 +6,10 @@ import {
   ClipboardList,
   Sparkles,
   ArrowLeft,
+  Layers,
 } from "lucide-react";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { StatCard } from "@/components/dashboard/stat-card";
 import { WorkflowModuleCard } from "@/components/clients/workflow-module-card";
 import { GenerateBrainButton } from "@/components/creative-brain/generate-brain-button";
 import {
@@ -65,6 +67,11 @@ export default async function ClientDetailPage({ params }: PageProps) {
   const logoUrl = parsedOnboarding.logoUrl ?? null;
   const brandDna = creativeBrain?.brand_dna as BrandDna | undefined;
   const hasBrandDna = Boolean(brandDna);
+  const totalDemands = demands.length;
+  const totalArtes = demands.reduce(
+    (acc, demand) => acc + demand.artes.length,
+    0
+  );
 
   return (
     <DashboardShell
@@ -131,6 +138,21 @@ export default async function ClientDetailPage({ params }: PageProps) {
             </div>
           </div>
         )}
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <StatCard
+            title="Demandas"
+            value={totalDemands}
+            description="Briefings recebidos via Make"
+            icon={ClipboardList}
+          />
+          <StatCard
+            title="Artes"
+            value={totalArtes}
+            description="Peças solicitadas em todas as demandas"
+            icon={Layers}
+          />
+        </div>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <WorkflowModuleCard

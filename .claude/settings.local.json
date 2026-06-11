@@ -7,7 +7,11 @@
       "Bash(claude mcp:*)",
       "mcp__supabase__apply_migration",
       "Bash(node -e \"const p = require\\('./package.json'\\); console.log\\(JSON.stringify\\(p.scripts, null, 2\\)\\)\")",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(npm install:*)",
+      "Bash(grep \"\"version\"\":*)",
+      "Bash(node:*)",
+      "Bash(npx next:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

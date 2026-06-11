@@ -17,9 +17,10 @@ const navItems = [
 type AppSidebarProps = {
   userName?: string | null;
   userEmail?: string | null;
+  newDemandsCount?: number;
 };
 
-export function AppSidebar({ userName, userEmail }: AppSidebarProps) {
+export function AppSidebar({ userName, userEmail, newDemandsCount = 0 }: AppSidebarProps) {
   const pathname = usePathname();
 
   return (
@@ -71,6 +72,11 @@ export function AppSidebar({ userName, userEmail }: AppSidebarProps) {
                 strokeWidth={1.75}
               />
               {item.label}
+              {item.href === "/demands" && newDemandsCount > 0 && (
+                <span className="ml-auto flex size-5 items-center justify-center rounded-full bg-indigo-500 text-[0.6rem] font-bold text-white">
+                  {newDemandsCount > 99 ? "99+" : newDemandsCount}
+                </span>
+              )}
             </Link>
           );
         })}
