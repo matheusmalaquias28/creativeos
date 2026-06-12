@@ -12,10 +12,7 @@ import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { WorkflowModuleCard } from "@/components/clients/workflow-module-card";
 import { GenerateBrainButton } from "@/components/creative-brain/generate-brain-button";
-import {
-  ClientStatusIndicator,
-  getClientStatusConfig,
-} from "@/components/clients/client-status-indicator";
+import { ClientStatusSelect } from "@/components/clients/client-status-select";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -85,10 +82,7 @@ export default async function ClientDetailPage({ params }: PageProps) {
     >
       <div className={layout.sectionGap}>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline" className="gap-2 pr-2.5">
-            <ClientStatusIndicator status={client.status} size="sm" />
-            {getClientStatusConfig(client.status).label}
-          </Badge>
+          <ClientStatusSelect clientId={id} currentStatus={client.status} />
           {onboardingDone && (
             <Badge variant="secondary">Onboarding concluído</Badge>
           )}

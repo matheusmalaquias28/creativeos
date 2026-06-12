@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -21,19 +21,60 @@ const statusVariant: Record<
   archived: "outline",
 };
 
+const statusCardStyle: Record<
+  ClientListItem["status"],
+  { border: string; bg: string; accent: string }
+> = {
+  active: {
+    border: "border-emerald-500/30 hover:border-emerald-500/55",
+    bg: "bg-emerald-500/[0.03] group-hover:bg-emerald-500/[0.06]",
+    accent: "from-emerald-500/30 to-transparent",
+  },
+  onboarding: {
+    border: "border-sky-500/30 hover:border-sky-500/55",
+    bg: "bg-sky-500/[0.03] group-hover:bg-sky-500/[0.06]",
+    accent: "from-sky-500/30 to-transparent",
+  },
+  draft: {
+    border: "border-amber-500/30 hover:border-amber-500/55",
+    bg: "bg-amber-500/[0.03] group-hover:bg-amber-500/[0.06]",
+    accent: "from-amber-500/30 to-transparent",
+  },
+  archived: {
+    border: "border-zinc-500/25 hover:border-zinc-500/45",
+    bg: "opacity-75 group-hover:opacity-100 group-hover:bg-zinc-500/[0.04]",
+    accent: "from-zinc-500/25 to-transparent",
+  },
+};
+
+function daysInBase(createdAt: string): number {
+  return Math.floor(
+    (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24)
+  );
+}
+
 export function ClientCard({ client }: { client: ClientListItem }) {
   const initials = clientInitials(client.name);
   const status = getClientStatusConfig(client.status);
   const opportunityFlags = client.opportunityFlags ?? [];
+  const cardStyle = statusCardStyle[client.status];
+  const days = client.status === "onboarding" ? daysInBase(client.created_at) : null;
 
   return (
     <Link href={`/clients/${client.id}`} className="group block">
       <article
         className={cn(
-          "surface-panel hover-lift flex flex-col gap-5 p-6",
-          "group-hover:bg-card/55"
+          "hover-lift relative flex flex-col gap-5 overflow-hidden rounded-[var(--radius-xl)] border p-6 backdrop-blur-[12px] transition-colors",
+          cardStyle.border,
+          cardStyle.bg
         )}
       >
+        <div
+          className={cn(
+            "pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r",
+            cardStyle.accent
+          )}
+        />
         <div className="flex items-start gap-4">
           <div className="relative shrink-0">
             <Avatar
@@ -87,14 +128,25 @@ export function ClientCard({ client }: { client: ClientListItem }) {
         )}
 
         <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>
-            Atualizado{" "}
-            {new Date(client.updated_at).toLocaleDateString("pt-BR", {
-              day: "2-digit",
-              month: "short",
-              year: "numeric",
-            })}
-          </span>
+          {days !== null ? (
+            <span className="flex items-center gap-1.5 text-sky-400/90">
+              <Clock className="size-3.5 shrink-0" strokeWidth={1.75} />
+              {days === 0
+                ? "Entrou hoje"
+                : days === 1
+                  ? "1 dia na base"
+                  : `${days} dias na base`}
+            </span>
+          ) : (
+            <span>
+              Atualizado{" "}
+              {new Date(client.updated_at).toLocaleDateString("pt-BR", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              })}
+            </span>
+          )}
           <ArrowUpRight
             className="size-4 text-muted-foreground/50 transition-premium group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-foreground/70"
             strokeWidth={1.5}

@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createClientSchema } from "@/lib/schemas/client";
 import { slugify } from "@/lib/utils/slug";
 import { ensureUserProfile } from "@/services/users";
+import type { ClientStatus } from "@/types";
 
 export type ClientActionState = {
   error?: string;
@@ -97,6 +98,31 @@ export async function createClientAction(
     clientId: created.clientId,
     clientName: created.clientName,
   };
+}
+
+export async function updateClientStatusAction(
+  clientId: string,
+  status: ClientStatus
+): Promise<{ error?: string; success?: boolean }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { error: "Não autenticado" };
+
+  const { error } = await supabase
+    .from("clients")
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq("id", clientId)
+    .eq("user_id", user.id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/clients");
+  revalidatePath(`/clients/${clientId}`);
+
+  return { success: true };
 }
 
 export async function createClientFromDemandAction(

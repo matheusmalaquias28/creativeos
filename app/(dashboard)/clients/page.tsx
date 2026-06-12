@@ -1,5 +1,5 @@
 import { DashboardShell } from "@/components/layout/dashboard-shell";
-import { ClientCard } from "@/components/clients/client-card";
+import { ClientList } from "@/components/clients/client-list";
 import { CreateClientForm } from "@/components/clients/create-client-form";
 import {
   Surface,
@@ -47,11 +47,7 @@ export default async function ClientsPage() {
             </p>
           </Surface>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {clients.map((client) => (
-              <ClientCard key={client.id} client={client} />
-            ))}
-          </div>
+          <ClientList clients={clients} />
         )}
       </div>
     </DashboardShell>

@@ -11,7 +11,10 @@
       "Bash(npm install:*)",
       "Bash(grep \"\"version\"\":*)",
       "Bash(node:*)",
-      "Bash(npx next:*)"
+      "Bash(npx next:*)",
+      "Bash(dir /s /b \"C:\\\\Users\\\\Matheus\\\\Desktop\\\\Outside\\\\CreativeOS\\\\creativeos\\\\src\")",
+      "Bash(findstr /i \"client\\\\|customer\\\\|cliente\")",
+      "Bash(dir C:\\\\Users\\\\Matheus\\\\Desktop\\\\Outside\\\\CreativeOS\\\\creativeos\\\\src *)"
     ]
   },
   "enableAllProjectMcpServers": true,

@@ -12,18 +12,18 @@ const statusConfig: Record<
   },
   onboarding: {
     label: "Onboarding",
-    title: "Pendente de onboarding",
-    dotClass: "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.4)]",
+    title: "Em processo de onboarding",
+    dotClass: "bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.4)]",
   },
   draft: {
-    label: "Pendente",
-    title: "Aguardando início do onboarding",
+    label: "Falta Materiais",
+    title: "Aguardando materiais do cliente",
     dotClass: "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.4)]",
   },
   archived: {
-    label: "Inativo",
-    title: "Cliente inativo",
-    dotClass: "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]",
+    label: "Finalizado",
+    title: "Contrato encerrado",
+    dotClass: "bg-zinc-400 shadow-[0_0_8px_rgba(161,161,170,0.35)]",
   },
 };
 

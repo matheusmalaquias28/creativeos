@@ -1,6 +1,7 @@
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { PageHeader } from "@/components/layout/page-header";
 import { DemandsRealtimeListener } from "@/components/demands/demands-realtime-listener";
+import { ClientsRealtimeListener } from "@/components/clients/clients-realtime-listener";
 import { getCurrentUserProfile } from "@/services/users";
 import { getNewDemandsCount } from "@/services/demands";
 import { layout } from "@/lib/design/tokens";
@@ -25,6 +26,7 @@ export async function DashboardShell({
   return (
     <div className="flex min-h-screen">
       <DemandsRealtimeListener />
+      <ClientsRealtimeListener />
       <AppSidebar
         userName={profile?.full_name}
         userEmail={profile?.email}
