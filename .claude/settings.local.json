@@ -14,7 +14,8 @@
       "Bash(npx next:*)",
       "Bash(dir /s /b \"C:\\\\Users\\\\Matheus\\\\Desktop\\\\Outside\\\\CreativeOS\\\\creativeos\\\\src\")",
       "Bash(findstr /i \"client\\\\|customer\\\\|cliente\")",
-      "Bash(dir C:\\\\Users\\\\Matheus\\\\Desktop\\\\Outside\\\\CreativeOS\\\\creativeos\\\\src *)"
+      "Bash(dir C:\\\\Users\\\\Matheus\\\\Desktop\\\\Outside\\\\CreativeOS\\\\creativeos\\\\src *)",
+      "WebFetch(domain:localhost)"
     ]
   },
   "enableAllProjectMcpServers": true,

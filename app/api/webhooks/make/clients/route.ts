@@ -66,10 +66,12 @@ export async function POST(request: Request) {
     });
   }
 
-  // Need a user_id — use the first user in the system (single-tenant)
+  // Need a user_id — use the admin user in the system (single-tenant)
   const { data: users } = await supabase
     .from("users")
     .select("id")
+    .eq("role", "admin")
+    .order("created_at", { ascending: true })
     .limit(1)
     .single();
 
