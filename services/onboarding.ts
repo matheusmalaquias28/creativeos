@@ -2,7 +2,30 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { OnboardingFormValues } from "@/lib/schemas/client";
 import { isSchemaMissingError, schemaNotReadyError } from "@/lib/errors/database";
+import { parseStoredBoolean } from "@/lib/utils/parse-stored-boolean";
 import type { OnboardingAnswers } from "@/types";
+
+const ONBOARDING_BOOLEAN_FIELDS = [
+  "logoQualityOk",
+  "hasClientImages",
+  "hasSite",
+  "hasGMB",
+  "hasVisualIdentity",
+] as const satisfies readonly (keyof OnboardingFormValues)[];
+
+function normalizeOnboardingBooleans(
+  answers: Partial<OnboardingFormValues>
+): Partial<OnboardingFormValues> {
+  const normalized = { ...answers };
+
+  for (const field of ONBOARDING_BOOLEAN_FIELDS) {
+    if (field in answers) {
+      normalized[field] = parseStoredBoolean(answers[field]) as never;
+    }
+  }
+
+  return normalized;
+}
 
 function throwIfDbError(error: { message: string }) {
   if (isSchemaMissingError(error.message)) {
@@ -34,15 +57,17 @@ export function parseOnboardingAnswers(
     return { brandColors: [], fontStyles: "" };
   }
   const raw = record.answers as Partial<OnboardingFormValues>;
-  return {
+  return normalizeOnboardingBooleans({
     ...raw,
     brandColors: Array.isArray(raw.brandColors) ? raw.brandColors : [],
     fontStyles: raw.fontStyles ?? "",
     logoUrl: raw.logoUrl,
     logoStoragePath: raw.logoStoragePath,
     references: Array.isArray(raw.references) ? raw.references : [],
-  };
+  });
 }
+
+export { normalizeOnboardingBooleans };
 
 export function isOnboardingComplete(
   answers: Partial<OnboardingFormValues>

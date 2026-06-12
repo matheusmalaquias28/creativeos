@@ -1,5 +1,6 @@
 import type { BrandDna } from "./creative-brain";
 import type { GeneratedCreative } from "./creative";
+import type { ClientOpportunityId } from "@/lib/clients/opportunities";
 
 export type ClientStatus = "draft" | "onboarding" | "active" | "archived";
 
@@ -26,9 +27,10 @@ export type Client = {
   updated_at: string;
 };
 
-/** Cliente com logo do onboarding para listagens (cards, dashboard). */
+/** Cliente com logo e oportunidades do onboarding para listagens (cards, dashboard). */
 export type ClientListItem = Client & {
   logoUrl?: string | null;
+  opportunityFlags?: ClientOpportunityId[];
 };
 
 export type ClientReference = {

@@ -24,6 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { isNegativeOpportunity, parseStoredBoolean } from "@/lib/utils/parse-stored-boolean";
 
 type OnboardingFormProps = {
   clientId: string;
@@ -94,14 +95,16 @@ function YesNoToggle({
   value: boolean | null | undefined;
   onChange: (v: boolean | null) => void;
 }) {
+  const boolValue = parseStoredBoolean(value);
+
   return (
     <div className="flex gap-2">
       <button
         type="button"
-        onClick={() => onChange(value === true ? null : true)}
+        onClick={() => onChange(boolValue === true ? null : true)}
         className={cn(
           "rounded-lg border px-5 py-2 text-sm font-medium transition-premium",
-          value === true
+          boolValue === true
             ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
             : "border-border bg-card text-muted-foreground hover:border-border/80 hover:text-foreground"
         )}
@@ -110,10 +113,10 @@ function YesNoToggle({
       </button>
       <button
         type="button"
-        onClick={() => onChange(value === false ? null : false)}
+        onClick={() => onChange(boolValue === false ? null : false)}
         className={cn(
           "rounded-lg border px-5 py-2 text-sm font-medium transition-premium",
-          value === false
+          boolValue === false
             ? "border-rose-500/60 bg-rose-500/15 text-rose-600 dark:text-rose-400"
             : "border-border bg-card text-muted-foreground hover:border-border/80 hover:text-foreground"
         )}
@@ -126,7 +129,7 @@ function YesNoToggle({
 
 function OpportunityFlag({ label }: { label: string }) {
   return (
-    <p className="text-xs text-amber-600 dark:text-amber-400">
+    <p className="text-xs text-amber-400">
       <span className="font-medium">Oportunidade:</span> {label}
     </p>
   );
@@ -178,13 +181,13 @@ export function OnboardingForm({
       fontStyles: defaultValues.fontStyles ?? "",
       logoUrl: defaultValues.logoUrl,
       logoStoragePath: defaultValues.logoStoragePath,
-      logoQualityOk: defaultValues.logoQualityOk ?? null,
-      hasClientImages: defaultValues.hasClientImages ?? null,
-      hasSite: defaultValues.hasSite ?? null,
+      logoQualityOk: parseStoredBoolean(defaultValues.logoQualityOk),
+      hasClientImages: parseStoredBoolean(defaultValues.hasClientImages),
+      hasSite: parseStoredBoolean(defaultValues.hasSite),
       siteUrl: defaultValues.siteUrl ?? "",
       instagramHandle: defaultValues.instagramHandle ?? "",
-      hasGMB: defaultValues.hasGMB ?? null,
-      hasVisualIdentity: defaultValues.hasVisualIdentity ?? null,
+      hasGMB: parseStoredBoolean(defaultValues.hasGMB),
+      hasVisualIdentity: parseStoredBoolean(defaultValues.hasVisualIdentity),
       visualIdentityOption: defaultValues.visualIdentityOption ?? null,
     },
     mode: "onChange",
@@ -342,7 +345,7 @@ export function OnboardingForm({
                 />
               )}
             />
-            {logoQualityOk === false && (
+            {isNegativeOpportunity(logoQualityOk) && (
               <OpportunityFlag label="Vetorização de logo necessária" />
             )}
           </div>
@@ -368,7 +371,7 @@ export function OnboardingForm({
                 />
               )}
             />
-            {hasClientImages === false && (
+            {isNegativeOpportunity(hasClientImages) && (
               <OpportunityFlag label="Ensaio de IA" />
             )}
           </div>
@@ -434,7 +437,7 @@ export function OnboardingForm({
               className="border-border/70 bg-background"
             />
           )}
-          {hasSite === false && (
+          {isNegativeOpportunity(hasSite) && (
             <OpportunityFlag label="LP ou Site Institucional" />
           )}
         </div>
@@ -462,7 +465,7 @@ export function OnboardingForm({
               />
             )}
           />
-          {hasGMB === false && (
+          {isNegativeOpportunity(hasGMB) && (
             <OpportunityFlag label="Google Meu Negócio" />
           )}
         </div>

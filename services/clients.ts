@@ -1,8 +1,17 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { isSchemaMissingError, schemaNotReadyError } from "@/lib/errors/database";
+import { getOnboardingAnswers, parseOnboardingAnswers } from "@/services/onboarding";
+import { getClientOpportunityFlags } from "@/lib/clients/opportunities";
 import { getCurrentUserProfile } from "@/services/users";
-import type { Client, ClientListItem, ClientReference, CreativeBrain } from "@/types";
+import type { Client, ClientListItem, ClientReference, CreativeBrain, OnboardingAnswers } from "@/types";
+
+export type ClientVisualAssets = {
+  clientId: string;
+  clientName: string;
+  logoUrl: string | null;
+  references: ClientReference[];
+};
 
 function throwIfDbError(error: { message: string }) {
   if (isSchemaMissingError(error.message)) {
@@ -30,6 +39,12 @@ export const getClientsForUser = cache(async (userId: string): Promise<ClientLis
   return (data ?? []).map((client) => {
     const ob = client.onboarding_answers as { answers?: unknown } | { answers?: unknown }[] | null;
     const answers = Array.isArray(ob) ? ob[0]?.answers : ob?.answers;
+    const parsedOnboarding = parseOnboardingAnswers(
+      answers && typeof answers === "object"
+        ? ({ answers } as OnboardingAnswers)
+        : null
+    );
+
     return {
       id: client.id,
       user_id: client.user_id,
@@ -39,7 +54,8 @@ export const getClientsForUser = cache(async (userId: string): Promise<ClientLis
       company_info: client.company_info,
       created_at: client.created_at,
       updated_at: client.updated_at,
-      logoUrl: extractLogoUrl(answers ?? null),
+      logoUrl: parsedOnboarding.logoUrl ?? extractLogoUrl(answers ?? null),
+      opportunityFlags: getClientOpportunityFlags(parsedOnboarding),
     };
   });
 });
@@ -68,6 +84,28 @@ export const getClientById = cache(async (
 
   if (error) return null;
   return data;
+});
+
+export const getClientVisualAssets = cache(async (
+  clientId: string,
+  userId: string
+): Promise<ClientVisualAssets | null> => {
+  const client = await getClientById(clientId, userId);
+  if (!client) return null;
+
+  const [onboarding, references] = await Promise.all([
+    getOnboardingAnswers(clientId),
+    getClientReferences(clientId),
+  ]);
+
+  const parsed = parseOnboardingAnswers(onboarding);
+
+  return {
+    clientId: client.id,
+    clientName: client.name,
+    logoUrl: parsed.logoUrl ?? null,
+    references,
+  };
 });
 
 export const getClientReferences = cache(async (

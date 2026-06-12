@@ -6,6 +6,7 @@ import {
   ClientStatusIndicator,
   getClientStatusConfig,
 } from "@/components/clients/client-status-indicator";
+import { CLIENT_OPPORTUNITY_LABELS } from "@/lib/clients/opportunities";
 import { cn } from "@/lib/utils";
 import { clientInitials } from "@/lib/utils/client";
 import type { ClientListItem } from "@/types";
@@ -23,6 +24,7 @@ const statusVariant: Record<
 export function ClientCard({ client }: { client: ClientListItem }) {
   const initials = clientInitials(client.name);
   const status = getClientStatusConfig(client.status);
+  const opportunityFlags = client.opportunityFlags ?? [];
 
   return (
     <Link href={`/clients/${client.id}`} className="group block">
@@ -69,6 +71,20 @@ export function ClientCard({ client }: { client: ClientListItem }) {
             </Badge>
           </div>
         </div>
+
+        {opportunityFlags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {opportunityFlags.map((flag) => (
+              <Badge
+                key={flag}
+                variant="outline"
+                className="border-amber-500/40 bg-amber-500/10 text-amber-400"
+              >
+                {CLIENT_OPPORTUNITY_LABELS[flag]}
+              </Badge>
+            ))}
+          </div>
+        )}
 
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>

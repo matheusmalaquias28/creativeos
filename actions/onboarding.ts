@@ -6,6 +6,8 @@ import { onboardingSchema, type OnboardingFormValues } from "@/lib/schemas/clien
 import { getOwnedClient } from "@/lib/auth/verify-client";
 import { buildLogoStoragePath } from "@/lib/utils/logo-filename";
 import { isAllowedLogoFile, isSvgLogoFile } from "@/lib/utils/logo-file";
+import { parseStoredBoolean } from "@/lib/utils/parse-stored-boolean";
+import { normalizeOnboardingBooleans } from "@/services/onboarding";
 
 type StoredAnswers = Partial<OnboardingFormValues>;
 
@@ -35,8 +37,7 @@ function parseBrandColors(raw: FormDataEntryValue | null): string[] {
 }
 
 function parseBooleanField(raw: FormDataEntryValue | null): boolean | null {
-  if (!raw || typeof raw !== "string" || raw === "") return null;
-  return raw === "true";
+  return parseStoredBoolean(raw);
 }
 
 function parseJsonStringArray(raw: FormDataEntryValue | null): string[] {
@@ -83,6 +84,7 @@ async function mergeWithExistingAnswers(
   clientId: string,
   incoming: Partial<OnboardingFormValues>
 ): Promise<StoredAnswers> {
+  const normalizedIncoming = normalizeOnboardingBooleans(incoming);
   const supabase = await createClient();
   const { data } = await supabase
     .from("onboarding_answers")
@@ -99,14 +101,15 @@ async function mergeWithExistingAnswers(
   // overwrite existing DB values for fields absent from FormData (e.g. siteUrl
   // when the site input is conditionally hidden).
   const defined = Object.fromEntries(
-    Object.entries(incoming).filter(([, v]) => v !== undefined)
+    Object.entries(normalizedIncoming).filter(([, v]) => v !== undefined)
   ) as StoredAnswers;
 
   return {
     ...existing,
     ...defined,
-    logoUrl: incoming.logoUrl ?? existing.logoUrl,
-    logoStoragePath: incoming.logoStoragePath ?? existing.logoStoragePath,
+    logoUrl: normalizedIncoming.logoUrl ?? existing.logoUrl,
+    logoStoragePath:
+      normalizedIncoming.logoStoragePath ?? existing.logoStoragePath,
   };
 }
 

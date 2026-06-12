@@ -16,7 +16,6 @@ export function formatArteTexts(arte: DemandArte): string {
   appendLine(lines, "Subheadline", arte.subheadline);
   appendLine(lines, "Informações extras", arte.informacoesExtras);
   appendLine(lines, "CTA", arte.cta);
-  appendLine(lines, "Link de referências", arte.linkReferencias);
 
   return lines.join("\n").trim();
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Inbox } from "lucide-react";
 import { DemandCard } from "@/components/demands/demand-card";
 import {
@@ -12,6 +12,7 @@ import {
   GROUP_HEADER_CLASSES,
   GROUP_DOT_CLASSES,
 } from "@/lib/demands/demand-color";
+import { cn } from "@/lib/utils";
 import type { DemandClientOption } from "@/components/demands/demand-client-linker";
 import type { CreativeDemandListItem, DemandStatus } from "@/types/demand";
 
@@ -23,6 +24,10 @@ type Props = {
 export function DemandsActiveList({ initialDemands, clients }: Props) {
   const [demands, setDemands] = useState(initialDemands);
   const pendingArchiveRef = useRef<CreativeDemandListItem | null>(null);
+
+  useEffect(() => {
+    setDemands(initialDemands);
+  }, [initialDemands]);
 
   const groups = useMemo(() => groupDemands(demands), [demands]);
 
@@ -98,10 +103,10 @@ export function DemandsActiveList({ initialDemands, clients }: Props) {
         <section key={group.key} className="space-y-3">
           <div className="flex items-center gap-2.5">
             <span
-              className={`size-2 shrink-0 rounded-full ${GROUP_DOT_CLASSES[group.key]}`}
+              className={cn("size-2 shrink-0 rounded-full", GROUP_DOT_CLASSES[group.key])}
             />
             <h2
-              className={`text-sm font-semibold tracking-heading ${GROUP_HEADER_CLASSES[group.key]}`}
+              className={cn("text-sm font-semibold tracking-heading", GROUP_HEADER_CLASSES[group.key])}
             >
               {group.label}
             </h2>

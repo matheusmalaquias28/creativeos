@@ -9,6 +9,13 @@ import { linkDemandToClientAction } from "@/actions/demands";
 import { CreateClientFromDemandButton } from "@/components/demands/create-client-from-demand-button";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 export type DemandClientOption = {
@@ -75,28 +82,52 @@ export function DemandClientLinker({
   const canSubmit =
     selectedId.length > 0 && selectedId !== linkedClientId && !isPending;
 
+  const clientSelectPlaceholder = compact
+    ? "Selecionar cliente"
+    : "Selecione um cliente";
+
+  const clientSelectItems = [
+    { value: "", label: clientSelectPlaceholder },
+    ...sortedClients.map((client) => ({
+      value: client.id,
+      label: client.name,
+    })),
+  ];
+
+  function renderClientSelect(triggerClassName?: string) {
+    return (
+      <Select
+        value={selectedId}
+        onValueChange={(value) => setSelectedId(value ?? "")}
+        disabled={isPending}
+        items={clientSelectItems}
+      >
+        <SelectTrigger className={triggerClassName}>
+          <SelectValue placeholder={clientSelectPlaceholder} />
+        </SelectTrigger>
+        <SelectContent>
+          {clientSelectItems.map((item) => (
+            <SelectItem key={item.value || "__placeholder"} value={item.value}>
+              {item.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
+  }
+
   if (compact) {
     return (
       <div className="flex flex-col gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
-        <p className="text-xs text-amber-800 dark:text-amber-300">
+        <p className="text-xs text-amber-400">
           Cliente externo: <span className="font-medium">{externalClientName}</span>
         </p>
         <div className="flex flex-wrap items-center gap-2">
           {sortedClients.length > 0 && (
             <>
-              <select
-                value={selectedId}
-                onChange={(event) => setSelectedId(event.target.value)}
-                disabled={isPending}
-                className="h-8 min-w-0 flex-1 rounded-md border border-border/50 bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-              >
-                <option value="">Selecionar cliente</option>
-                {sortedClients.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.name}
-                  </option>
-                ))}
-              </select>
+              <div className="min-w-0 flex-1">
+                {renderClientSelect("h-8 px-2 text-xs")}
+              </div>
               <Button
                 type="button"
                 size="sm"
@@ -158,19 +189,7 @@ export function DemandClientLinker({
               <span className="text-xs font-medium text-muted-foreground">
                 Vincular a um cliente cadastrado
               </span>
-              <select
-                value={selectedId}
-                onChange={(event) => setSelectedId(event.target.value)}
-                disabled={isPending}
-                className="h-10 w-full rounded-lg border border-border/50 bg-input/30 px-3.5 text-sm outline-none focus-visible:border-border focus-visible:ring-2 focus-visible:ring-ring/40"
-              >
-                <option value="">Selecione um cliente</option>
-                {sortedClients.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.name}
-                  </option>
-                ))}
-              </select>
+              {renderClientSelect("h-10")}
             </label>
 
             <Button

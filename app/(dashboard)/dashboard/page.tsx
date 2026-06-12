@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Brain, Sparkles, Users, Workflow } from "lucide-react";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { StatCard } from "@/components/dashboard/stat-card";
+import { DashboardDemandsAnalyticsLoader } from "@/components/dashboard/dashboard-demands-analytics-loader";
 import { ClientCard } from "@/components/clients/client-card";
 import { CreateClientForm } from "@/components/clients/create-client-form";
 import { buttonVariants } from "@/components/ui/button";
@@ -16,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { layout } from "@/lib/design/tokens";
 import { createClient } from "@/lib/supabase/server";
 import { getClientsForUser, getDashboardStats } from "@/services/clients";
+import { getDemandsMonthlyStats } from "@/services/demands";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -25,9 +27,10 @@ export default async function DashboardPage() {
 
   if (!user) return null;
 
-  const [stats, clients] = await Promise.all([
+  const [stats, clients, monthlyStats] = await Promise.all([
     getDashboardStats(user.id),
     getClientsForUser(user.id),
+    getDemandsMonthlyStats(),
   ]);
 
   const recentClients = clients.slice(0, 4);
@@ -65,6 +68,8 @@ export default async function DashboardPage() {
             className="stagger-4 animate-in-soft"
           />
         </div>
+
+        <DashboardDemandsAnalyticsLoader data={monthlyStats} />
 
         <Surface variant="elevated">
           <SurfaceHeader>

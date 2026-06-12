@@ -5,6 +5,10 @@ import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { DemandDetailStatusBar } from "@/components/demands/demand-detail-status-bar";
 import { CopyArteTextsButton } from "@/components/demands/copy-arte-texts-button";
 import { DemandClientLinker } from "@/components/demands/demand-client-linker";
+import {
+  DemandClientAssets,
+  DemandClientAssetsEmpty,
+} from "@/components/demands/demand-client-assets";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Surface,
@@ -16,8 +20,9 @@ import {
 import { cn } from "@/lib/utils";
 import { layout } from "@/lib/design/tokens";
 import { getDemandById } from "@/services/demands";
-import { getClientOptionsForCurrentUser } from "@/services/clients";
+import { getClientOptionsForCurrentUser, getClientVisualAssets } from "@/services/clients";
 import { markDemandAsReadAction } from "@/actions/demands";
+import { createClient } from "@/lib/supabase/server";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -40,7 +45,15 @@ function InfoRow({ label, value }: { label: string; value: string | null | undef
   );
 }
 
-function ExternalHref({ href, label }: { href: string; label: string }) {
+function ExternalHref({
+  href,
+  label,
+  className,
+}: {
+  href: string;
+  label: string;
+  className?: string;
+}) {
   if (!href) return null;
   return (
     <a
@@ -49,7 +62,8 @@ function ExternalHref({ href, label }: { href: string; label: string }) {
       rel="noopener noreferrer"
       className={cn(
         buttonVariants({ variant: "outline", size: "sm" }),
-        "inline-flex gap-2"
+        "inline-flex gap-2",
+        className
       )}
     >
       {label}
@@ -58,13 +72,26 @@ function ExternalHref({ href, label }: { href: string; label: string }) {
   );
 }
 
+const arteCardClassName =
+  "border-zinc-200 bg-white text-zinc-950 shadow-sm hover:border-zinc-300 hover:bg-white";
+
 export default async function DemandDetailPage({ params }: PageProps) {
   const { id } = await params;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   const [demand, clients] = await Promise.all([
     getDemandById(id),
     getClientOptionsForCurrentUser(),
   ]);
   if (!demand) notFound();
+
+  const clientAssets =
+    demand.client_id && user
+      ? await getClientVisualAssets(demand.client_id, user.id)
+      : null;
 
   // Marca como lida ao abrir
   if (demand.is_new) {
@@ -102,6 +129,27 @@ export default async function DemandDetailPage({ params }: PageProps) {
               clientNotFound={demand.client_not_found}
               clients={clients}
             />
+          </SurfaceContent>
+        </Surface>
+
+        <Surface variant="elevated">
+          <SurfaceHeader>
+            <SurfaceTitle>Logo e referências</SurfaceTitle>
+            <SurfaceDescription>
+              Materiais visuais cadastrados na página do cliente vinculado
+            </SurfaceDescription>
+          </SurfaceHeader>
+          <SurfaceContent>
+            {clientAssets ? (
+              <DemandClientAssets
+                clientId={clientAssets.clientId}
+                clientName={clientAssets.clientName}
+                logoUrl={clientAssets.logoUrl}
+                references={clientAssets.references}
+              />
+            ) : (
+              <DemandClientAssetsEmpty />
+            )}
           </SurfaceContent>
         </Surface>
 
@@ -164,28 +212,40 @@ export default async function DemandDetailPage({ params }: PageProps) {
 
           <div className="grid gap-4">
             {demand.artes.map((arte, index) => (
-              <Surface key={`${arte.headline}-${index}`} variant="elevated">
+              <Surface key={`${arte.headline}-${index}`} variant="elevated" className={arteCardClassName}>
                 <SurfaceHeader className="flex-row items-start justify-between gap-3 space-y-0">
                   <div className="min-w-0 space-y-1">
-                    <SurfaceTitle className="text-base">Arte {index + 1}</SurfaceTitle>
+                    <SurfaceTitle className="text-base text-zinc-950">
+                      Arte {index + 1}
+                    </SurfaceTitle>
                     {arte.cta && (
-                      <SurfaceDescription>CTA: {arte.cta}</SurfaceDescription>
+                      <SurfaceDescription className="text-zinc-600">
+                        CTA: {arte.cta}
+                      </SurfaceDescription>
                     )}
                   </div>
-                  <CopyArteTextsButton arte={arte} arteIndex={index} />
+                  <CopyArteTextsButton
+                    arte={arte}
+                    arteIndex={index}
+                    className="border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100"
+                  />
                 </SurfaceHeader>
                 <SurfaceContent className="space-y-2">
                   {arte.headline && (
-                    <p className="text-sm font-medium text-foreground">{arte.headline}</p>
+                    <p className="text-sm font-medium text-zinc-950">{arte.headline}</p>
                   )}
                   {arte.subheadline && (
-                    <p className="text-sm text-muted-foreground">{arte.subheadline}</p>
+                    <p className="text-sm text-zinc-700">{arte.subheadline}</p>
                   )}
                   {arte.informacoesExtras && (
-                    <p className="text-xs text-muted-foreground">{arte.informacoesExtras}</p>
+                    <p className="text-xs text-zinc-600">{arte.informacoesExtras}</p>
                   )}
                   {arte.linkReferencias && (
-                    <ExternalHref href={arte.linkReferencias} label="Referências" />
+                    <ExternalHref
+                      href={arte.linkReferencias}
+                      label="Referências"
+                      className="border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100"
+                    />
                   )}
                 </SurfaceContent>
               </Surface>

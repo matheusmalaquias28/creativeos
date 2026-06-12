@@ -3,7 +3,6 @@ import { AlertTriangle, Archive, Inbox } from "lucide-react";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { DemandCard } from "@/components/demands/demand-card";
 import { DemandsActiveList } from "@/components/demands/demands-active-list";
-import { DemandsMonthlyChartLoader } from "@/components/demands/demands-monthly-chart-loader";
 import { Badge } from "@/components/ui/badge";
 import {
   Surface,
@@ -13,7 +12,7 @@ import {
   SurfaceTitle,
 } from "@/components/ui/surface";
 import { layout } from "@/lib/design/tokens";
-import { getDemandsForUser, getDemandsMonthlyStats } from "@/services/demands";
+import { getDemandsForUser } from "@/services/demands";
 import { getClientOptionsForCurrentUser } from "@/services/clients";
 
 type SearchParams = { archived?: string };
@@ -26,9 +25,8 @@ export default async function DemandsPage({
   const { archived: archivedParam } = await searchParams;
   const showArchived = archivedParam === "1";
 
-  const [demands, monthlyStats, clients] = await Promise.all([
+  const [demands, clients] = await Promise.all([
     getDemandsForUser(showArchived),
-    getDemandsMonthlyStats(),
     getClientOptionsForCurrentUser(),
   ]);
 
@@ -78,21 +76,6 @@ export default async function DemandsPage({
                 no CreativeOS.
               </SurfaceDescription>
             </SurfaceHeader>
-          </Surface>
-        )}
-
-        {/* Gráfico mensal */}
-        {!showArchived && monthlyStats.length > 0 && (
-          <Surface variant="elevated">
-            <SurfaceHeader>
-              <SurfaceTitle>Análise mensal</SurfaceTitle>
-              <SurfaceDescription>
-                Demandas, artes e tempo médio de execução por mês
-              </SurfaceDescription>
-            </SurfaceHeader>
-            <SurfaceContent>
-              <DemandsMonthlyChartLoader data={monthlyStats} />
-            </SurfaceContent>
           </Surface>
         )}
 

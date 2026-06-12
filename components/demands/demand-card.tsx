@@ -4,15 +4,14 @@ import { useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, Calendar, Sparkles, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
 import { DemandStatusSelector } from "@/components/demands/demand-status-selector";
 import {
   DemandClientLinker,
   type DemandClientOption,
 } from "@/components/demands/demand-client-linker";
 import {
+  CARD_NEON_THEMES,
   getDemandColorState,
-  CARD_COLOR_CLASSES,
 } from "@/lib/demands/demand-color";
 import { cn } from "@/lib/utils";
 import type { CreativeDemandListItem, DemandStatus } from "@/types/demand";
@@ -28,10 +27,18 @@ function formatDate(value: string | null): string {
   });
 }
 
-function DueDateLabel({ dueDate }: { dueDate: string | null }) {
+function DueDateLabel({
+  dueDate,
+  accentClass,
+  mutedClass,
+}: {
+  dueDate: string | null;
+  accentClass: string;
+  mutedClass: string;
+}) {
   if (!dueDate) {
     return (
-      <span className="inline-flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+      <span className={cn("inline-flex items-center gap-1.5", accentClass)}>
         <Calendar className="size-3.5" />
         Definir prazo
       </span>
@@ -42,7 +49,7 @@ function DueDateLabel({ dueDate }: { dueDate: string | null }) {
     <span
       className={cn(
         "inline-flex items-center gap-1.5",
-        isOverdue ? "text-red-600 dark:text-red-400 font-medium" : "text-muted-foreground"
+        isOverdue ? cn(accentClass, "font-medium") : mutedClass
       )}
     >
       <Calendar className="size-3.5" />
@@ -73,7 +80,7 @@ export function DemandCard({
 
   const title = demand.briefing.titulo || demand.client_name_external;
   const colorState = getDemandColorState({ ...demand, client_not_found: clientNotFound });
-  const colorClass = CARD_COLOR_CLASSES[colorState];
+  const theme = CARD_NEON_THEMES[colorState];
 
   function handleClientLinked(linkedClientId: string, linkedClientName: string) {
     setClientNotFound(false);
@@ -85,86 +92,115 @@ export function DemandCard({
   return (
     <article
       className={cn(
-        "surface-panel hover-lift flex flex-col gap-4 p-5 transition-all",
-        colorClass
+        "group relative overflow-hidden rounded-2xl border p-5 transition-premium hover:-translate-y-0.5 animate-in-soft",
+        theme.card
       )}
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 space-y-1">
-          <h3 className="truncate text-sm font-medium tracking-heading text-foreground">
-            {title}
-          </h3>
-          <p className="text-xs text-muted-foreground">
-            {clientNotFound
-              ? demand.client_name_external
-              : (clientName ?? demand.client_name_external)}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {demand.is_new && (
-            <Badge className="gap-1 bg-indigo-500 text-white hover:bg-indigo-600">
-              <Sparkles className="size-3" />
-              Nova
-            </Badge>
-          )}
-          {clientNotFound && (
-            <Badge
-              variant="outline"
-              className="gap-1 border-amber-500/40 text-amber-700 dark:text-amber-400"
-            >
-              <AlertTriangle className="size-3" />
-              Sem cliente
-            </Badge>
-          )}
-          {demand.tipo && (
-            <Badge variant="outline" className="text-[0.65rem]">
-              {demand.tipo}
-            </Badge>
-          )}
-        </div>
-      </div>
-
-      {clientNotFound && (
-        <DemandClientLinker
-          demandId={demand.id}
-          currentClientId={clientId}
-          currentClientName={clientName}
-          externalClientName={demand.client_name_external}
-          clientNotFound={clientNotFound}
-          clients={clients}
-          compact
-          onLinked={handleClientLinked}
-        />
-      )}
-
-      <div className="flex items-center gap-3 flex-wrap">
-        <DemandStatusSelector
-          demandId={demand.id}
-          currentStatus={demand.status}
-          onArchived={onArchived}
-          onArchiveRevert={onArchiveRevert}
-          onStatusUpdated={onStatusUpdated}
-        />
-        <span className="text-xs text-muted-foreground">{demand.artes.length} arte(s)</span>
-      </div>
-
-      <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-        {demand.gestor && (
-          <span className="inline-flex items-center gap-1.5">
-            <User className="size-3.5" />
-            {demand.gestor}
-          </span>
+      <div
+        className={cn(
+          "pointer-events-none absolute -right-16 -top-16 size-40 rounded-full blur-3xl transition-opacity group-hover:opacity-100",
+          theme.glowA
         )}
-        <DueDateLabel dueDate={demand.due_date} />
-      </div>
+        aria-hidden
+      />
+      <div
+        className={cn(
+          "pointer-events-none absolute -bottom-20 -left-12 size-36 rounded-full blur-3xl transition-opacity group-hover:opacity-100",
+          theme.glowB
+        )}
+        aria-hidden
+      />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <Link
-          href={`/demands/${demand.id}`}
-          className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-fit")}
-        >
-          Ver demanda
-        </Link>
+      <div className="relative flex flex-col gap-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 space-y-1">
+            <h3 className="truncate text-sm font-medium tracking-heading text-foreground">
+              {title}
+            </h3>
+            <p className={cn("text-xs", theme.muted)}>
+              {clientNotFound
+                ? demand.client_name_external
+                : (clientName ?? demand.client_name_external)}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {demand.is_new && (
+              <Badge className="gap-1 border border-cyan-400/40 bg-cyan-500/15 text-cyan-200 shadow-[0_0_12px_rgba(34,211,238,0.2)] hover:bg-cyan-500/20">
+                <Sparkles className="size-3" />
+                Nova
+              </Badge>
+            )}
+            {clientNotFound && (
+              <Badge
+                variant="outline"
+                className="gap-1 border-amber-500/40 bg-amber-500/10 text-amber-300"
+              >
+                <AlertTriangle className="size-3" />
+                Sem cliente
+              </Badge>
+            )}
+            {demand.tipo && (
+              <Badge
+                variant="outline"
+                className="border-white/10 bg-black/20 text-[0.65rem] text-foreground/80"
+              >
+                {demand.tipo}
+              </Badge>
+            )}
+          </div>
+        </div>
+
+        {clientNotFound && (
+          <DemandClientLinker
+            demandId={demand.id}
+            currentClientId={clientId}
+            currentClientName={clientName}
+            externalClientName={demand.client_name_external}
+            clientNotFound={clientNotFound}
+            clients={clients}
+            compact
+            onLinked={handleClientLinked}
+          />
+        )}
+
+        <div className="flex flex-wrap items-center gap-3">
+          <DemandStatusSelector
+            demandId={demand.id}
+            currentStatus={demand.status}
+            onArchived={onArchived}
+            onArchiveRevert={onArchiveRevert}
+            onStatusUpdated={onStatusUpdated}
+          />
+          <span className={cn("text-xs tabular-nums", theme.muted)}>
+            {demand.artes.length} arte(s)
+          </span>
+        </div>
+
+        <div className="flex flex-wrap gap-3 text-xs">
+          {demand.gestor && (
+            <span className={cn("inline-flex items-center gap-1.5", theme.muted)}>
+              <User className="size-3.5" />
+              {demand.gestor}
+            </span>
+          )}
+          <DueDateLabel
+            dueDate={demand.due_date}
+            accentClass={theme.accent}
+            mutedClass={theme.muted}
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={`/demands/${demand.id}`}
+            className={cn(
+              "inline-flex h-8 items-center justify-center rounded-lg border px-3 text-sm font-medium transition-premium",
+              theme.button
+            )}
+          >
+            Ver demanda
+          </Link>
+        </div>
       </div>
     </article>
   );

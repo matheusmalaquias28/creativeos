@@ -79,7 +79,11 @@ export default async function ReferencesPage({ params }: PageProps) {
               </SurfaceDescription>
             </SurfaceHeader>
             <SurfaceContent>
-              <ClientPhotosPanel clientId={id} photos={clientPhotos} />
+              <ClientPhotosPanel
+                clientId={id}
+                clientName={client.name}
+                photos={clientPhotos}
+              />
             </SurfaceContent>
           </Surface>
         </div>

@@ -5,37 +5,23 @@ import { Copy, Check, Trash2, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { deleteClientPhotoAction } from "@/actions/client-photos";
 import { Button } from "@/components/ui/button";
+import { copyImageToClipboard } from "@/lib/utils/copy-image";
 
 type Photo = { id: string; public_url: string; storage_path: string };
 
 type ClientPhotosPanelProps = {
   clientId: string;
+  clientName: string;
   photos: Photo[];
   logoUrl?: string | null;
 };
 
-async function copyImageToClipboard(url: string) {
-  const res = await fetch(url);
-  const blob = await res.blob();
-  // Clipboard API only accepts image/png; convert if needed
-  let imageBlob = blob;
-  if (blob.type !== "image/png") {
-    const bitmap = await createImageBitmap(blob);
-    const canvas = document.createElement("canvas");
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
-    const ctx = canvas.getContext("2d")!;
-    ctx.drawImage(bitmap, 0, 0);
-    imageBlob = await new Promise<Blob>((resolve) =>
-      canvas.toBlob((b) => resolve(b!), "image/png")
-    );
-  }
-  await navigator.clipboard.write([
-    new ClipboardItem({ "image/png": imageBlob }),
-  ]);
-}
-
-export function ClientPhotosPanel({ clientId, photos: initialPhotos, logoUrl }: ClientPhotosPanelProps) {
+export function ClientPhotosPanel({
+  clientId,
+  clientName,
+  photos: initialPhotos,
+  logoUrl,
+}: ClientPhotosPanelProps) {
   const [photos, setPhotos] = useState(initialPhotos);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();

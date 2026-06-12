@@ -35,6 +35,10 @@ import { getClientPhotos } from "@/services/client-photos";
 import { ClientPhotosPanel } from "@/components/clients/client-photos-panel";
 import { ClientDemandsPanel } from "@/components/demands/client-demands-panel";
 import { getDemandsByClientId } from "@/services/demands";
+import {
+  getClientOpportunityFlags,
+  CLIENT_OPPORTUNITY_LABELS,
+} from "@/lib/clients/opportunities";
 import type { BrandDna } from "@/types";
 
 type PageProps = {
@@ -72,6 +76,7 @@ export default async function ClientDetailPage({ params }: PageProps) {
     (acc, demand) => acc + demand.artes.length,
     0
   );
+  const opportunityFlags = getClientOpportunityFlags(parsedOnboarding);
 
   return (
     <DashboardShell
@@ -94,47 +99,21 @@ export default async function ClientDetailPage({ params }: PageProps) {
           )}
         </div>
 
-        {(parsedOnboarding.logoQualityOk === false ||
-          parsedOnboarding.hasClientImages === false ||
-          parsedOnboarding.hasSite === false ||
-          parsedOnboarding.hasGMB === false) && (
+        {opportunityFlags.length > 0 && (
           <div className="space-y-1.5">
             <p className="text-xs font-medium text-muted-foreground">
               Oportunidades identificadas
             </p>
             <div className="flex flex-wrap gap-2">
-              {parsedOnboarding.logoQualityOk === false && (
+              {opportunityFlags.map((flag) => (
                 <Badge
+                  key={flag}
                   variant="outline"
-                  className="border-amber-500/30 text-amber-600 dark:text-amber-400"
+                  className="border-amber-500/40 bg-amber-500/10 text-amber-400"
                 >
-                  Vetorização de logo
+                  {CLIENT_OPPORTUNITY_LABELS[flag]}
                 </Badge>
-              )}
-              {parsedOnboarding.hasClientImages === false && (
-                <Badge
-                  variant="outline"
-                  className="border-amber-500/30 text-amber-600 dark:text-amber-400"
-                >
-                  Ensaio de IA
-                </Badge>
-              )}
-              {parsedOnboarding.hasSite === false && (
-                <Badge
-                  variant="outline"
-                  className="border-amber-500/30 text-amber-600 dark:text-amber-400"
-                >
-                  LP ou Site Institucional
-                </Badge>
-              )}
-              {parsedOnboarding.hasGMB === false && (
-                <Badge
-                  variant="outline"
-                  className="border-amber-500/30 text-amber-600 dark:text-amber-400"
-                >
-                  Google Meu Negócio
-                </Badge>
-              )}
+              ))}
             </div>
           </div>
         )}
@@ -276,7 +255,12 @@ export default async function ClientDetailPage({ params }: PageProps) {
               </p>
             </div>
           </div>
-          <ClientPhotosPanel clientId={id} photos={clientPhotos} logoUrl={logoUrl} />
+          <ClientPhotosPanel
+            clientId={id}
+            clientName={client.name}
+            photos={clientPhotos}
+            logoUrl={logoUrl}
+          />
         </section>
 
         <Link
