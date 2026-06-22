@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ExternalLink } from "lucide-react";
-import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { ArrowLeft, ExternalLink, GitBranch, Zap } from "lucide-react";
+import { DashboardPage } from "@/components/layout/dashboard-page";
 import { DemandDetailStatusBar } from "@/components/demands/demand-detail-status-bar";
 import { CopyArteTextsButton } from "@/components/demands/copy-arte-texts-button";
+import { MarkDemandReadOnMount } from "@/components/demands/mark-demand-read-on-mount";
 import { DemandClientLinker } from "@/components/demands/demand-client-linker";
 import {
   DemandClientAssets,
@@ -21,8 +22,9 @@ import { cn } from "@/lib/utils";
 import { layout } from "@/lib/design/tokens";
 import { getDemandById } from "@/services/demands";
 import { getClientOptionsForCurrentUser, getClientVisualAssets } from "@/services/clients";
-import { markDemandAsReadAction } from "@/actions/demands";
-import { createClient } from "@/lib/supabase/server";
+import { getDemandReferenceImages } from "@/services/art-gen";
+import { DemandReferenceManager } from "@/components/demands/demand-reference-manager";
+import { getAuthUser } from "@/lib/auth/session";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -73,14 +75,18 @@ function ExternalHref({
 }
 
 const arteCardClassName =
-  "border-zinc-200 bg-white text-zinc-950 shadow-sm hover:border-zinc-300 hover:bg-white";
+  "border-zinc-200 bg-white shadow-sm transition-none dark:border-zinc-600 dark:bg-zinc-100";
+
+const arteTextPrimary = "!text-zinc-950";
+const arteTextSecondary = "!text-zinc-700";
+const arteTextMuted = "!text-zinc-600";
+
+const arteButtonClassName =
+  "border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100 dark:border-zinc-400 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200";
 
 export default async function DemandDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
 
   const [demand, clients] = await Promise.all([
     getDemandById(id),
@@ -88,29 +94,49 @@ export default async function DemandDetailPage({ params }: PageProps) {
   ]);
   if (!demand) notFound();
 
-  const clientAssets =
+  const [clientAssets, demandRefs] = await Promise.all([
     demand.client_id && user
-      ? await getClientVisualAssets(demand.client_id, user.id)
-      : null;
-
-  // Marca como lida ao abrir
-  if (demand.is_new) {
-    await markDemandAsReadAction(id);
-  }
+      ? getClientVisualAssets(demand.client_id, user.id)
+      : Promise.resolve(null),
+    getDemandReferenceImages(id),
+  ]);
 
   const title = demand.briefing.titulo || demand.client_name_external;
 
   return (
-    <DashboardShell title={title} description="Detalhes da demanda recebida via Make">
+    <DashboardPage title={title} description="Detalhes da demanda recebida via Make">
+      <MarkDemandReadOnMount demandId={id} isNew={demand.is_new} />
       <div className={layout.sectionGap}>
-        {/* Status + timer */}
-        <div className="flex flex-wrap items-center gap-3">
+        {/* Status + timer + ações */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <DemandDetailStatusBar
             demandId={demand.id}
             status={demand.status}
             startedAt={demand.started_at}
             elapsedSeconds={demand.elapsed_seconds}
           />
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/demands/${id}/flow`}
+              className={cn(
+                buttonVariants({ variant: "outline", size: "sm" }),
+                "gap-2"
+              )}
+            >
+              <GitBranch className="size-3.5" />
+              Fluxo
+            </Link>
+            <Link
+              href={`/demands/${id}/curation`}
+              className={cn(
+                buttonVariants({ size: "sm" }),
+                "gap-2 bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md hover:from-violet-500 hover:to-indigo-500 hover:shadow-lg transition-all"
+              )}
+            >
+              <Zap className="size-4 fill-current" />
+              Curadoria de artes
+            </Link>
+          </div>
         </div>
 
         <Surface variant="elevated">
@@ -150,6 +176,27 @@ export default async function DemandDetailPage({ params }: PageProps) {
             ) : (
               <DemandClientAssetsEmpty />
             )}
+          </SurfaceContent>
+        </Surface>
+
+        <Surface variant="elevated">
+          <SurfaceHeader>
+            <SurfaceTitle>Referências desta demanda</SurfaceTitle>
+            <SurfaceDescription>
+              Imagens de referência específicas para esta demanda (além das do perfil do cliente)
+            </SurfaceDescription>
+          </SurfaceHeader>
+          <SurfaceContent>
+            <DemandReferenceManager
+              demandId={id}
+              initialRefs={demandRefs}
+              clientRefs={
+                clientAssets?.references.map((r) => ({
+                  public_url: r.public_url,
+                  file_name: r.file_name,
+                })) ?? []
+              }
+            />
           </SurfaceContent>
         </Surface>
 
@@ -212,14 +259,14 @@ export default async function DemandDetailPage({ params }: PageProps) {
 
           <div className="grid gap-4">
             {demand.artes.map((arte, index) => (
-              <Surface key={`${arte.headline}-${index}`} variant="elevated" className={arteCardClassName}>
+              <Surface key={`${arte.headline}-${index}`} variant="default" className={arteCardClassName}>
                 <SurfaceHeader className="flex-row items-start justify-between gap-3 space-y-0">
                   <div className="min-w-0 space-y-1">
-                    <SurfaceTitle className="text-base text-zinc-950">
+                    <SurfaceTitle className={cn("text-base", arteTextPrimary)}>
                       Arte {index + 1}
                     </SurfaceTitle>
                     {arte.cta && (
-                      <SurfaceDescription className="text-zinc-600">
+                      <SurfaceDescription className={arteTextMuted}>
                         CTA: {arte.cta}
                       </SurfaceDescription>
                     )}
@@ -227,24 +274,24 @@ export default async function DemandDetailPage({ params }: PageProps) {
                   <CopyArteTextsButton
                     arte={arte}
                     arteIndex={index}
-                    className="border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100"
+                    className={arteButtonClassName}
                   />
                 </SurfaceHeader>
                 <SurfaceContent className="space-y-2">
                   {arte.headline && (
-                    <p className="text-sm font-medium text-zinc-950">{arte.headline}</p>
+                    <p className={cn("text-sm font-medium", arteTextPrimary)}>{arte.headline}</p>
                   )}
                   {arte.subheadline && (
-                    <p className="text-sm text-zinc-700">{arte.subheadline}</p>
+                    <p className={cn("text-sm", arteTextSecondary)}>{arte.subheadline}</p>
                   )}
                   {arte.informacoesExtras && (
-                    <p className="text-xs text-zinc-600">{arte.informacoesExtras}</p>
+                    <p className={cn("text-xs", arteTextMuted)}>{arte.informacoesExtras}</p>
                   )}
                   {arte.linkReferencias && (
                     <ExternalHref
                       href={arte.linkReferencias}
                       label="Referências"
-                      className="border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100"
+                      className={arteButtonClassName}
                     />
                   )}
                 </SurfaceContent>
@@ -264,6 +311,6 @@ export default async function DemandDetailPage({ params }: PageProps) {
           Voltar para demandas
         </Link>
       </div>
-    </DashboardShell>
+    </DashboardPage>
   );
 }

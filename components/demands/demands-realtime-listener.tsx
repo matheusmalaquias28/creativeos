@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
+import { useNewDemandsCount } from "@/components/demands/new-demands-count-provider";
 
 let sharedAudioContext: AudioContext | null = null;
 
@@ -55,7 +56,6 @@ async function playNotificationSound() {
     if (!ctx) return;
 
     const now = ctx.currentTime;
-    // Dois bipes ascendentes — mais perceptível que um tom único
     playTone(ctx, 880, now, 0.18);
     playTone(ctx, 1175, now + 0.2, 0.22);
   } catch {
@@ -65,6 +65,7 @@ async function playNotificationSound() {
 
 export function DemandsRealtimeListener() {
   const router = useRouter();
+  const { increment } = useNewDemandsCount();
   const initialized = useRef(false);
 
   useEffect(() => {
@@ -104,6 +105,7 @@ export function DemandsRealtimeListener() {
             demand.client_name_external ||
             "Nova demanda";
 
+          increment();
           void playNotificationSound();
 
           toast.info(`Nova demanda: ${title}`, {
@@ -115,7 +117,8 @@ export function DemandsRealtimeListener() {
             duration: 8000,
           });
 
-          router.refresh();
+          // Atualiza os dados do servidor para o Kanban e outras listas
+          setTimeout(() => router.refresh(), 400);
         }
       )
       .subscribe();
@@ -123,7 +126,7 @@ export function DemandsRealtimeListener() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [router]);
+  }, [router, increment]);
 
   return null;
 }

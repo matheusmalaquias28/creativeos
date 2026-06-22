@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/auth/session";
 import { isSchemaMissingError, schemaNotReadyError } from "@/lib/errors/database";
 import type {
   CreativeDemand,
@@ -9,7 +10,7 @@ import type {
   DemandMonthStat,
 } from "@/types/demand";
 
-export async function getNewDemandsCount(): Promise<number> {
+export const getNewDemandsCount = cache(async (): Promise<number> => {
   const supabase = await createClient();
   const { count, error } = await supabase
     .from("creative_demands")
@@ -19,13 +20,67 @@ export async function getNewDemandsCount(): Promise<number> {
 
   if (error) return 0;
   return count ?? 0;
-}
+});
 
 function throwIfDbError(error: { message: string }) {
   if (isSchemaMissingError(error.message)) {
     throw schemaNotReadyError(error.message);
   }
   throw new Error(error.message);
+}
+
+function parseBriefingSummary(value: unknown): DemandBriefing {
+  const record = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  return {
+    titulo: typeof record.titulo === "string" ? record.titulo : "",
+    instagramCliente: "",
+    tipo: typeof record.tipo === "string" ? record.tipo : "",
+    quantidadeArtes: null,
+    materiaisEditados: "",
+    driveMateriais: "",
+  };
+}
+
+function parseArtesCount(value: unknown): number {
+  return Array.isArray(value) ? value.length : 0;
+}
+
+const DEMAND_LIST_SELECT =
+  "id, external_id, client_id, client_name_external, client_not_found, tipo, gestor, status, is_archived, is_new, started_at, completed_at, elapsed_seconds, due_date, external_created_at, created_at, updated_at, briefing, artes, clients(name)";
+
+function mapDemandListRow(
+  row: Record<string, unknown>,
+  clientName?: string | null
+): CreativeDemandListItem {
+  const artesCount = parseArtesCount(row.artes);
+  return {
+    id: String(row.id),
+    external_id: String(row.external_id),
+    client_id: row.client_id ? String(row.client_id) : null,
+    client_name_external: String(row.client_name_external),
+    client_not_found: Boolean(row.client_not_found),
+    tipo: row.tipo ? String(row.tipo) : null,
+    squad: null,
+    gestor: row.gestor ? String(row.gestor) : null,
+    webdesigner: null,
+    solicitante: null,
+    briefing: parseBriefingSummary(row.briefing),
+    artes: [],
+    artes_count: artesCount,
+    status: row.status ? String(row.status) : null,
+    is_archived: Boolean(row.is_archived),
+    is_new: Boolean(row.is_new),
+    started_at: row.started_at ? String(row.started_at) : null,
+    completed_at: row.completed_at ? String(row.completed_at) : null,
+    elapsed_seconds: typeof row.elapsed_seconds === "number" ? row.elapsed_seconds : null,
+    due_date: row.due_date ? String(row.due_date) : null,
+    external_created_at: row.external_created_at
+      ? String(row.external_created_at)
+      : null,
+    created_at: String(row.created_at),
+    updated_at: String(row.updated_at),
+    client_name: clientName ?? null,
+  };
 }
 
 function parseBriefing(value: unknown): DemandBriefing {
@@ -100,7 +155,7 @@ export const getDemandsForUser = cache(
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("creative_demands")
-      .select("*, clients(name)")
+      .select(DEMAND_LIST_SELECT)
       .eq("is_archived", archived)
       .order("created_at", { ascending: false });
 
@@ -109,7 +164,7 @@ export const getDemandsForUser = cache(
     return (data ?? []).map((row) => {
       const clients = row.clients as { name?: string } | { name?: string }[] | null;
       const clientName = Array.isArray(clients) ? clients[0]?.name : clients?.name;
-      return mapDemandRow(row as Record<string, unknown>, clientName);
+      return mapDemandListRow(row as Record<string, unknown>, clientName);
     });
   }
 );
@@ -144,7 +199,7 @@ export const getDemandById = cache(async (demandId: string): Promise<CreativeDem
   return mapDemandRow(data as Record<string, unknown>, clientName);
 });
 
-export async function getDemandsMonthlyStats(): Promise<DemandMonthStat[]> {
+export const getDemandsMonthlyStats = cache(async (): Promise<DemandMonthStat[]> => {
   const supabase = await createClient();
 
   // Busca demands dos últimos 12 meses com campos necessários
@@ -204,7 +259,7 @@ export async function getDemandsMonthlyStats(): Promise<DemandMonthStat[]> {
       avg_elapsed_minutes: avgElapsed,
     };
   });
-}
+});
 
 export async function getUnmatchedDemandsCount(): Promise<number> {
   const supabase = await createClient();

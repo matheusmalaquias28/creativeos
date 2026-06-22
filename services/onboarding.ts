@@ -72,24 +72,13 @@ export { normalizeOnboardingBooleans };
 export function isOnboardingComplete(
   answers: Partial<OnboardingFormValues>
 ): boolean {
-  const requiredStrings: (keyof OnboardingFormValues)[] = [
-    "businessDescription",
-    "targetAudience",
-    "brandPersonality",
-    "goals",
-    "toneOfVoice",
-    "fontStyles",
-  ];
-
-  const stringsOk = requiredStrings.every((key) => {
-    const v = answers[key];
-    return typeof v === "string" && v.trim().length > 0;
-  });
+  const fontStylesOk =
+    typeof answers.fontStyles === "string" && answers.fontStyles.trim().length > 0;
 
   const colorsOk =
     Array.isArray(answers.brandColors) &&
     answers.brandColors.length >= 1 &&
     answers.brandColors.length <= 5;
 
-  return stringsOk && colorsOk;
+  return fontStylesOk && colorsOk;
 }

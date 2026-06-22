@@ -7,6 +7,7 @@ type StatCardProps = {
   description?: string;
   icon: LucideIcon;
   className?: string;
+  accent?: "positive" | "negative" | "warning" | "neutral";
 };
 
 export function StatCard({
@@ -15,29 +16,50 @@ export function StatCard({
   description,
   icon: Icon,
   className,
+  accent = "neutral",
 }: StatCardProps) {
+  const accentMap = {
+    positive: "dark:border-positive/20",
+    negative: "dark:border-negative/20",
+    warning: "dark:border-warning/20",
+    neutral: "",
+  };
+
+  const iconAccentMap = {
+    positive: "text-positive",
+    negative: "text-negative",
+    warning: "text-warning",
+    neutral: "text-muted-foreground/60",
+  };
+
   return (
     <div
       className={cn(
-        "surface-panel hover-lift flex flex-col gap-6 p-6",
+        "surface-panel hover-lift flex flex-col gap-5 p-6",
+        accentMap[accent],
         className
       )}
     >
       <div className="flex items-start justify-between gap-4">
-        <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+        <p className="text-[0.625rem] font-semibold tracking-[0.1em] text-muted-foreground/70 uppercase">
           {title}
         </p>
-        <Icon
-          className="size-4 shrink-0 text-muted-foreground/60"
-          strokeWidth={1.5}
-        />
+        <div className={cn(
+          "flex size-7 items-center justify-center rounded-lg border border-border/60 dark:border-white/8",
+          accent !== "neutral" ? "dark:bg-white/4" : "dark:bg-white/3"
+        )}>
+          <Icon
+            className={cn("size-3.5 shrink-0", iconAccentMap[accent])}
+            strokeWidth={1.75}
+          />
+        </div>
       </div>
       <div>
-        <p className="text-3xl font-medium tracking-heading tabular-nums text-foreground">
+        <p className="text-3xl font-semibold tracking-tight tabular-nums text-foreground">
           {value}
         </p>
         {description && (
-          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+          <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
             {description}
           </p>
         )}

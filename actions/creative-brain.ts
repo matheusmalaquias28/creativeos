@@ -59,7 +59,7 @@ export async function generateCreativeBrainAction(
 
   if (!isOnboardingComplete(answers)) {
     return {
-      error: "Complete o onboarding criativo antes de gerar o Creative Brain",
+      error: "Complete o onboarding antes de gerar o Creative Brain",
     };
   }
 

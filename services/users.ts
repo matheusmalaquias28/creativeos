@@ -1,4 +1,6 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/auth/session";
 import type { User, UserRole } from "@/types";
 
 function resolveRole(appMetadata: Record<string, unknown> | undefined): UserRole {
@@ -40,22 +42,28 @@ export async function ensureUserProfile(): Promise<string | null> {
   return authUser.id;
 }
 
-export async function getCurrentUserProfile(): Promise<User | null> {
-  const supabase = await createClient();
-  const {
-    data: { user: authUser },
-  } = await supabase.auth.getUser();
-
+export const getCurrentUserProfile = cache(async (): Promise<User | null> => {
+  const authUser = await getAuthUser();
   if (!authUser) return null;
 
-  await ensureUserProfile().catch(() => null);
-
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from("users")
     .select("*")
     .eq("id", authUser.id)
     .single();
 
-  if (error || !data) return null;
-  return data;
-}
+  if (data) return data;
+
+  if (error) {
+    await ensureUserProfile().catch(() => null);
+    const { data: retry } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", authUser.id)
+      .single();
+    return retry ?? null;
+  }
+
+  return null;
+});

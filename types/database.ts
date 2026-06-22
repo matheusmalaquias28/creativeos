@@ -216,6 +216,7 @@ export type Database = {
           due_date: string | null;
           external_created_at: string | null;
           raw_payload: Json;
+          flow_graph: Json | null;
           created_at: string;
           updated_at: string;
         };
@@ -241,6 +242,7 @@ export type Database = {
           due_date?: string | null;
           external_created_at?: string | null;
           raw_payload?: Json;
+          flow_graph?: Json | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -264,6 +266,7 @@ export type Database = {
           due_date: string | null;
           external_created_at: string | null;
           raw_payload: Json;
+          flow_graph: Json | null;
           updated_at: string;
         }>;
         Relationships: [
@@ -312,6 +315,145 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      demand_reference_image: {
+        Row: {
+          id: string;
+          demand_id: string;
+          storage_path: string;
+          storage_url: string;
+          file_name: string;
+          mime_type: string | null;
+          file_size: number | null;
+          role: string | null;
+          position: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          demand_id: string;
+          storage_path: string;
+          storage_url: string;
+          file_name: string;
+          mime_type?: string | null;
+          file_size?: number | null;
+          role?: string | null;
+          position?: number;
+          created_at?: string;
+        };
+        Update: Partial<{
+          role: string | null;
+          position: number;
+        }>;
+        Relationships: [];
+      };
+      client_creative_profile: {
+        Row: {
+          id: string;
+          client_id: string;
+          base_prompt: string;
+          palette: string[];
+          style_reference_urls: string[];
+          logo_url: string | null;
+          logo_mode: "reference" | "composite";
+          logo_placement: Json;
+          image_size: "1K" | "2K" | "4K";
+          aspect_ratio: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          client_id: string;
+          base_prompt?: string;
+          palette?: string[];
+          style_reference_urls?: string[];
+          logo_url?: string | null;
+          logo_mode?: "reference" | "composite";
+          logo_placement?: Json;
+          image_size?: "1K" | "2K" | "4K";
+          aspect_ratio?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<{
+          base_prompt: string;
+          palette: string[];
+          style_reference_urls: string[];
+          logo_url: string | null;
+          logo_mode: "reference" | "composite";
+          logo_placement: Json;
+          image_size: "1K" | "2K" | "4K";
+          aspect_ratio: string;
+        }>;
+        Relationships: [];
+      };
+      art_generation_job: {
+        Row: {
+          id: string;
+          demand_id: string;
+          client_id: string | null;
+          status: "queued" | "processing" | "succeeded" | "failed";
+          prompt_final: string | null;
+          params: Json;
+          error: string | null;
+          attempts: number;
+          art_index: number;
+          approved: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          demand_id: string;
+          client_id?: string | null;
+          status?: "queued" | "processing" | "succeeded" | "failed";
+          prompt_final?: string | null;
+          params?: Json;
+          error?: string | null;
+          attempts?: number;
+          art_index?: number;
+          approved?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<{
+          status: "queued" | "processing" | "succeeded" | "failed";
+          prompt_final: string | null;
+          params: Json;
+          error: string | null;
+          attempts: number;
+          approved: boolean;
+          updated_at: string;
+        }>;
+        Relationships: [];
+      };
+      art_version: {
+        Row: {
+          id: string;
+          job_id: string;
+          version_number: number;
+          result_url: string;
+          storage_path: string;
+          instruction: string | null;
+          is_current: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          job_id: string;
+          version_number?: number;
+          result_url: string;
+          storage_path: string;
+          instruction?: string | null;
+          is_current?: boolean;
+          created_at?: string;
+        };
+        Update: Partial<{
+          is_current: boolean;
+          instruction: string | null;
+        }>;
+        Relationships: [];
       };
     };
     Views: Record<string, never>;

@@ -20,6 +20,18 @@ function verifyWebhookSecret(request: Request): boolean {
   return false;
 }
 
+const KNOWN_STATUSES = new Set(["Nova", "Fazendo", "Revisão", "Concluída", "Cancelada"]);
+
+/**
+ * Normaliza o status vindo do Make para um dos status internos do CreativeOS.
+ * Qualquer valor desconhecido (ex: "Aguardando Definição de Data") cai em "Nova".
+ */
+function normalizeStatus(status: string | null | undefined): string {
+  if (!status) return "Nova";
+  if (KNOWN_STATUSES.has(status)) return status;
+  return "Nova";
+}
+
 function parseDueDate(value: string | null): string | null {
   if (!value) return null;
   const parsed = Date.parse(value);
@@ -62,7 +74,7 @@ export async function POST(request: Request) {
     solicitante: parsed.solicitante || null,
     briefing: parsed.briefing,
     artes: parsed.artes,
-    status: parsed.status || null,
+    status: normalizeStatus(parsed.status),
     due_date: parseDueDate(parsed.dueDate),
     external_created_at: parseDueDate(parsed.externalCreatedAt),
     raw_payload: body as CreativeDemandInsert["raw_payload"],

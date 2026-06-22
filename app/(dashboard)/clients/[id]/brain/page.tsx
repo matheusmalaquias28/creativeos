@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { DashboardPage } from "@/components/layout/dashboard-page";
 import { BrainViewer } from "@/components/creative-brain/brain-viewer";
 import { BrainActions } from "@/components/creative-brain/brain-actions";
 import { GenerateBrainButton } from "@/components/creative-brain/generate-brain-button";
@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/surface";
 import { cn } from "@/lib/utils";
 import { layout } from "@/lib/design/tokens";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/auth/session";
 import { getClientById, getLatestCreativeBrain } from "@/services/clients";
 import {
   getOnboardingAnswers,
@@ -47,11 +47,7 @@ type PageProps = {
 export default async function BrainPage({ params, searchParams }: PageProps) {
   const { id } = await params;
   const { brain: brainQuery } = await searchParams;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const user = await getAuthUser();
   if (!user) return null;
 
   const client = await getClientById(id, user.id);
@@ -73,7 +69,7 @@ export default async function BrainPage({ params, searchParams }: PageProps) {
     : fetchedBrain;
 
   return (
-    <DashboardShell
+    <DashboardPage
       title="Creative Brain"
       description={`${client.name} · Brand DNA estruturado`}
     >
@@ -88,7 +84,7 @@ export default async function BrainPage({ params, searchParams }: PageProps) {
                 <p className="mt-2 text-sm text-muted-foreground">
                   {canGenerate
                     ? "Gere o Brand DNA com base no onboarding e referências."
-                    : "Complete o onboarding criativo antes de gerar."}
+                    : "Complete o onboarding antes de gerar."}
                 </p>
               </div>
               <GenerateBrainButton
@@ -203,6 +199,6 @@ export default async function BrainPage({ params, searchParams }: PageProps) {
           Voltar ao cliente
         </Link>
       </div>
-    </DashboardShell>
+    </DashboardPage>
   );
 }

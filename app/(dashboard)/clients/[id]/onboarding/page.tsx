@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { DashboardPage } from "@/components/layout/dashboard-page";
 import { OnboardingForm } from "@/components/clients/onboarding-form";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/surface";
 import { cn } from "@/lib/utils";
 import { layout } from "@/lib/design/tokens";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/auth/session";
 import { getClientById } from "@/services/clients";
 import {
   getOnboardingAnswers,
@@ -27,11 +27,7 @@ type PageProps = {
 
 export default async function OnboardingPage({ params }: PageProps) {
   const { id } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const user = await getAuthUser();
   if (!user) return null;
 
   const client = await getClientById(id, user.id);
@@ -44,7 +40,7 @@ export default async function OnboardingPage({ params }: PageProps) {
   const answers = parseOnboardingAnswers(onboarding);
 
   return (
-    <DashboardShell
+    <DashboardPage
       title="Onboarding criativo"
       description={`${client.name} · contexto de marca para IA`}
     >
@@ -77,6 +73,6 @@ export default async function OnboardingPage({ params }: PageProps) {
           Voltar ao cliente
         </Link>
       </div>
-    </DashboardShell>
+    </DashboardPage>
   );
 }

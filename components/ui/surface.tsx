@@ -3,18 +3,20 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const surfaceVariants = cva(
-  "transition-premium overflow-hidden rounded-xl border backdrop-blur-md",
+  "transition-premium overflow-hidden rounded-2xl border backdrop-blur-xl",
   {
     variants: {
       variant: {
         default:
-          "border-border/50 bg-card/45 hover:border-border/70",
+          "border-border bg-card shadow-sm dark:border-white/7 dark:bg-card dark:shadow-[0_0_0_1px_oklch(1_0_0/6%),0_4px_24px_oklch(0_0_0/45%)]",
         elevated:
-          "border-border/45 bg-surface-elevated hover:border-border/65",
+          "border-border bg-surface-elevated shadow-md dark:border-white/8 dark:bg-surface-elevated dark:shadow-[0_0_0_1px_oklch(1_0_0/8%),0_8px_32px_oklch(0_0_0/55%)]",
         ghost:
-          "border-transparent bg-transparent hover:border-border/40 hover:bg-card/30",
+          "border-transparent bg-transparent hover:border-border hover:bg-muted/60 dark:hover:border-white/8 dark:hover:bg-white/4",
         dashed:
-          "border-dashed border-border/40 bg-transparent hover:border-border/55 hover:bg-card/25",
+          "border-dashed border-border bg-transparent hover:border-border hover:bg-muted/50 dark:border-white/7 dark:hover:border-white/12 dark:hover:bg-white/3",
+        terminal:
+          "border-white/8 bg-[oklch(0.085_0.007_265/85%)] shadow-[0_0_0_1px_oklch(1_0_0/6%),0_8px_32px_oklch(0_0_0/50%)] backdrop-blur-2xl",
       },
       padding: {
         none: "",
@@ -52,7 +54,7 @@ function SurfaceHeader({
   return (
     <div
       data-slot="surface-header"
-      className={cn("flex flex-col gap-1 px-6 pt-6 pb-0", className)}
+      className={cn("flex flex-col gap-1 px-6 pt-6 pb-6", className)}
       {...props}
     />
   );
@@ -94,7 +96,7 @@ function SurfaceContent({
   return (
     <div
       data-slot="surface-content"
-      className={cn("px-6 pb-6 pt-4", className)}
+      className={cn("px-6 pb-6 pt-0", className)}
       {...props}
     />
   );

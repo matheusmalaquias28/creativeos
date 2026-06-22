@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isSchemaMissingError, schemaNotReadyError } from "@/lib/errors/database";
 import { getOnboardingAnswers, parseOnboardingAnswers } from "@/services/onboarding";
 import { getClientOpportunityFlags } from "@/lib/clients/opportunities";
-import { getCurrentUserProfile } from "@/services/users";
+import { getAuthUser } from "@/lib/auth/session";
 import type { Client, ClientListItem, ClientReference, CreativeBrain, OnboardingAnswers } from "@/types";
 
 export type ClientVisualAssets = {
@@ -63,11 +63,13 @@ export const getClientsForUser = cache(async (userId: string): Promise<ClientLis
 export async function getClientOptionsForCurrentUser(): Promise<
   { id: string; name: string }[]
 > {
-  const profile = await getCurrentUserProfile();
-  if (!profile) return [];
+  const user = await getAuthUser();
+  if (!user) return [];
 
-  const clients = await getClientsForUser(profile.id);
-  return clients.map(({ id, name }) => ({ id, name }));
+  const clients = await getClientsForUser(user.id);
+  return clients
+    .filter((client) => client.status !== "archived")
+    .map(({ id, name }) => ({ id, name }));
 }
 
 export const getClientById = cache(async (

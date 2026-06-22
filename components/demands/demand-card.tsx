@@ -172,7 +172,7 @@ export function DemandCard({
             onStatusUpdated={onStatusUpdated}
           />
           <span className={cn("text-xs tabular-nums", theme.muted)}>
-            {demand.artes.length} arte(s)
+            {demand.artes_count ?? demand.artes.length} arte(s)
           </span>
         </div>
 

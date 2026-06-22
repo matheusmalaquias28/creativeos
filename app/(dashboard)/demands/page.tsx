@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { AlertTriangle, Archive, Inbox } from "lucide-react";
-import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { DashboardPage } from "@/components/layout/dashboard-page";
 import { DemandCard } from "@/components/demands/demand-card";
-import { DemandsActiveList } from "@/components/demands/demands-active-list";
+import { DemandsKanbanBoard } from "@/components/demands/demands-kanban-board";
 import { Badge } from "@/components/ui/badge";
 import {
   Surface,
@@ -33,7 +33,7 @@ export default async function DemandsPage({
   const unmatchedCount = demands.filter((d) => d.client_not_found).length;
 
   return (
-    <DashboardShell
+    <DashboardPage
       title="Demandas"
       description="Briefings recebidos dos gestores via Make"
     >
@@ -101,7 +101,9 @@ export default async function DemandsPage({
                 </SurfaceContent>
               </Surface>
             ) : (
-              <DemandsActiveList initialDemands={demands} clients={clients} />
+              <div className="-mx-8 px-8 lg:-mx-10 lg:px-10 overflow-x-auto">
+                <DemandsKanbanBoard initialDemands={demands} clients={clients} />
+              </div>
             )}
           </>
         )}
@@ -153,6 +155,6 @@ export default async function DemandsPage({
           </section>
         )}
       </div>
-    </DashboardShell>
+    </DashboardPage>
   );
 }

@@ -8,16 +8,17 @@ import {
   ArrowLeft,
   Layers,
 } from "lucide-react";
-import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { DashboardPage } from "@/components/layout/dashboard-page";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { WorkflowModuleCard } from "@/components/clients/workflow-module-card";
 import { GenerateBrainButton } from "@/components/creative-brain/generate-brain-button";
-import { ClientStatusSelect } from "@/components/clients/client-status-select";
+import { ClientDisplayStatusBadge } from "@/components/clients/client-display-status-badge";
+import { ArchiveClientButton } from "@/components/clients/archive-client-button";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { layout } from "@/lib/design/tokens";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/auth/session";
 import {
   getClientById,
   getClientReferences,
@@ -44,11 +45,7 @@ type PageProps = {
 
 export default async function ClientDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const user = await getAuthUser();
   if (!user) return null;
 
   const client = await getClientById(id, user.id);
@@ -76,16 +73,19 @@ export default async function ClientDetailPage({ params }: PageProps) {
   const opportunityFlags = getClientOpportunityFlags(parsedOnboarding);
 
   return (
-    <DashboardShell
+    <DashboardPage
       title={client.name}
       description={`/${client.slug}`}
+      headerAction={
+        <ArchiveClientButton
+          clientId={id}
+          isArchived={client.status === "archived"}
+        />
+      }
     >
       <div className={layout.sectionGap}>
         <div className="flex flex-wrap items-center gap-2">
-          <ClientStatusSelect clientId={id} currentStatus={client.status} />
-          {onboardingDone && (
-            <Badge variant="secondary">Onboarding concluído</Badge>
-          )}
+          <ClientDisplayStatusBadge status={client.status} />
           {creativeBrain && (
             <Badge variant="secondary">
               Creative Brain v{creativeBrain.version}
@@ -103,7 +103,7 @@ export default async function ClientDetailPage({ params }: PageProps) {
                 <Badge
                   key={flag}
                   variant="outline"
-                  className="border-amber-500/40 bg-amber-500/10 text-amber-400"
+                  className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400"
                 >
                   {CLIENT_OPPORTUNITY_LABELS[flag]}
                 </Badge>
@@ -268,6 +268,6 @@ export default async function ClientDetailPage({ params }: PageProps) {
           Voltar para clientes
         </Link>
       </div>
-    </DashboardShell>
+    </DashboardPage>
   );
 }

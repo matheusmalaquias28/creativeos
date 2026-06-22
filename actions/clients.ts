@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createClientSchema } from "@/lib/schemas/client";
+import { getOwnedClient } from "@/lib/auth/verify-client";
 import { slugify } from "@/lib/utils/slug";
 import { ensureUserProfile } from "@/services/users";
 import type { ClientStatus } from "@/types";
@@ -13,6 +14,16 @@ export type ClientActionState = {
   clientId?: string;
   clientName?: string;
 };
+
+const ARCHIVED_FROM_STATUS_KEY = "archivedFromStatus";
+
+function isRestorableClientStatus(value: unknown): value is ClientStatus {
+  return (
+    value === "draft" ||
+    value === "onboarding" ||
+    value === "active"
+  );
+}
 
 async function insertClientForUser(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -199,4 +210,76 @@ export async function createClientFromDemandAction(
     clientId: created.clientId,
     clientName: created.clientName,
   };
+}
+
+function revalidateClientPaths(clientId: string) {
+  revalidatePath("/dashboard");
+  revalidatePath("/clients");
+  revalidatePath(`/clients/${clientId}`);
+  revalidatePath(`/clients/${clientId}/onboarding`);
+  revalidatePath(`/clients/${clientId}/brain`);
+  revalidatePath("/demands");
+}
+
+export async function archiveClientAction(
+  clientId: string
+): Promise<ClientActionState> {
+  const owned = await getOwnedClient(clientId);
+  if (!owned) return { error: "Cliente não encontrado" };
+  if (owned.client.status === "archived") {
+    return { error: "Cliente já está arquivado" };
+  }
+
+  const supabase = await createClient();
+  const company_info = {
+    ...(owned.client.company_info ?? {}),
+    [ARCHIVED_FROM_STATUS_KEY]: owned.client.status,
+  };
+
+  const { error } = await supabase
+    .from("clients")
+    .update({
+      status: "archived",
+      company_info,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", clientId);
+
+  if (error) return { error: error.message };
+
+  revalidateClientPaths(clientId);
+  return { success: true, clientId };
+}
+
+export async function unarchiveClientAction(
+  clientId: string
+): Promise<ClientActionState> {
+  const owned = await getOwnedClient(clientId);
+  if (!owned) return { error: "Cliente não encontrado" };
+  if (owned.client.status !== "archived") {
+    return { error: "Cliente não está arquivado" };
+  }
+
+  const storedStatus = owned.client.company_info?.[ARCHIVED_FROM_STATUS_KEY];
+  const restoreStatus: ClientStatus = isRestorableClientStatus(storedStatus)
+    ? storedStatus
+    : "active";
+
+  const company_info = { ...(owned.client.company_info ?? {}) };
+  delete company_info[ARCHIVED_FROM_STATUS_KEY];
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("clients")
+    .update({
+      status: restoreStatus,
+      company_info,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", clientId);
+
+  if (error) return { error: error.message };
+
+  revalidateClientPaths(clientId);
+  return { success: true, clientId };
 }

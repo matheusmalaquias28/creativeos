@@ -1,5 +1,6 @@
 "use client"
 
+import { useTheme } from "next-themes"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 import {
   CircleCheckIcon,
@@ -10,9 +11,11 @@ import {
 } from "lucide-react"
 
 const Toaster = ({ ...props }: ToasterProps) => {
+  const { resolvedTheme } = useTheme()
+
   return (
     <Sonner
-      theme="dark"
+      theme={resolvedTheme === "dark" ? "dark" : "light"}
       className="toaster group"
       icons={{
         success: <CircleCheckIcon className="size-4 text-muted-foreground" />,
@@ -24,7 +27,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       toastOptions={{
         classNames: {
           toast:
-            "group toast !rounded-lg !border !border-border/50 !bg-popover/95 !text-foreground !shadow-none !backdrop-blur-md",
+            "group toast !rounded-xl !border !border-border !bg-popover !text-foreground !shadow-md dark:!border-white/8 dark:!bg-[oklch(0.1_0.008_265/95%)] dark:!shadow-[0_0_0_1px_oklch(1_0_0/7%),0_8px_32px_oklch(0_0_0/60%)] !backdrop-blur-2xl",
           title: "!text-sm !font-medium",
           description: "!text-xs !text-muted-foreground",
           closeButton:

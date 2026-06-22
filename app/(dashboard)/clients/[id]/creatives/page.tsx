@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Sparkles } from "lucide-react";
-import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { DashboardPage } from "@/components/layout/dashboard-page";
 import { CreativeGenerator } from "@/components/creatives/creative-generator";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { layout } from "@/lib/design/tokens";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/auth/session";
 import { getClientById, getLatestCreativeBrain } from "@/services/clients";
 import type { BrandDna } from "@/types";
 
@@ -16,11 +16,7 @@ type PageProps = {
 
 export default async function ClientCreativesPage({ params }: PageProps) {
   const { id } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const user = await getAuthUser();
   if (!user) return null;
 
   const client = await getClientById(id, user.id);
@@ -30,7 +26,7 @@ export default async function ClientCreativesPage({ params }: PageProps) {
   const brandDna = brain?.brand_dna as BrandDna | undefined;
 
   return (
-    <DashboardShell
+    <DashboardPage
       title="Gerar prompt"
       description={`${client.name} — prompt para Magnific Spaces`}
     >
@@ -66,6 +62,6 @@ export default async function ClientCreativesPage({ params }: PageProps) {
           <CreativeGenerator brandDna={brandDna} clientName={client.name} />
         )}
       </div>
-    </DashboardShell>
+    </DashboardPage>
   );
 }
