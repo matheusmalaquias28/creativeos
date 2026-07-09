@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { getCurrentUserProfile } from "@/services/users";
 import { MagnificOAuthProvider } from "@/lib/magnific/oauth-provider";
+import { createBufferedFetch } from "@/lib/magnific/buffered-fetch";
 
 const MAGNIFIC_MCP_URL = "https://mcp.magnific.com";
 
@@ -20,6 +21,7 @@ export async function GET(request: Request) {
   // serverless separadas — o provider recarrega client_information/code_verifier do banco.
   const transport = new StreamableHTTPClientTransport(new URL(MAGNIFIC_MCP_URL), {
     authProvider: new MagnificOAuthProvider(),
+    fetch: createBufferedFetch("[magnific/oauth/callback]"),
   });
 
   try {
