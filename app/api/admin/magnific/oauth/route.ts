@@ -24,9 +24,28 @@ export async function GET() {
     redirectTo = url;
   });
 
+  const instrumentedFetch: typeof fetch = async (input, init) => {
+    const url = typeof input === "string" ? input : input.toString();
+    const method = init?.method ?? "GET";
+    const t0 = Date.now();
+    console.log(`[magnific/oauth] fetch -> ${method} ${url}`);
+    try {
+      const response = await fetch(input, init);
+      console.log(`[magnific/oauth] fetch <- ${method} ${url} status=${response.status} ${Date.now() - t0}ms`);
+      return response;
+    } catch (fetchError) {
+      console.log(
+        `[magnific/oauth] fetch !! ${method} ${url} ${Date.now() - t0}ms`,
+        fetchError instanceof Error ? fetchError.message : fetchError
+      );
+      throw fetchError;
+    }
+  };
+
   const client = new Client({ name: "creative-os", version: "1.0.0" });
   const transport = new StreamableHTTPClientTransport(new URL(MAGNIFIC_MCP_URL), {
     authProvider: provider,
+    fetch: instrumentedFetch,
   });
 
   const start = Date.now();
