@@ -27,6 +27,10 @@ import { getDemandReferenceImages } from "@/services/art-gen";
 import { DemandReferenceManager } from "@/components/demands/demand-reference-manager";
 import { getAuthUser } from "@/lib/auth/session";
 
+// Cobre a geração de Magnific Space disparada por generateMagnificSpaceAction
+// (upload de fotos + create + edit + polling pode passar de 1 minuto).
+export const maxDuration = 300;
+
 type PageProps = {
   params: Promise<{ id: string }>;
 };

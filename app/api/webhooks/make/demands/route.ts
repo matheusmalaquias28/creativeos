@@ -8,6 +8,10 @@ import type { Database } from "@/types/database";
 type CreativeDemandInsert =
   Database["public"]["Tables"]["creative_demands"]["Insert"];
 
+// Cobre a geração de Magnific Space disparada via after() abaixo (upload de fotos +
+// create + edit + polling pode passar de 1 minuto).
+export const maxDuration = 300;
+
 function verifyWebhookSecret(request: Request): boolean {
   const secret = process.env.MAKE_WEBHOOK_SECRET;
   if (!secret) return true;

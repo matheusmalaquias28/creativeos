@@ -15,6 +15,10 @@ import { layout } from "@/lib/design/tokens";
 import { getDemandsForUser } from "@/services/demands";
 import { getClientOptionsForCurrentUser } from "@/services/clients";
 
+// Cobre a geração de Magnific Space disparada por generateMagnificSpaceAction
+// (upload de fotos + create + edit + polling pode passar de 1 minuto).
+export const maxDuration = 300;
+
 type SearchParams = { archived?: string };
 
 export default async function DemandsPage({
