@@ -116,17 +116,15 @@ export default async function DemandDetailPage({ params }: PageProps) {
             startedAt={demand.started_at}
             elapsedSeconds={demand.elapsed_seconds}
           />
-<<<<<<< HEAD
-          {!demand.client_not_found && (
-            <MagnificSpaceButton
-              demandId={demand.id}
-              status={demand.magnific_space_status}
-              spaceUrl={demand.magnific_space_url}
-              errorMessage={demand.magnific_space_error}
-            />
-          )}
-=======
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {!demand.client_not_found && (
+              <MagnificSpaceButton
+                demandId={demand.id}
+                status={demand.magnific_space_status}
+                spaceUrl={demand.magnific_space_url}
+                errorMessage={demand.magnific_space_error}
+              />
+            )}
             <Link
               href={`/demands/${id}/flow`}
               className={cn(
@@ -148,7 +146,6 @@ export default async function DemandDetailPage({ params }: PageProps) {
               Curadoria de artes
             </Link>
           </div>
->>>>>>> 642a2f891e5a2c25d1f311f7b2b1813d7376a95e
         </div>
 
         <Surface variant="elevated">

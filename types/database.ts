@@ -227,16 +227,13 @@ export type Database = {
           due_date: string | null;
           external_created_at: string | null;
           raw_payload: Json;
-<<<<<<< HEAD
           magnific_space_id: string | null;
           magnific_space_url: string | null;
           magnific_space_status: MagnificSpaceStatus;
           magnific_space_error: string | null;
           magnific_space_requested_at: string | null;
           magnific_space_generated_at: string | null;
-=======
           flow_graph: Json | null;
->>>>>>> 642a2f891e5a2c25d1f311f7b2b1813d7376a95e
           created_at: string;
           updated_at: string;
         };
@@ -262,16 +259,13 @@ export type Database = {
           due_date?: string | null;
           external_created_at?: string | null;
           raw_payload?: Json;
-<<<<<<< HEAD
           magnific_space_id?: string | null;
           magnific_space_url?: string | null;
           magnific_space_status?: MagnificSpaceStatus;
           magnific_space_error?: string | null;
           magnific_space_requested_at?: string | null;
           magnific_space_generated_at?: string | null;
-=======
           flow_graph?: Json | null;
->>>>>>> 642a2f891e5a2c25d1f311f7b2b1813d7376a95e
           created_at?: string;
           updated_at?: string;
         };
@@ -295,16 +289,13 @@ export type Database = {
           due_date: string | null;
           external_created_at: string | null;
           raw_payload: Json;
-<<<<<<< HEAD
           magnific_space_id: string | null;
           magnific_space_url: string | null;
           magnific_space_status: MagnificSpaceStatus;
           magnific_space_error: string | null;
           magnific_space_requested_at: string | null;
           magnific_space_generated_at: string | null;
-=======
           flow_graph: Json | null;
->>>>>>> 642a2f891e5a2c25d1f311f7b2b1813d7376a95e
           updated_at: string;
         }>;
         Relationships: [
@@ -354,7 +345,6 @@ export type Database = {
           },
         ];
       };
-<<<<<<< HEAD
       magnific_oauth_tokens: {
         Row: {
           id: number;
@@ -373,7 +363,8 @@ export type Database = {
           id?: number;
         };
         Update: Partial<Database["public"]["Tables"]["magnific_oauth_tokens"]["Row"]>;
-=======
+        Relationships: [];
+      };
       demand_reference_image: {
         Row: {
           id: string;
@@ -511,7 +502,6 @@ export type Database = {
           is_current: boolean;
           instruction: string | null;
         }>;
->>>>>>> 642a2f891e5a2c25d1f311f7b2b1813d7376a95e
         Relationships: [];
       };
     };
