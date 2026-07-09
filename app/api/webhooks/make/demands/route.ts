@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { findClientByExternalName } from "@/lib/demands/match-client";
 import { parseMakeDemandPayload } from "@/lib/demands/parse-make-payload";
+import { triggerMagnificGeneration } from "@/lib/magnific/trigger-generation";
 import type { Database } from "@/types/database";
 
 type CreativeDemandInsert =
@@ -77,6 +78,35 @@ export async function POST(request: Request) {
   if (error) {
     console.error("[webhook/make/demands]", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Dispara a geração automática do Space só quando o cliente está vinculado, já tem
+  // material salvo, e a demanda ainda não está em geração/pronta — evita reprocessar a
+  // cada re-sync do Make sobre a mesma demanda (upsert por external_id).
+  if (data.client_id && !data.client_not_found) {
+    const { count } = await supabase
+      .from("client_photos")
+      .select("id", { count: "exact", head: true })
+      .eq("client_id", data.client_id);
+
+    if (count && count > 0) {
+      const { data: claimed } = await supabase
+        .from("creative_demands")
+        .update({
+          magnific_space_status: "generating",
+          magnific_space_requested_at: new Date().toISOString(),
+          magnific_space_error: null,
+        })
+        .eq("id", data.id)
+        .neq("magnific_space_status", "generating")
+        .neq("magnific_space_status", "ready")
+        .select("id")
+        .maybeSingle();
+
+      if (claimed) {
+        after(() => triggerMagnificGeneration(data.id));
+      }
+    }
   }
 
   return NextResponse.json({

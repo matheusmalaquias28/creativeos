@@ -118,6 +118,19 @@ export function DemandsRealtimeListener() {
           router.refresh();
         }
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "creative_demands",
+        },
+        () => {
+          // Cobre o status do Magnific Space (generating → ready/failed) e outras
+          // atualizações — sem toast/som, só re-busca os dados do servidor.
+          router.refresh();
+        }
+      )
       .subscribe();
 
     return () => {

@@ -15,7 +15,11 @@
       "Bash(dir /s /b \"C:\\\\Users\\\\Matheus\\\\Desktop\\\\Outside\\\\CreativeOS\\\\creativeos\\\\src\")",
       "Bash(findstr /i \"client\\\\|customer\\\\|cliente\")",
       "Bash(dir C:\\\\Users\\\\Matheus\\\\Desktop\\\\Outside\\\\CreativeOS\\\\creativeos\\\\src *)",
-      "WebFetch(domain:localhost)"
+      "WebFetch(domain:localhost)",
+      "Bash(curl *)",
+      "WebFetch(domain:docs.magnific.com)",
+      "Bash(cd \"C:\\\\Users\\\\Matheus\\\\.claude\\\\projects\\\\C--Users-Matheus-Desktop-Outside-CreativeOS-creativeos\\\\memory\")",
+      "Bash(cat MEMORY.md)"
     ]
   },
   "enableAllProjectMcpServers": true,

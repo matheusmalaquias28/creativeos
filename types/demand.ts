@@ -1,3 +1,5 @@
+import type { MagnificSpaceStatus } from "./database";
+
 export type DemandArte = {
   headline: string;
   subheadline: string;
@@ -46,6 +48,10 @@ export type CreativeDemand = {
   elapsed_seconds: number | null;
   due_date: string | null;
   external_created_at: string | null;
+  magnific_space_id: string | null;
+  magnific_space_url: string | null;
+  magnific_space_status: MagnificSpaceStatus;
+  magnific_space_error: string | null;
   created_at: string;
   updated_at: string;
 };

@@ -8,6 +8,7 @@ import type {
   DemandBriefing,
   DemandMonthStat,
 } from "@/types/demand";
+import type { MagnificSpaceStatus } from "@/types/database";
 
 export async function getNewDemandsCount(): Promise<number> {
   const supabase = await createClient();
@@ -42,7 +43,7 @@ function parseBriefing(value: unknown): DemandBriefing {
   };
 }
 
-function parseArtes(value: unknown): DemandArte[] {
+export function parseArtes(value: unknown): DemandArte[] {
   if (!Array.isArray(value)) return [];
 
   return value
@@ -89,6 +90,11 @@ function mapDemandRow(
     external_created_at: row.external_created_at
       ? String(row.external_created_at)
       : null,
+    magnific_space_id: row.magnific_space_id ? String(row.magnific_space_id) : null,
+    magnific_space_url: row.magnific_space_url ? String(row.magnific_space_url) : null,
+    magnific_space_status:
+      (row.magnific_space_status as MagnificSpaceStatus | undefined) ?? "not_generated",
+    magnific_space_error: row.magnific_space_error ? String(row.magnific_space_error) : null,
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
     client_name: clientName ?? null,

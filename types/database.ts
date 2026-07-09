@@ -4,6 +4,15 @@ import type { ClientOpportunityId } from "@/lib/clients/opportunities";
 
 export type ClientStatus = "draft" | "onboarding" | "active" | "archived";
 
+export const MAGNIFIC_SPACE_STATUSES = [
+  "not_generated",
+  "generating",
+  "ready",
+  "failed",
+] as const;
+
+export type MagnificSpaceStatus = (typeof MAGNIFIC_SPACE_STATUSES)[number];
+
 export type UserRole = "admin" | "member";
 
 export type User = {
@@ -54,6 +63,7 @@ export type ClientPhoto = {
   mime_type: string | null;
   file_size: number | null;
   sort_order: number;
+  magnific_creation_id: string | null;
   created_at: string;
 };
 
@@ -127,9 +137,10 @@ export type Database = {
       };
       client_photos: {
         Row: ClientPhoto;
-        Insert: Omit<ClientPhoto, "id" | "created_at"> & {
+        Insert: Omit<ClientPhoto, "id" | "created_at" | "magnific_creation_id"> & {
           id?: string;
           created_at?: string;
+          magnific_creation_id?: string | null;
         };
         Update: Partial<Omit<ClientPhoto, "id">>;
         Relationships: [
@@ -216,6 +227,12 @@ export type Database = {
           due_date: string | null;
           external_created_at: string | null;
           raw_payload: Json;
+          magnific_space_id: string | null;
+          magnific_space_url: string | null;
+          magnific_space_status: MagnificSpaceStatus;
+          magnific_space_error: string | null;
+          magnific_space_requested_at: string | null;
+          magnific_space_generated_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -241,6 +258,12 @@ export type Database = {
           due_date?: string | null;
           external_created_at?: string | null;
           raw_payload?: Json;
+          magnific_space_id?: string | null;
+          magnific_space_url?: string | null;
+          magnific_space_status?: MagnificSpaceStatus;
+          magnific_space_error?: string | null;
+          magnific_space_requested_at?: string | null;
+          magnific_space_generated_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -264,6 +287,12 @@ export type Database = {
           due_date: string | null;
           external_created_at: string | null;
           raw_payload: Json;
+          magnific_space_id: string | null;
+          magnific_space_url: string | null;
+          magnific_space_status: MagnificSpaceStatus;
+          magnific_space_error: string | null;
+          magnific_space_requested_at: string | null;
+          magnific_space_generated_at: string | null;
           updated_at: string;
         }>;
         Relationships: [
@@ -312,6 +341,26 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      magnific_oauth_tokens: {
+        Row: {
+          id: number;
+          client_id: string | null;
+          client_secret: string | null;
+          access_token: string | null;
+          refresh_token: string | null;
+          token_type: string | null;
+          scope: string | null;
+          expires_at: string | null;
+          code_verifier: string | null;
+          state: string | null;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["magnific_oauth_tokens"]["Row"]> & {
+          id?: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["magnific_oauth_tokens"]["Row"]>;
+        Relationships: [];
       };
     };
     Views: Record<string, never>;

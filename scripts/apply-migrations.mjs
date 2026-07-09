@@ -121,6 +121,8 @@ async function main() {
           "20250528300000_client_photos_table.sql": sql`select exists (select 1 from information_schema.tables where table_name = 'client_photos') as e`,
           "20250529100000_creative_brain_failed_status.sql": sql`select exists (select 1 from pg_enum where enumlabel = 'failed') as e`,
           "20250609100000_creative_demands.sql": sql`select exists (select 1 from information_schema.tables where table_name = 'creative_demands') as e`,
+          "20250611100000_creative_demands_update_policy.sql": sql`select exists (select 1 from pg_policies where policyname = 'Authenticated users can update demands') as e`,
+          "20250611110000_creative_demands_realtime.sql": sql`select exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename = 'creative_demands') as e`,
         };
         for (const [file, query] of Object.entries(checks)) {
           const [{ e }] = await query;

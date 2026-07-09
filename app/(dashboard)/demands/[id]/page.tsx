@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { DemandDetailStatusBar } from "@/components/demands/demand-detail-status-bar";
+import { MagnificSpaceButton } from "@/components/demands/magnific-space-button";
 import { CopyArteTextsButton } from "@/components/demands/copy-arte-texts-button";
 import { DemandClientLinker } from "@/components/demands/demand-client-linker";
 import {
@@ -111,6 +112,14 @@ export default async function DemandDetailPage({ params }: PageProps) {
             startedAt={demand.started_at}
             elapsedSeconds={demand.elapsed_seconds}
           />
+          {!demand.client_not_found && (
+            <MagnificSpaceButton
+              demandId={demand.id}
+              status={demand.magnific_space_status}
+              spaceUrl={demand.magnific_space_url}
+              errorMessage={demand.magnific_space_error}
+            />
+          )}
         </div>
 
         <Surface variant="elevated">
