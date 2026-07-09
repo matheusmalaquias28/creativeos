@@ -20,6 +20,7 @@ export async function GET() {
 
   let redirectTo: URL | null = null;
   const provider = new MagnificOAuthProvider((url) => {
+    console.log("[magnific/oauth] redirectToAuthorization ->", url.toString());
     redirectTo = url;
   });
 
@@ -28,14 +29,28 @@ export async function GET() {
     authProvider: provider,
   });
 
+  const start = Date.now();
+  console.log("[magnific/oauth] connecting to", MAGNIFIC_MCP_URL);
+
   try {
     await client.connect(transport);
+    console.log("[magnific/oauth] connected without auth challenge in", Date.now() - start, "ms");
     return NextResponse.json({ ok: true, message: "Magnific já está autorizado." });
   } catch (error) {
+    console.log("[magnific/oauth] connect() threw after", Date.now() - start, "ms");
+    console.error("[magnific/oauth] error:", error);
+
     if (error instanceof UnauthorizedError && redirectTo) {
       return NextResponse.redirect(redirectTo);
     }
     const message = error instanceof Error ? error.message : "Erro desconhecido";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: message,
+        errorName: error instanceof Error ? error.name : typeof error,
+        gotRedirect: Boolean(redirectTo),
+      },
+      { status: 500 }
+    );
   }
 }

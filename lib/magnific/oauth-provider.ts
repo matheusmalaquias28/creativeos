@@ -45,20 +45,24 @@ export class MagnificOAuthProvider implements OAuthClientProvider {
   }
 
   private async getRow(): Promise<TokensRow | null> {
+    const t0 = Date.now();
     const supabase = createAdminClient();
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("magnific_oauth_tokens")
       .select("*")
       .eq("id", TOKENS_ROW_ID)
       .maybeSingle();
+    console.log(`[magnific/oauth-provider] getRow ${Date.now() - t0}ms`, error?.message ?? "ok");
     return data;
   }
 
   private async upsertRow(patch: Partial<TokensRow>): Promise<void> {
+    const t0 = Date.now();
     const supabase = createAdminClient();
     const { error } = await supabase
       .from("magnific_oauth_tokens")
       .upsert({ id: TOKENS_ROW_ID, ...patch }, { onConflict: "id" });
+    console.log(`[magnific/oauth-provider] upsertRow ${Date.now() - t0}ms`, error?.message ?? "ok");
     if (error) {
       throw new Error(`Falha ao salvar credenciais do Magnific: ${error.message}`);
     }
