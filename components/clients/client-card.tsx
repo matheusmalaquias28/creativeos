@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { ArrowUpRight, Clock } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   ClientStatusIndicator,
   getClientStatusConfig,
@@ -21,134 +20,77 @@ const statusVariant: Record<
   archived: "outline",
 };
 
-const statusCardStyle: Record<
-  ClientListItem["status"],
-  { border: string; bg: string; accent: string }
-> = {
-  active: {
-    border: "border-emerald-500/30 hover:border-emerald-500/55",
-    bg: "bg-emerald-500/[0.03] group-hover:bg-emerald-500/[0.06]",
-    accent: "from-emerald-500/30 to-transparent",
-  },
-  onboarding: {
-    border: "border-sky-500/30 hover:border-sky-500/55",
-    bg: "bg-sky-500/[0.03] group-hover:bg-sky-500/[0.06]",
-    accent: "from-sky-500/30 to-transparent",
-  },
-  draft: {
-    border: "border-amber-500/30 hover:border-amber-500/55",
-    bg: "bg-amber-500/[0.03] group-hover:bg-amber-500/[0.06]",
-    accent: "from-amber-500/30 to-transparent",
-  },
-  archived: {
-    border: "border-zinc-500/25 hover:border-zinc-500/45",
-    bg: "opacity-75 group-hover:opacity-100 group-hover:bg-zinc-500/[0.04]",
-    accent: "from-zinc-500/25 to-transparent",
-  },
-};
-
-function daysInBase(createdAt: string): number {
-  return Math.floor(
-    (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24)
-  );
-}
-
 export function ClientCard({ client }: { client: ClientListItem }) {
   const initials = clientInitials(client.name);
   const status = getClientStatusConfig(client.status);
   const opportunityFlags = client.opportunityFlags ?? [];
-  const cardStyle = statusCardStyle[client.status];
-  const days = client.status === "onboarding" ? daysInBase(client.created_at) : null;
 
   return (
-    <Link href={`/clients/${client.id}`} className="group block">
+    <Link href={`/clients/${client.id}`} className="group block w-full max-w-[13.5rem]">
       <article
         className={cn(
-          "hover-lift relative flex flex-col gap-5 overflow-hidden rounded-[var(--radius-xl)] border p-6 backdrop-blur-[12px] transition-colors",
-          cardStyle.border,
-          cardStyle.bg
+          "surface-panel hover-lift flex flex-col gap-3.5 p-4",
+          "group-hover:border-border group-hover:shadow-[var(--surface-shadow-hover)] dark:group-hover:border-white/12 dark:group-hover:bg-[oklch(0.095_0.007_265/85%)]"
         )}
       >
-        <div
-          className={cn(
-            "pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r",
-            cardStyle.accent
-          )}
-        />
-        <div className="flex items-start gap-4">
-          <div className="relative shrink-0">
-            <Avatar
-              size="lg"
-              className="size-11 shrink-0 rounded-xl after:rounded-xl"
-            >
-              {client.logoUrl ? (
-                <AvatarImage
-                  src={client.logoUrl}
-                  alt={`Logo ${client.name}`}
-                  className="rounded-xl object-contain p-1.5"
-                />
-              ) : null}
-              <AvatarFallback className="rounded-xl text-xs font-medium">
+        <div className="relative w-full">
+          <div className="flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-xl border border-border/60 bg-muted/45 p-3 dark:border-border/50 dark:bg-muted/25">
+            {client.logoUrl ? (
+              <img
+                src={client.logoUrl}
+                alt={`Logo ${client.name}`}
+                className="max-h-full max-w-full object-contain"
+              />
+            ) : (
+              <span className="font-heading text-2xl font-medium tracking-heading text-muted-foreground/80">
                 {initials}
-              </AvatarFallback>
-            </Avatar>
-            <ClientStatusIndicator
-              status={client.status}
-              className="absolute -right-0.5 -bottom-0.5"
-            />
+              </span>
+            )}
           </div>
-
-          <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
-            <div className="min-w-0 space-y-1">
-              <h3 className="truncate font-medium tracking-heading text-foreground">
-                {client.name}
-              </h3>
-              <p className="truncate font-mono text-xs text-muted-foreground">
-                /{client.slug}
-              </p>
-            </div>
-            <Badge variant={statusVariant[client.status]} className="shrink-0">
-              {status.label}
-            </Badge>
-          </div>
+          <ClientStatusIndicator
+            status={client.status}
+            className="absolute -right-0.5 -bottom-0.5"
+          />
         </div>
 
-        {opportunityFlags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {opportunityFlags.map((flag) => (
-              <Badge
-                key={flag}
-                variant="outline"
-                className="border-amber-500/40 bg-amber-500/10 text-amber-400"
-              >
-                {CLIENT_OPPORTUNITY_LABELS[flag]}
-              </Badge>
-            ))}
+        <div className="min-w-0 space-y-2">
+          <div className="space-y-0.5">
+            <h3 className="truncate text-sm font-medium tracking-heading text-foreground">
+              {client.name}
+            </h3>
+            <p className="truncate font-mono text-[0.6875rem] text-muted-foreground">
+              /{client.slug}
+            </p>
           </div>
-        )}
 
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          {days !== null ? (
-            <span className="flex items-center gap-1.5 text-sky-400/90">
-              <Clock className="size-3.5 shrink-0" strokeWidth={1.75} />
-              {days === 0
-                ? "Entrou hoje"
-                : days === 1
-                  ? "1 dia na base"
-                  : `${days} dias na base`}
-            </span>
-          ) : (
-            <span>
-              Atualizado{" "}
-              {new Date(client.updated_at).toLocaleDateString("pt-BR", {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-              })}
-            </span>
+          <Badge variant={statusVariant[client.status]} className="w-fit text-[0.6875rem]">
+            {status.label}
+          </Badge>
+
+          {opportunityFlags.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {opportunityFlags.map((flag) => (
+                <Badge
+                  key={flag}
+                  variant="outline"
+                  className="border-amber-500/40 bg-amber-500/10 px-1.5 py-0 text-[0.625rem] text-amber-700 dark:text-amber-400"
+                >
+                  {CLIENT_OPPORTUNITY_LABELS[flag]}
+                </Badge>
+              ))}
+            </div>
           )}
+        </div>
+
+        <div className="mt-auto flex items-center justify-between border-t border-border/40 pt-2.5 text-[0.6875rem] text-muted-foreground">
+          <span className="truncate">
+            {new Date(client.updated_at).toLocaleDateString("pt-BR", {
+              day: "2-digit",
+              month: "short",
+            })}
+          </span>
           <ArrowUpRight
-            className="size-4 text-muted-foreground/50 transition-premium group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-foreground/70"
+            className="size-3.5 shrink-0 text-muted-foreground/50 transition-premium group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-foreground/70"
             strokeWidth={1.5}
           />
         </div>

@@ -40,16 +40,11 @@ export function pickOnboardingForAi(
     out[key] = value;
   };
 
-  set("business", onboarding.businessDescription);
-  set("audience", onboarding.targetAudience);
-  set("personality", onboarding.brandPersonality);
-  set("goals", onboarding.goals);
-  set("tone", onboarding.toneOfVoice);
   set("fonts", onboarding.fontStyles);
   if (onboarding.brandColors?.length) set("colors", onboarding.brandColors);
-  set("visualInspirations", onboarding.visualInspirations);
-  set("avoidStyles", onboarding.avoidStyles);
-  set("competitors", onboarding.competitors);
+  if (onboarding.references?.length) set("references", onboarding.references);
+  set("instagram", onboarding.instagramHandle);
+  set("siteUrl", onboarding.siteUrl);
 
   return out;
 }

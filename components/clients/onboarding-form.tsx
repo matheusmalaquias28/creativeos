@@ -21,7 +21,6 @@ import { ClientPhotosField } from "@/components/clients/client-photos-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { isNegativeOpportunity, parseStoredBoolean } from "@/lib/utils/parse-stored-boolean";
@@ -31,62 +30,6 @@ type OnboardingFormProps = {
   defaultValues: Partial<OnboardingFormValues> & { clientPhotos?: ClientPhotoRow[] };
   completedAt: string | null;
 };
-
-const briefingFields: {
-  name: keyof OnboardingFormValues;
-  label: string;
-  placeholder: string;
-  rows?: number;
-}[] = [
-  {
-    name: "businessDescription",
-    label: "Descrição do negócio",
-    placeholder: "O que a marca faz, posicionamento, diferenciais...",
-    rows: 4,
-  },
-  {
-    name: "targetAudience",
-    label: "Público-alvo",
-    placeholder: "Quem são os clientes ideais?",
-    rows: 3,
-  },
-  {
-    name: "brandPersonality",
-    label: "Personalidade da marca",
-    placeholder: "Como a marca se comporta e se comunica?",
-    rows: 2,
-  },
-  {
-    name: "toneOfVoice",
-    label: "Tom de voz",
-    placeholder: "Formal, ousado, acolhedor...",
-    rows: 2,
-  },
-  {
-    name: "goals",
-    label: "Objetivos da campanha",
-    placeholder: "Conversão, awareness, lançamento...",
-    rows: 3,
-  },
-  {
-    name: "competitors",
-    label: "Concorrentes",
-    placeholder: "Principais referências do mercado",
-    rows: 2,
-  },
-  {
-    name: "visualInspirations",
-    label: "Inspirações visuais",
-    placeholder: "Estéticas, marcas ou referências",
-    rows: 2,
-  },
-  {
-    name: "avoidStyles",
-    label: "Estilos a evitar",
-    placeholder: "O que não deve aparecer nos criativos",
-    rows: 2,
-  },
-];
 
 function YesNoToggle({
   value,
@@ -129,7 +72,7 @@ function YesNoToggle({
 
 function OpportunityFlag({ label }: { label: string }) {
   return (
-    <p className="text-xs text-amber-400">
+    <p className="text-xs text-amber-700 dark:text-amber-400">
       <span className="font-medium">Oportunidade:</span> {label}
     </p>
   );
@@ -169,14 +112,6 @@ export function OnboardingForm({
   const form = useForm<OnboardingFormValues>({
     resolver: zodResolver(onboardingSchema),
     defaultValues: {
-      businessDescription: defaultValues.businessDescription ?? "",
-      targetAudience: defaultValues.targetAudience ?? "",
-      brandPersonality: defaultValues.brandPersonality ?? "",
-      competitors: defaultValues.competitors ?? "",
-      goals: defaultValues.goals ?? "",
-      toneOfVoice: defaultValues.toneOfVoice ?? "",
-      visualInspirations: defaultValues.visualInspirations ?? "",
-      avoidStyles: defaultValues.avoidStyles ?? "",
       brandColors: defaultValues.brandColors ?? [],
       fontStyles: defaultValues.fontStyles ?? "",
       logoUrl: defaultValues.logoUrl,
@@ -333,7 +268,7 @@ export function OnboardingForm({
             }}
           />
 
-          <div className="space-y-3 rounded-lg border border-border/50 bg-card/40 p-4">
+          <div className="space-y-3 rounded-lg border border-border bg-muted/45 dark:border-border/50 dark:bg-card/40 p-4">
             <Label>O logo do cliente tem qualidade suficiente para uso?</Label>
             <Controller
               name="logoQualityOk"
@@ -359,7 +294,7 @@ export function OnboardingForm({
             onChange={(photos) => setClientPhotos(photos)}
           />
 
-          <div className="space-y-3 rounded-lg border border-border/50 bg-card/40 p-4">
+          <div className="space-y-3 rounded-lg border border-border bg-muted/45 dark:border-border/50 dark:bg-card/40 p-4">
             <Label>O cliente tem fotos/imagens para uso nos criativos?</Label>
             <Controller
               name="hasClientImages"
@@ -391,13 +326,13 @@ export function OnboardingForm({
 
         <div className="space-y-3">
           {refInputs.map((ref, i) => (
-            <div key={i} className="space-y-1.5 rounded-lg border border-border/50 bg-card/40 p-3">
+            <div key={i} className="space-y-1.5 rounded-lg border border-border bg-muted/45 dark:border-border/50 dark:bg-card/40 p-3">
               <Label className="text-xs text-muted-foreground">Referência {i + 1}</Label>
               <Input
                 value={ref}
                 onChange={(e) => handleRefChange(i, e.target.value)}
                 placeholder="URL ou descrição da referência"
-                className="border-border/70 bg-background"
+                className="border-border bg-card dark:border-border/70 dark:bg-background"
               />
             </div>
           ))}
@@ -418,7 +353,7 @@ export function OnboardingForm({
         </div>
 
         {/* [5] Site? */}
-        <div className="space-y-3 rounded-lg border border-border/50 bg-card/40 p-4">
+        <div className="space-y-3 rounded-lg border border-border bg-muted/45 dark:border-border/50 dark:bg-card/40 p-4">
           <Label>O cliente tem site?</Label>
           <Controller
             name="hasSite"
@@ -434,7 +369,7 @@ export function OnboardingForm({
             <Input
               {...form.register("siteUrl")}
               placeholder="https://..."
-              className="border-border/70 bg-background"
+              className="border-border bg-card dark:border-border/70 dark:bg-background"
             />
           )}
           {isNegativeOpportunity(hasSite) && (
@@ -443,17 +378,17 @@ export function OnboardingForm({
         </div>
 
         {/* [6] Instagram */}
-        <div className="space-y-2 rounded-lg border border-border/50 bg-card/40 p-4">
+        <div className="space-y-2 rounded-lg border border-border bg-muted/45 dark:border-border/50 dark:bg-card/40 p-4">
           <Label>Instagram</Label>
           <Input
             {...form.register("instagramHandle")}
             placeholder="@nomedocliente"
-            className="border-border/70 bg-background"
+            className="border-border bg-card dark:border-border/70 dark:bg-background"
           />
         </div>
 
         {/* [7] Google Meu Negócio? */}
-        <div className="space-y-3 rounded-lg border border-border/50 bg-card/40 p-4">
+        <div className="space-y-3 rounded-lg border border-border bg-muted/45 dark:border-border/50 dark:bg-card/40 p-4">
           <Label>O cliente tem Google Meu Negócio?</Label>
           <Controller
             name="hasGMB"
@@ -484,7 +419,7 @@ export function OnboardingForm({
           </p>
         </div>
 
-        <div className="space-y-4 rounded-lg border border-border/50 bg-card/40 p-4">
+        <div className="space-y-4 rounded-lg border border-border bg-muted/45 dark:border-border/50 dark:bg-card/40 p-4">
           <div className="space-y-3">
             <Label>O cliente tem identidade visual?</Label>
             <Controller
@@ -543,49 +478,6 @@ export function OnboardingForm({
             </div>
           )}
         </div>
-      </section>
-
-      <Separator className="opacity-50" />
-
-      {/* ── Briefing Criativo ─────────────────────────────── */}
-      <section className="space-y-6">
-        <div>
-          <h2 className="text-lg font-medium tracking-heading">
-            Briefing Criativo
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Contexto estratégico para geração do Creative Brain
-          </p>
-        </div>
-
-        {briefingFields.map((field) => (
-          <div key={field.name} className="space-y-2 rounded-lg border border-border/50 bg-card/40 p-4">
-            <Label htmlFor={field.name} className="text-sm font-medium">
-              {field.label}
-            </Label>
-            {field.rows ? (
-              <Textarea
-                id={field.name}
-                rows={field.rows}
-                placeholder={field.placeholder}
-                className="border-border/70 bg-background"
-                {...form.register(field.name)}
-              />
-            ) : (
-              <Input
-                id={field.name}
-                placeholder={field.placeholder}
-                className="border-border/70 bg-background"
-                {...form.register(field.name)}
-              />
-            )}
-            {form.formState.errors[field.name] && (
-              <p className="text-xs text-destructive">
-                {String(form.formState.errors[field.name]?.message)}
-              </p>
-            )}
-          </div>
-        ))}
       </section>
 
       {/* Hidden inputs para serialização no FormData */}

@@ -69,14 +69,6 @@ function parseFormToAnswers(formData: FormData): Partial<OnboardingFormValues> {
     hasGMB: parseBooleanField(formData.get("hasGMB")),
     hasVisualIdentity: parseBooleanField(formData.get("hasVisualIdentity")),
     visualIdentityOption: (viOption as "sell" | "name_only") || undefined,
-    businessDescription: String(formData.get("businessDescription") ?? ""),
-    targetAudience: String(formData.get("targetAudience") ?? ""),
-    brandPersonality: String(formData.get("brandPersonality") ?? ""),
-    competitors: String(formData.get("competitors") ?? "") || undefined,
-    goals: String(formData.get("goals") ?? ""),
-    toneOfVoice: String(formData.get("toneOfVoice") ?? ""),
-    visualInspirations: String(formData.get("visualInspirations") ?? "") || undefined,
-    avoidStyles: String(formData.get("avoidStyles") ?? "") || undefined,
   };
 }
 

@@ -37,15 +37,6 @@ export const onboardingSchema = z.object({
   // [8] ID Visual?
   hasVisualIdentity: z.boolean().nullable().optional(),
   visualIdentityOption: z.enum(["sell", "name_only"]).nullable().optional(),
-  // Briefing Criativo — todos opcionais
-  businessDescription: z.string().optional(),
-  targetAudience: z.string().optional(),
-  brandPersonality: z.string().optional(),
-  competitors: z.string().optional(),
-  goals: z.string().optional(),
-  toneOfVoice: z.string().optional(),
-  visualInspirations: z.string().optional(),
-  avoidStyles: z.string().optional(),
 });
 
 

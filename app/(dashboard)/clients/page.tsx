@@ -1,4 +1,4 @@
-import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { DashboardPage } from "@/components/layout/dashboard-page";
 import { ClientList } from "@/components/clients/client-list";
 import { CreateClientForm } from "@/components/clients/create-client-form";
 import {
@@ -9,21 +9,17 @@ import {
   SurfaceTitle,
 } from "@/components/ui/surface";
 import { layout } from "@/lib/design/tokens";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/auth/session";
 import { getClientsForUser } from "@/services/clients";
 
 export default async function ClientsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const user = await getAuthUser();
   if (!user) return null;
 
   const clients = await getClientsForUser(user.id);
 
   return (
-    <DashboardShell
+    <DashboardPage
       title="Clientes"
       description="Gerencie marcas, onboarding e Creative Brains"
     >
@@ -40,16 +36,8 @@ export default async function ClientsPage() {
           </SurfaceContent>
         </Surface>
 
-        {clients.length === 0 ? (
-          <Surface variant="dashed" padding="lg">
-            <p className="text-center text-sm text-muted-foreground">
-              Nenhum cliente cadastrado.
-            </p>
-          </Surface>
-        ) : (
-          <ClientList clients={clients} />
-        )}
+        <ClientList clients={clients} />
       </div>
-    </DashboardShell>
+    </DashboardPage>
   );
 }

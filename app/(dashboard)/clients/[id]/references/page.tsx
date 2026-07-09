@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { DashboardPage } from "@/components/layout/dashboard-page";
 import { ReferenceUpload } from "@/components/clients/reference-upload";
 import { ReferenceGallery } from "@/components/clients/reference-gallery";
 import { ClientPhotosPanel } from "@/components/clients/client-photos-panel";
@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/surface";
 import { cn } from "@/lib/utils";
 import { layout } from "@/lib/design/tokens";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/auth/session";
 import { getClientById, getClientReferences } from "@/services/clients";
 import { getClientPhotos } from "@/services/client-photos";
 
@@ -25,11 +25,7 @@ type PageProps = {
 
 export default async function ReferencesPage({ params }: PageProps) {
   const { id } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const user = await getAuthUser();
   if (!user) return null;
 
   const client = await getClientById(id, user.id);
@@ -41,7 +37,7 @@ export default async function ReferencesPage({ params }: PageProps) {
   ]);
 
   return (
-    <DashboardShell
+    <DashboardPage
       title="Referências visuais"
       description={`${client.name} · inspirações para o Brand DNA`}
     >
@@ -99,6 +95,6 @@ export default async function ReferencesPage({ params }: PageProps) {
           Voltar ao cliente
         </Link>
       </div>
-    </DashboardShell>
+    </DashboardPage>
   );
 }

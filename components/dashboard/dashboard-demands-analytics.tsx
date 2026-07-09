@@ -63,7 +63,7 @@ function NeonTooltip({
 
   return (
     <div className="rounded-xl border border-cyan-500/30 bg-popover/95 p-3 shadow-[0_0_24px_rgba(34,211,238,0.15)] backdrop-blur-md">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-cyan-300/90">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-cyan-700 dark:text-cyan-300/90">
         {label}
       </p>
       <div className="space-y-1.5 text-xs">
@@ -135,7 +135,7 @@ export function DashboardDemandsAnalytics({ data }: Props) {
       : (filled.find((item) => item.month === selectedMonth)?.label ?? selectedMonth);
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-card/80 via-background to-violet-950/20 p-6 shadow-[0_0_60px_rgba(34,211,238,0.08)] animate-in-soft">
+    <div className="relative overflow-hidden rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-card/80 via-background to-violet-100/60 p-6 shadow-[0_0_40px_rgba(34,211,238,0.06)] dark:border-white/7 dark:to-violet-950/20 dark:shadow-[0_0_0_1px_oklch(1_0_0/6%),0_8px_40px_oklch(0_0_0/55%)] animate-in-soft">
       <div
         className="pointer-events-none absolute -right-20 -top-20 size-64 rounded-full bg-cyan-500/10 blur-3xl"
         aria-hidden
@@ -148,7 +148,7 @@ export function DashboardDemandsAnalytics({ data }: Props) {
       <div className="relative space-y-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-[0.65rem] font-medium uppercase tracking-wider text-cyan-300">
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-[0.65rem] font-medium uppercase tracking-wider text-cyan-700 dark:text-cyan-300">
               <Sparkles className="size-3" />
               Analytics · Demandas
             </div>
@@ -159,10 +159,10 @@ export function DashboardDemandsAnalytics({ data }: Props) {
               Volume filtrável por mês e comparativo de tempo entre designer tradicional e híbrido
             </p>
           </div>
-          <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.12)]">
+          <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-700 shadow-[0_0_16px_rgba(52,211,153,0.08)] dark:text-emerald-300 dark:shadow-[0_0_20px_rgba(52,211,153,0.12)]">
             <TrendingUp className="size-4" />
             <span className="font-medium tabular-nums">{totals.speedup}x</span>
-            <span className="text-emerald-300/80">mais rápido</span>
+            <span className="text-emerald-700/80 dark:text-emerald-300/80">mais rápido</span>
           </div>
         </div>
 
@@ -439,7 +439,7 @@ function FilterPill({
       className={cn(
         "rounded-full border px-3 py-1 text-xs font-medium transition-premium",
         active
-          ? "border-cyan-400/40 bg-cyan-500/15 text-cyan-200 shadow-[0_0_16px_rgba(34,211,238,0.12)]"
+          ? "border-cyan-500/40 bg-cyan-500/15 text-cyan-700 shadow-[0_0_12px_rgba(34,211,238,0.1)] dark:border-cyan-400/40 dark:text-cyan-200 dark:shadow-[0_0_16px_rgba(34,211,238,0.12)]"
           : "border-border/50 text-muted-foreground hover:border-cyan-500/30 hover:text-foreground"
       )}
     >
@@ -464,10 +464,10 @@ function KpiCard({
   large?: boolean;
 }) {
   const accents = {
-    cyan: "border-cyan-500/25 bg-cyan-500/5 text-cyan-300 shadow-[0_0_20px_rgba(34,211,238,0.08)]",
-    amber: "border-amber-500/25 bg-amber-500/5 text-amber-300 shadow-[0_0_20px_rgba(251,191,36,0.08)]",
-    violet: "border-violet-500/25 bg-violet-500/5 text-violet-300 shadow-[0_0_20px_rgba(167,139,250,0.08)]",
-    emerald: "border-emerald-500/25 bg-emerald-500/5 text-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.08)]",
+    cyan: "border-cyan-500/25 bg-cyan-500/5 text-cyan-700 shadow-[0_0_16px_rgba(34,211,238,0.06)] dark:text-cyan-300 dark:shadow-[0_0_20px_rgba(34,211,238,0.08)]",
+    amber: "border-amber-500/25 bg-amber-500/5 text-amber-700 shadow-[0_0_16px_rgba(251,191,36,0.06)] dark:text-amber-300 dark:shadow-[0_0_20px_rgba(251,191,36,0.08)]",
+    violet: "border-violet-500/25 bg-violet-500/5 text-violet-700 shadow-[0_0_16px_rgba(167,139,250,0.06)] dark:text-violet-300 dark:shadow-[0_0_20px_rgba(167,139,250,0.08)]",
+    emerald: "border-emerald-500/25 bg-emerald-500/5 text-emerald-700 shadow-[0_0_16px_rgba(52,211,153,0.06)] dark:text-emerald-300 dark:shadow-[0_0_20px_rgba(52,211,153,0.08)]",
   };
 
   return (
@@ -534,7 +534,7 @@ function ComparisonCard({
             <p
               className={cn(
                 "mt-1 text-3xl font-semibold tabular-nums tracking-heading",
-                isAmber ? "text-amber-300" : "text-cyan-300"
+                isAmber ? "text-amber-700 dark:text-amber-300" : "text-cyan-700 dark:text-cyan-300"
               )}
             >
               {total}
@@ -548,7 +548,7 @@ function ComparisonCard({
           </div>
         </div>
         <div className="space-y-2">
-          <div className="h-2 overflow-hidden rounded-full bg-white/5">
+          <div className="h-2 overflow-hidden rounded-full bg-black/5 dark:bg-white/5">
             <div
               className={cn(
                 "h-full rounded-full transition-all duration-1000 ease-out",

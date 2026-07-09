@@ -23,7 +23,7 @@ export function WorkflowModuleCard({
   return (
     <div className={cn("surface-panel flex flex-col gap-6 p-6 hover-lift")}>
       <div className="flex items-start gap-4">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border/45 bg-muted/30">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/60 dark:border-border/45 dark:bg-muted/30">
           <Icon className="size-4 text-muted-foreground" strokeWidth={1.5} />
         </div>
         <div className="min-w-0 space-y-1">

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Brain, Sparkles, Users, Workflow } from "lucide-react";
-import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { DashboardPage } from "@/components/layout/dashboard-page";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { DashboardDemandsAnalyticsLoader } from "@/components/dashboard/dashboard-demands-analytics-loader";
 import { ClientCard } from "@/components/clients/client-card";
@@ -15,16 +15,12 @@ import {
 } from "@/components/ui/surface";
 import { cn } from "@/lib/utils";
 import { layout } from "@/lib/design/tokens";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/auth/session";
 import { getClientsForUser, getDashboardStats } from "@/services/clients";
 import { getDemandsMonthlyStats } from "@/services/demands";
 
-export default async function DashboardPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+export default async function DashboardPageRoute() {
+  const user = await getAuthUser();
   if (!user) return null;
 
   const [stats, clients, monthlyStats] = await Promise.all([
@@ -33,10 +29,12 @@ export default async function DashboardPage() {
     getDemandsMonthlyStats(),
   ]);
 
-  const recentClients = clients.slice(0, 4);
+  const recentClients = clients
+    .filter((client) => client.status !== "archived")
+    .slice(0, 4);
 
   return (
-    <DashboardShell
+    <DashboardPage
       title="Dashboard"
       description="Visão geral dos clientes e Creative Brains da agência"
     >
@@ -121,7 +119,7 @@ export default async function DashboardPage() {
               </div>
             </Surface>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(12.5rem,13.5rem))]">
               {recentClients.map((client) => (
                 <ClientCard key={client.id} client={client} />
               ))}
@@ -129,6 +127,6 @@ export default async function DashboardPage() {
           )}
         </section>
       </div>
-    </DashboardShell>
+    </DashboardPage>
   );
 }

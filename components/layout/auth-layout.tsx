@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Brain } from "lucide-react";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 
 export function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -11,6 +12,7 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
           </div>
           <span className="text-sm font-medium tracking-heading">Creative OS</span>
         </Link>
+        <ThemeToggle compact />
       </header>
 
       <div className="flex flex-1 items-center justify-center px-6 pb-16">

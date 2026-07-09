@@ -33,7 +33,8 @@ export default function RootLayout({
   return (
     <html
       lang="pt-BR"
-      className={`${manrope.variable} ${geistMono.variable} dark h-full`}
+      className={`${manrope.variable} ${geistMono.variable} h-full`}
+      suppressHydrationWarning
     >
       <body className="relative min-h-full font-sans">
         <AmbientBackground />

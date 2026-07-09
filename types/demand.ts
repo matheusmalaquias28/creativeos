@@ -58,6 +58,8 @@ export type CreativeDemand = {
 
 export type CreativeDemandListItem = CreativeDemand & {
   client_name?: string | null;
+  /** Contagem leve para listagens (artes completas só no detalhe). */
+  artes_count?: number;
 };
 
 export type DemandMonthStat = {
