@@ -46,3 +46,37 @@ export async function generateMagnificSpaceAction(
 
   return { success: true };
 }
+
+export type CancelMagnificSpaceState = {
+  error?: string;
+  success?: boolean;
+};
+
+/**
+ * Força o cancelamento de uma geração em andamento. Marca `magnific_space_cancel_requested`
+ * (verificado pelo poller em trigger-generation.ts, que aborta a chamada em andamento) e já
+ * grava o status como "failed" de imediato — cobre tanto o caso de uma geração realmente
+ * travada (invocação já morta, ninguém vai ler o flag) quanto o caso de estar ativa.
+ */
+export async function cancelMagnificSpaceGenerationAction(
+  demandId: string
+): Promise<CancelMagnificSpaceState> {
+  const supabase = await createClient();
+
+  const { data: claimed, error } = await supabase
+    .from("creative_demands")
+    .update({
+      magnific_space_status: "failed",
+      magnific_space_error: "Cancelado pelo operador",
+      magnific_space_cancel_requested: true,
+    })
+    .eq("id", demandId)
+    .eq("magnific_space_status", "generating")
+    .select("id")
+    .maybeSingle();
+
+  if (error) return { error: error.message };
+  if (!claimed) return { error: "Nenhuma geração em andamento para cancelar" };
+
+  return { success: true };
+}

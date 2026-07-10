@@ -15,9 +15,21 @@ const MAX_TURNS = 4;
  * campo que cada tool do Magnific devolve — quem interpreta isso é o próprio Claude.
  * `resultSchema` força o texto final a vir como JSON no formato esperado.
  */
+export type RunMagnificAgentOptions = {
+  /** Aborta a operação (timeout automático ou cancelamento manual do operador). */
+  signal?: AbortSignal;
+};
+
+function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) {
+    throw signal.reason instanceof Error ? signal.reason : new Error("Operação cancelada");
+  }
+}
+
 export async function runMagnificAgent<T>(
   prompt: string,
-  resultSchema: Record<string, unknown>
+  resultSchema: Record<string, unknown>,
+  opts: RunMagnificAgentOptions = {}
 ): Promise<T> {
   const client = getAnthropicClient();
   const accessToken = await getValidMagnificAccessToken();
@@ -25,22 +37,27 @@ export async function runMagnificAgent<T>(
   const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: prompt }];
 
   for (let turn = 0; turn < MAX_TURNS; turn++) {
-    const response = await client.beta.messages.create({
-      model: AGENT_MODEL,
-      max_tokens: 8000,
-      betas: [MCP_BETA],
-      mcp_servers: [
-        {
-          type: "url",
-          url: MAGNIFIC_MCP_URL,
-          name: "magnific",
-          authorization_token: accessToken,
-        },
-      ],
-      tools: [{ type: "mcp_toolset", mcp_server_name: "magnific" }],
-      output_config: { format: { type: "json_schema", schema: resultSchema } },
-      messages,
-    });
+    throwIfAborted(opts.signal);
+
+    const response = await client.beta.messages.create(
+      {
+        model: AGENT_MODEL,
+        max_tokens: 8000,
+        betas: [MCP_BETA],
+        mcp_servers: [
+          {
+            type: "url",
+            url: MAGNIFIC_MCP_URL,
+            name: "magnific",
+            authorization_token: accessToken,
+          },
+        ],
+        tools: [{ type: "mcp_toolset", mcp_server_name: "magnific" }],
+        output_config: { format: { type: "json_schema", schema: resultSchema } },
+        messages,
+      },
+      { signal: opts.signal }
+    );
 
     if (response.stop_reason === "pause_turn") {
       messages.push({ role: "assistant", content: response.content });
@@ -82,6 +99,9 @@ const SPACE_RESULT_SCHEMA = {
 
 export type SpaceAgentResult = { spaceId: string; spaceUrl: string };
 
-export async function runMagnificSpaceAgent(prompt: string): Promise<SpaceAgentResult> {
-  return runMagnificAgent<SpaceAgentResult>(prompt, SPACE_RESULT_SCHEMA);
+export async function runMagnificSpaceAgent(
+  prompt: string,
+  opts?: RunMagnificAgentOptions
+): Promise<SpaceAgentResult> {
+  return runMagnificAgent<SpaceAgentResult>(prompt, SPACE_RESULT_SCHEMA, opts);
 }

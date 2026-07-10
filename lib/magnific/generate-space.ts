@@ -121,7 +121,8 @@ function buildAgentPrompt(
 }
 
 export async function generateMagnificSpace(
-  input: GenerateSpaceInput
+  input: GenerateSpaceInput,
+  opts: { signal?: AbortSignal } = {}
 ): Promise<GenerateSpaceResult> {
   const [clientPhotoUrls, demandRefUrls, profile, onboardingLogoUrl] = await Promise.all([
     fetchClientPhotoUrls(input.clientId),
@@ -139,7 +140,7 @@ export async function generateMagnificSpace(
   const prompt = buildAgentPrompt(input, logoUrl, imageUrls, brief);
 
   try {
-    return await runMagnificSpaceAgent(prompt);
+    return await runMagnificSpaceAgent(prompt, opts);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro desconhecido";
     throw new MagnificGenerationError("agent", message);
