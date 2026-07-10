@@ -123,6 +123,9 @@ async function main() {
           "20250609100000_creative_demands.sql": sql`select exists (select 1 from information_schema.tables where table_name = 'creative_demands') as e`,
           "20250611100000_creative_demands_update_policy.sql": sql`select exists (select 1 from pg_policies where policyname = 'Authenticated users can update demands') as e`,
           "20250611110000_creative_demands_realtime.sql": sql`select exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename = 'creative_demands') as e`,
+          "20260617000000_client_creative_profile.sql": sql`select exists (select 1 from information_schema.tables where table_name = 'client_creative_profile') as e`,
+          "20260617100000_art_generation_job.sql": sql`select exists (select 1 from information_schema.tables where table_name = 'art_generation_job') as e`,
+          "20260617200000_art_version.sql": sql`select exists (select 1 from information_schema.tables where table_name = 'art_version') as e`,
         };
         for (const [file, query] of Object.entries(checks)) {
           const [{ e }] = await query;
