@@ -72,15 +72,27 @@ export function MagnificSpaceButton({ demandId, status, spaceUrl, errorMessage }
 
   if (localStatus === "ready" && spaceUrl) {
     return (
-      <a
-        href={spaceUrl}
-        target="_blank"
-        rel="noreferrer"
-        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 text-sm font-medium text-emerald-300 transition-premium hover:bg-emerald-500/20"
-      >
-        <ExternalLink className="size-3.5" />
-        Abrir no Spaces
-      </a>
+      <span className="inline-flex items-center gap-1.5">
+        <a
+          href={spaceUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 text-sm font-medium text-emerald-300 transition-premium hover:bg-emerald-500/20"
+        >
+          <ExternalLink className="size-3.5" />
+          Abrir no Spaces
+        </a>
+        <button
+          type="button"
+          disabled={isPending}
+          onClick={handleGenerate}
+          title="Gera o Space de novo, mesmo já estando pronto"
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/10 bg-black/20 px-3 text-sm font-medium text-foreground/80 transition-premium hover:bg-black/30 disabled:opacity-60"
+        >
+          <RefreshCw className="size-3.5" />
+          Regenerar
+        </button>
+      </span>
     );
   }
 
