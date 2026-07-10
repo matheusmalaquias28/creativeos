@@ -15,8 +15,8 @@ export function buildMagnificSpaceQuery(
 
   parts.push(
     tipo
-      ? `Crie um conjunto de artes premium para "${tipo}" usando as imagens de referência já adicionadas neste Space.`
-      : "Crie um conjunto de artes premium usando as imagens de referência já adicionadas neste Space."
+      ? `Crie um conjunto de artes para "${tipo}" usando as imagens de referência já adicionadas neste Space.`
+      : "Crie um conjunto de artes usando as imagens de referência já adicionadas neste Space."
   );
 
   if (profile?.basePrompt.trim()) {

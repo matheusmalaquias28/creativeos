@@ -461,6 +461,30 @@ export type Database = {
         }>;
         Relationships: [];
       };
+      client_magnific_space: {
+        Row: {
+          id: string;
+          client_id: string;
+          space_id: string;
+          space_url: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          client_id: string;
+          space_id: string;
+          space_url: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<{
+          space_id: string;
+          space_url: string;
+          updated_at: string;
+        }>;
+        Relationships: [];
+      };
       art_generation_job: {
         Row: {
           id: string;

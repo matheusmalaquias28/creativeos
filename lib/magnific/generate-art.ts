@@ -93,31 +93,38 @@ export async function generateMagnificArt(
 ): Promise<GenerateMagnificArtResult> {
   validateAspectRatio(input.model, input.aspectRatio);
 
-  const uploadUrls = [
-    ...(input.logoUrl ? [input.logoUrl] : []),
-    ...input.references.map((r) => r.url),
-  ];
-
+  const refUrls = input.references.map((r) => r.url);
   const brief = buildCopyBrief(input);
+
+  const uploadSteps: string[] = [];
+  if (input.logoUrl) {
+    uploadSteps.push(
+      `Suba a logo do cliente via creations_upload_image: ${input.logoUrl} — guarde o \`identifier\` retornado.`
+    );
+  }
+  if (refUrls.length) {
+    uploadSteps.push(
+      [
+        "Suba estas imagens de referência via creations_upload_image (uma URL por vez) e guarde o `identifier` retornado por cada uma:",
+        refUrls.map((url, i) => `${i + 1}. ${url}`).join("\n"),
+      ].join("\n")
+    );
+  }
 
   const prompt = [
     `Gere uma arte usando o modelo Magnific "${input.model}".`,
-    uploadUrls.length
-      ? [
-          "Suba estas imagens via creations_upload_image (uma URL por vez) e guarde o `identifier` retornado por cada upload:",
-          uploadUrls.map((url, i) => `${i + 1}. ${url}`).join("\n"),
-        ].join("\n")
-      : "Não há imagens de referência disponíveis — gere apenas com base no texto abaixo.",
-    uploadUrls.length
-      ? [
-          'Ao chamar images_generate, inclua TODOS os identifiers que você acabou de subir no array `references`, cada um como {"type": "image", "identifier": "<identifier>"}. Essa é a ÚNICA forma correta de usar essas imagens — elas devem influenciar a arte gerada apenas visualmente, através do `references`.',
-          "NÃO descreva o conteúdo dessas imagens no campo `prompt` de images_generate: nenhuma frase sobre o que elas mostram, cores, objetos, pessoas, estilo, etc. O `prompt` deve conter só a copy/briefing abaixo e, se houver logo, a instrução de posicionamento dela — nada sobre as referências.",
-        ].join("\n")
+    uploadSteps.length ? uploadSteps.join("\n\n") : null,
+    uploadSteps.length
+      ? 'Ao chamar images_generate, inclua todos os identifiers que você acabou de subir (logo e referências) no array `references`, cada um como {"type": "image", "identifier": "<identifier>"}. Essa é a única forma correta de usar essas imagens.'
       : null,
     input.logoUrl
-      ? "A logo deve aparecer no canto superior esquerdo da arte, em tamanho pequeno — inclua só essa instrução de posicionamento no `prompt`, sem descrever a logo."
+      ? "O identifier da logo deve ser usado SOMENTE para posicioná-la, sem alterações, no canto superior esquerdo da arte, em tamanho pequeno — não a use como referência de estilo, cor ou composição da arte."
       : null,
-    brief || "Gere uma arte premium para redes sociais com base no estilo visual das referências.",
+    refUrls.length
+      ? "Os identifiers das referências devem influenciar a arte apenas visualmente através do `references` — não descreva o conteúdo delas (cores, objetos, pessoas, estilo etc.) no campo `prompt` de images_generate."
+      : null,
+    "O campo `prompt` de images_generate deve conter apenas a copy/briefing abaixo e, se houver logo, a instrução de posicionamento dela. Não adicione adjetivos, estilos ou direção artística que não estejam no briefing abaixo.",
+    brief || "Sem copy adicional — gere a arte com base apenas nas referências visuais e na logo, se houver.",
     `Chame images_generate com mode="${input.model}", aspectRatio="${input.aspectRatio}", resolution="${input.resolution}", quality="${input.quality}".`,
     "Aguarde a geração terminar antes de responder, e use a URL final do arquivo gerado — nunca a webUrl de preview.",
     'Quando finalizar, responda SOMENTE com um JSON no formato {"imageUrl": "..."} — sem texto antes ou depois.',

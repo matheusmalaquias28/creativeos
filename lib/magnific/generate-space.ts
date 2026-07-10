@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { parseOnboardingAnswers } from "@/services/onboarding";
 import { runMagnificSpaceAgent } from "./mcp-agent";
 import { buildMagnificSpaceQuery, type CreativeProfileBrief } from "./build-space-query";
+import { getClientMagnificSpace, saveClientMagnificSpace } from "./client-space";
 import type { DemandArte } from "@/types/demand";
 
 export class MagnificGenerationError extends Error {
@@ -87,10 +88,20 @@ function buildAgentPrompt(
   input: GenerateSpaceInput,
   logoUrl: string | null,
   imageUrls: string[],
-  brief: string
+  brief: string,
+  existingSpaceId: string | null
 ): string {
-  const spaceName = `${input.clientName} — ${input.tipo ?? "Demanda"} ${input.externalId}`;
-  const parts: string[] = [`Crie um novo Space no Magnific chamado "${spaceName}".`];
+  const parts: string[] = [];
+
+  if (existingSpaceId) {
+    parts.push(
+      `Use o Space já existente com spaceId "${existingSpaceId}" — NÃO crie um Space novo.`
+    );
+  } else {
+    parts.push(
+      `Antes de criar qualquer coisa, procure um Space já existente para este cliente com spaces_list usando query="${input.clientName}". Se encontrar um Space cujo nome corresponda a "${input.clientName}", use-o (não crie outro). Só use spaces_create, com nome "${input.clientName}", se nenhum Space existente corresponder.`
+    );
+  }
 
   if (logoUrl) {
     parts.push(
@@ -114,7 +125,7 @@ function buildAgentPrompt(
   parts.push(`Depois, use spaces_edit com esta instrução: ${brief}`);
   parts.push("Acompanhe a edição com spaces_edit_status até terminar (allTerminal) antes de responder.");
   parts.push(
-    'Quando finalizar, responda SOMENTE com um JSON no formato {"spaceId": "...", "spaceUrl": "..."} do Space criado — sem texto antes ou depois.'
+    'Quando finalizar, responda SOMENTE com um JSON no formato {"spaceId": "...", "spaceUrl": "..."} do Space usado (o existente reaproveitado ou o recém-criado) — sem texto antes ou depois.'
   );
 
   return parts.join("\n\n");
@@ -124,12 +135,14 @@ export async function generateMagnificSpace(
   input: GenerateSpaceInput,
   opts: { signal?: AbortSignal } = {}
 ): Promise<GenerateSpaceResult> {
-  const [clientPhotoUrls, demandRefUrls, profile, onboardingLogoUrl] = await Promise.all([
-    fetchClientPhotoUrls(input.clientId),
-    fetchDemandReferenceUrls(input.demandId),
-    fetchCreativeProfile(input.clientId),
-    fetchOnboardingLogoUrl(input.clientId),
-  ]);
+  const [clientPhotoUrls, demandRefUrls, profile, onboardingLogoUrl, existingSpace] =
+    await Promise.all([
+      fetchClientPhotoUrls(input.clientId),
+      fetchDemandReferenceUrls(input.demandId),
+      fetchCreativeProfile(input.clientId),
+      fetchOnboardingLogoUrl(input.clientId),
+      getClientMagnificSpace(input.clientId),
+    ]);
 
   const logoUrl = profile?.logoUrl ?? onboardingLogoUrl;
   const imageUrls = Array.from(
@@ -137,10 +150,19 @@ export async function generateMagnificSpace(
   );
 
   const brief = buildMagnificSpaceQuery(input.artes, input.tipo, profile?.brief ?? null);
-  const prompt = buildAgentPrompt(input, logoUrl, imageUrls, brief);
+  const prompt = buildAgentPrompt(input, logoUrl, imageUrls, brief, existingSpace?.spaceId ?? null);
 
   try {
-    return await runMagnificSpaceAgent(prompt, opts);
+    const result = await runMagnificSpaceAgent(prompt, opts);
+    // Best-effort: mesmo que essa geração seja a segunda+ demanda do cliente, grava
+    // (ou re-grava) o mapeamento cliente → Space pra próximas demandas reaproveitarem.
+    await saveClientMagnificSpace(input.clientId, result).catch((err: unknown) => {
+      console.error(
+        "[generate-space] falha ao salvar client_magnific_space:",
+        err instanceof Error ? err.message : err
+      );
+    });
+    return result;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro desconhecido";
     throw new MagnificGenerationError("agent", message);
