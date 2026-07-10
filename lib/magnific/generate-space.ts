@@ -172,7 +172,12 @@ export async function generateMagnificSpace(
     new Set([...(logoUrl ? [logoUrl] : []), ...clientPhotoUrls, ...(profile?.styleUrls ?? []), ...demandRefUrls])
   );
 
-  const brief = buildMagnificSpaceQuery(input.artes, input.tipo, profile?.brief ?? null);
+  const brief = buildMagnificSpaceQuery(
+    input.artes,
+    input.tipo,
+    profile?.brief ?? null,
+    Boolean(logoUrl)
+  );
 
   let step = "connect";
   try {
