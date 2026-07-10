@@ -58,30 +58,33 @@ function validateAspectRatio(model: string, aspectRatio: string): void {
   }
 }
 
+/**
+ * Prompt fixo por decisão de produto: SOMENTE headline/subheadline/CTA entram como
+ * texto da arte — briefing e informações extras NÃO vão no prompt. A logo, quando
+ * existe, é sempre a primeira referência enviada e sempre aparece no canto
+ * superior esquerdo.
+ */
 function buildPrompt(input: GenerateMagnificArtInput): string {
-  const parts: string[] = [];
+  const textLines: string[] = [];
+  if (input.headline) textLines.push(`Headline: ${input.headline}`);
+  if (input.subheadline) textLines.push(`Subheadline: ${input.subheadline}`);
+  if (input.cta) textLines.push(`CTA: ${input.cta}`);
 
-  if (input.briefingTitulo || input.briefingTipo) {
-    parts.push([input.briefingTitulo, input.briefingTipo].filter(Boolean).join(" — "));
+  const parts: string[] = [];
+  if (textLines.length) {
+    parts.push(["Utilize somente esses textos na criação da arte:", ...textLines].join("\n"));
+    parts.push("NÃO É PARA ADICIONAR NENHUM OUTRO TEXTO na arte além dos listados acima.");
+  } else {
+    parts.push("NÃO adicione nenhum texto na arte.");
   }
 
-  const copyParts: string[] = [];
-  if (input.headline) copyParts.push(`Headline: ${input.headline}`);
-  if (input.subheadline) copyParts.push(`Subheadline: ${input.subheadline}`);
-  if (input.cta) copyParts.push(`CTA: ${input.cta}`);
-  if (copyParts.length) parts.push(copyParts.join("  "));
-
-  if (input.informacoesExtras) parts.push(input.informacoesExtras);
-
-  // Regra que antes ia no prompt do agente: a logo entra como referência visual e
-  // só é posicionada — nunca descrita ou usada como direção de estilo.
   if (input.logoUrl) {
     parts.push(
-      "Posicione a logo (fornecida como imagem de referência) no canto superior esquerdo, em tamanho pequeno, sem alterações — não a use como referência de estilo, cor ou composição."
+      "A primeira imagem de referência é a logo da marca. A logo DEVE aparecer na arte, sempre no canto superior esquerdo, em tamanho pequeno e sem alterações — não a use como referência de estilo, cor ou composição."
     );
   }
 
-  return parts.join("\n\n") || "Arte para redes sociais baseada nas referências visuais fornecidas.";
+  return parts.join("\n\n");
 }
 
 function extractIdentifier(result: unknown, context: string): string {

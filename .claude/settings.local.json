@@ -23,7 +23,8 @@
       "Bash(mkdir:*)",
       "Bash(npm test:*)",
       "mcp__supabase__execute_sql",
-      "mcp__supabase__get_logs"
+      "mcp__supabase__get_logs",
+      "Skill(claude-api)"
     ]
   },
   "enableAllProjectMcpServers": true,

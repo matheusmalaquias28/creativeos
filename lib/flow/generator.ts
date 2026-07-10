@@ -10,8 +10,6 @@ const DEFAULT_QUALITY = 'low' as const;
 const DEFAULT_ASPECT_RATIO = '3:4';
 const DEFAULT_IMAGE_SIZE = '2K';
 
-const DEFAULT_PROMPT_EXTRAS =
-  'Desenvolva uma arte para as redes sociais. Com a logo no canto superior esquerdo em pequeno tamanho @(logo).';
 
 /**
  * Gera um FlowGraph padrão para uma demanda com `numArtes` artes.
@@ -77,6 +75,10 @@ export function gerarFluxoDaDemanda(
       id: gerarId,
       type: 'gerarImagem',
       data: {
+        aspectRatio: DEFAULT_ASPECT_RATIO,
+        imageSize: DEFAULT_IMAGE_SIZE,
+        model: DEFAULT_MODEL,
+        quality: DEFAULT_QUALITY,
         demandId: demanda.id,
         clientId: demanda.client_id ?? '',
         briefingTitulo: demanda.briefing?.titulo ?? null,
@@ -138,7 +140,7 @@ export function gerarSubfluxoDaDemanda(
         headline: arte?.headline ?? null,
         subheadline: arte?.subheadline ?? null,
         cta: arte?.cta ?? null,
-        informacoesExtras: arte?.informacoesExtras ?? DEFAULT_PROMPT_EXTRAS,
+        informacoesExtras: arte?.informacoesExtras ?? null,
       },
       position: { x: COL_W, y },
     });

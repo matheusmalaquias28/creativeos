@@ -209,7 +209,7 @@ function extractPipelineJob(
     subheadline,
     cta,
     informacoesExtras,
-    aspect_ratio: gerarNode.data.aspectRatio ?? "1:1",
+    aspect_ratio: gerarNode.data.aspectRatio ?? "3:4",
     image_size: gerarNode.data.imageSize ?? "2K",
     model: gerarNode.data.model ?? "gpt-2",
     quality: gerarNode.data.quality ?? "low",

@@ -250,7 +250,7 @@ export async function runGraph(graph: FlowGraph, context: RunContext): Promise<R
         const result = await context.imageProvider.generate({
           prompt: compiled,
           referenceUrls,
-          aspectRatio: node.data.aspectRatio ?? '1:1',
+          aspectRatio: node.data.aspectRatio ?? '3:4',
           imageSize: node.data.imageSize ?? '2K',
         });
 
