@@ -5,7 +5,12 @@ export type CreativeProfileBrief = {
   palette: string[];
 };
 
-/** Instrução em linguagem natural para `spaces_edit` — não depende de Creative Brain/brand DNA. */
+/**
+ * Instrução em linguagem natural para `spaces_edit` — não depende de Creative
+ * Brain/brand DNA. Só headline/subheadline/CTA de cada arte entram como texto
+ * — sem isso explícito, o Magnific tende a inventar textos/informações extras
+ * que não vieram da demanda.
+ */
 export function buildMagnificSpaceQuery(
   artes: DemandArte[],
   tipo: string | null,
@@ -27,6 +32,7 @@ export function buildMagnificSpaceQuery(
     parts.push(`Utilize as cores: ${profile.palette.slice(0, 6).join(", ")}.`);
   }
 
+  const textLines: string[] = [];
   artes.forEach((arte, index) => {
     const copyParts: string[] = [];
     if (arte.headline) copyParts.push(`Headline: ${arte.headline}`);
@@ -35,9 +41,21 @@ export function buildMagnificSpaceQuery(
     if (copyParts.length === 0) return;
 
     const label = artes.length > 1 ? `Arte ${index + 1}` : "Arte";
-    parts.push(`${label} — ${copyParts.join("  ")}.`);
-    if (arte.informacoesExtras.trim()) parts.push(arte.informacoesExtras.trim());
+    textLines.push(`${label} — ${copyParts.join("  ")}.`);
   });
+
+  if (textLines.length) {
+    parts.push(
+      ["Utilize somente estes textos, exatamente como estão, em cada arte correspondente:", ...textLines].join(
+        "\n"
+      )
+    );
+    parts.push(
+      "NÃO adicione nenhum outro texto nas artes além dos listados acima — nada de frases, informações, preços ou datas inventadas."
+    );
+  } else {
+    parts.push("NÃO adicione nenhum texto nas artes.");
+  }
 
   return parts.join(" ");
 }
