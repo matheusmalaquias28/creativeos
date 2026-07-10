@@ -9,7 +9,8 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname),
   experimental: {
     serverActions: {
-      bodySizeLimit: "3mb",
+      // Reference uploads allow up to 10MB per file (multiple files per request).
+      bodySizeLimit: "50mb",
     },
   },
   images: {
