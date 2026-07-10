@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { runWorker } from "@/lib/ai/imagegen/worker";
 import { extractFlowJobParams } from "@/lib/flow/extract-flow-jobs";
 import { enrichFlowGraphWithProfile } from "@/lib/flow/enrich-graph";
+import { loadFlowCreativeProfile } from "@/lib/flow/load-creative-profile";
 import { getClientFlowGraph } from "@/services/flow";
 import type { FlowGraph } from "@/lib/flow/types";
 
@@ -38,16 +39,7 @@ export async function POST(_req: Request, { params }: Params) {
     );
   }
 
-  let profile: { logo_url: string | null; style_reference_urls: string[] | null } | null =
-    null;
-  if (demand.client_id) {
-    const { data } = await supabase
-      .from("client_creative_profile")
-      .select("logo_url, style_reference_urls")
-      .eq("client_id", demand.client_id)
-      .maybeSingle();
-    profile = data;
-  }
+  const profile = await loadFlowCreativeProfile(demand.client_id ?? null);
 
   const enrichedGraph = enrichFlowGraphWithProfile(graph, profile);
   const briefing = (demand.briefing as { titulo?: string; tipo?: string }) ?? {};

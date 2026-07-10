@@ -2,28 +2,12 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { getDemandById } from "@/services/demands";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrCreateClientFlowGraph } from "@/services/flow";
 import { enrichFlowGraphWithProfile } from "@/lib/flow/enrich-graph";
+import { loadFlowCreativeProfile } from "@/lib/flow/load-creative-profile";
 import { FlowCanvas } from "@/components/flow/flow-canvas";
 
 type PageProps = { params: Promise<{ id: string }> };
-
-type CreativeProfileRow = {
-  logo_url: string | null;
-  style_reference_urls: string[] | null;
-};
-
-async function loadCreativeProfile(clientId: string | null): Promise<CreativeProfileRow | null> {
-  if (!clientId) return null;
-  const supabase = createAdminClient();
-  const { data } = await supabase
-    .from("client_creative_profile")
-    .select("logo_url, style_reference_urls")
-    .eq("client_id", clientId)
-    .maybeSingle();
-  return data;
-}
 
 export default async function DemandFlowPage({ params }: PageProps) {
   const { id } = await params;
@@ -36,7 +20,7 @@ export default async function DemandFlowPage({ params }: PageProps) {
 
   const [{ graph, clientId }, profile] = await Promise.all([
     getOrCreateClientFlowGraph(demand, numArtes),
-    loadCreativeProfile(demand.client_id ?? null),
+    loadFlowCreativeProfile(demand.client_id ?? null),
   ]);
 
   const initialGraph = enrichFlowGraphWithProfile(graph, profile);
