@@ -33,7 +33,11 @@ export type PromptArteData = {
 export type GerarImagemData = {
   aspectRatio?: string;
   imageSize?: string;
-  /** Injected at generation time — not serialized to graph. */
+  /** "gemini" ou o slug de um modelo Magnific (ex: "gpt-2"). Default: "gpt-2". */
+  model?: string;
+  /** Só se aplica a modelos Magnific. Default: "low". */
+  quality?: "low" | "medium" | "high";
+  /** Persistido no grafo — usado para escopar execução quando o fluxo é compartilhado por cliente. */
   demandId?: string;
   clientId?: string;
   briefingTitulo?: string | null;
@@ -43,6 +47,8 @@ export type GerarImagemData = {
 export type SaidaArteData = {
   artIndex: number;
   label?: string;
+  /** Persistido no grafo — usado para escopar execução quando o fluxo é compartilhado por cliente. */
+  demandId?: string;
   /** Runtime-only — injected by Realtime, never persisted to flow_graph. */
   resultUrl?: string | null;
   generatingStatus?: "queued" | "processing" | "succeeded" | "failed";

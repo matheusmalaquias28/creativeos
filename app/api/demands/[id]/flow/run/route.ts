@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { runWorker } from "@/lib/ai/imagegen/worker";
 import { extractFlowJobParams } from "@/lib/flow/extract-flow-jobs";
 import { enrichFlowGraphWithProfile } from "@/lib/flow/enrich-graph";
+import { getClientFlowGraph } from "@/services/flow";
 import type { FlowGraph } from "@/lib/flow/types";
 
 type Params = { params: Promise<{ id: string }> };
@@ -21,7 +22,10 @@ export async function POST(_req: Request, { params }: Params) {
     return NextResponse.json({ error: "Demanda não encontrada" }, { status: 404 });
   }
 
-  const graph = demand.flow_graph as FlowGraph | null;
+  const graph = demand.client_id
+    ? await getClientFlowGraph(demand.client_id)
+    : ((demand.flow_graph as FlowGraph | null) ?? null);
+
   if (!graph || !graph.nodes?.length) {
     return NextResponse.json(
       { error: "Nenhum fluxo salvo — salve o fluxo antes de executar" },
@@ -42,7 +46,9 @@ export async function POST(_req: Request, { params }: Params) {
 
   const enrichedGraph = enrichFlowGraphWithProfile(graph, profile);
   const briefing = (demand.briefing as { titulo?: string; tipo?: string }) ?? {};
-  const jobParams = extractFlowJobParams(enrichedGraph, briefing);
+  // Filtra por demandId — sem isso, um fluxo compartilhado por cliente reprocessaria
+  // as artes de TODAS as demandas do cliente ao clicar "Executar" numa só.
+  const jobParams = extractFlowJobParams(enrichedGraph, briefing, { demandId });
 
   if (jobParams.length === 0) {
     return NextResponse.json(
@@ -69,6 +75,8 @@ export async function POST(_req: Request, { params }: Params) {
       informacoesExtras: p.informacoesExtras,
       aspect_ratio: p.aspect_ratio,
       image_size: p.image_size,
+      model: p.model,
+      quality: p.quality,
       briefing_titulo: p.briefing_titulo,
       briefing_tipo: p.briefing_tipo,
       flow_logo_url: p.flow_logo_url,

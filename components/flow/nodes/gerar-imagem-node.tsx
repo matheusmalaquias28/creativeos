@@ -8,6 +8,11 @@ import type { GerarImagemData, SaidaArteData } from "@/lib/flow/types";
 
 const ASPECT_RATIOS = ["1:1", "4:5", "3:4", "4:3", "9:16", "16:9", "3:2"];
 const IMAGE_SIZES = ["1K", "2K", "4K"];
+const MODELS = [
+  { value: "gpt-2", label: "Magnific" },
+  { value: "gemini", label: "Gemini" },
+];
+const QUALITIES = ["low", "medium", "high"] as const;
 
 type Props = { id: string; data: GerarImagemData; selected?: boolean };
 
@@ -128,6 +133,48 @@ export function GerarImagemNode({ id, data, selected }: Props) {
         <div className="space-y-2">
           <div className="space-y-1">
             <label className="text-[0.5625rem] uppercase tracking-wider text-cyan-400/60">
+              Modelo
+            </label>
+            <div className="flex flex-wrap gap-1">
+              {MODELS.map((m) => (
+                <button
+                  key={m.value}
+                  onClick={() => update({ model: m.value })}
+                  className={`rounded px-1.5 py-0.5 text-[0.5625rem] font-medium transition-colors ${
+                    (data.model ?? "gpt-2") === m.value
+                      ? "bg-cyan-500/25 text-cyan-300"
+                      : "bg-white/4 text-muted-foreground/50 hover:bg-white/8"
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {(data.model ?? "gpt-2") !== "gemini" && (
+            <div className="space-y-1">
+              <label className="text-[0.5625rem] uppercase tracking-wider text-cyan-400/60">
+                Qualidade
+              </label>
+              <div className="flex gap-1">
+                {QUALITIES.map((q) => (
+                  <button
+                    key={q}
+                    onClick={() => update({ quality: q })}
+                    className={`rounded px-1.5 py-0.5 text-[0.5625rem] font-medium transition-colors ${
+                      (data.quality ?? "low") === q
+                        ? "bg-cyan-500/25 text-cyan-300"
+                        : "bg-white/4 text-muted-foreground/50 hover:bg-white/8"
+                    }`}
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="space-y-1">
+            <label className="text-[0.5625rem] uppercase tracking-wider text-cyan-400/60">
               Aspect ratio
             </label>
             <div className="flex flex-wrap gap-1">
@@ -136,7 +183,7 @@ export function GerarImagemNode({ id, data, selected }: Props) {
                   key={r}
                   onClick={() => update({ aspectRatio: r })}
                   className={`rounded px-1.5 py-0.5 text-[0.5625rem] font-medium transition-colors ${
-                    (data.aspectRatio ?? "1:1") === r
+                    (data.aspectRatio ?? "3:4") === r
                       ? "bg-cyan-500/25 text-cyan-300"
                       : "bg-white/4 text-muted-foreground/50 hover:bg-white/8"
                   }`}
@@ -168,9 +215,12 @@ export function GerarImagemNode({ id, data, selected }: Props) {
           </div>
         </div>
       ) : (
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[0.5625rem] text-muted-foreground/60">
-            {data.aspectRatio ?? "1:1"}
+            {MODELS.find((m) => m.value === (data.model ?? "gpt-2"))?.label ?? data.model}
+          </span>
+          <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[0.5625rem] text-muted-foreground/60">
+            {data.aspectRatio ?? "3:4"}
           </span>
           <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[0.5625rem] text-muted-foreground/60">
             {data.imageSize ?? "2K"}

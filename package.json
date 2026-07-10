@@ -9,6 +9,7 @@
     "lint": "eslint",
     "seed:admin": "node scripts/seed-admin.mjs",
     "db:setup": "node scripts/apply-migrations.mjs",
+    "backfill:client-flow": "node scripts/backfill-client-flow-graphs.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },

@@ -4,6 +4,7 @@ import type {
   FlowNode,
   PromptArteData,
   ReferenciaImagemData,
+  SaidaArteData,
 } from "@/lib/flow/types";
 
 export type FlowReferenceEntry = {
@@ -19,11 +20,16 @@ export type FlowJobParams = {
   informacoesExtras?: string | null;
   aspect_ratio: string;
   image_size: string;
+  model: string;
+  quality: "low" | "medium" | "high";
   briefing_titulo?: string | null;
   briefing_tipo?: string | null;
   flow_logo_url: string | null;
   flow_references: FlowReferenceEntry[];
 };
+
+/** Um alvo de @(label) — skipAutoAdd evita duplicar refs já adicionadas por outra edge. */
+type NamedRef = { url: string; skipAutoAdd?: boolean };
 
 function normalizeRefName(name: string): string {
   return name.toLowerCase().trim().replace(/\s+/g, "-");
@@ -69,7 +75,7 @@ function addReferenciaImagemNode(
 
 function resolveNamedRefTokens(
   text: string | null | undefined,
-  namedRefMap: Map<string, string>,
+  namedRefMap: Map<string, NamedRef>,
   refs: FlowReferenceEntry[],
   seen: Set<string>
 ): string | null {
@@ -77,14 +83,16 @@ function resolveNamedRefTokens(
 
   const result = text.replace(/@\(([^)]+)\)/g, (match, name: string) => {
     const key = normalizeRefName(name);
-    const url = namedRefMap.get(key);
-    if (url) {
-      addReference(
-        refs,
-        seen,
-        url,
-        `referência citada no prompt: ${name.replace(/-/g, " ")}`
-      );
+    const ref = namedRefMap.get(key);
+    if (ref) {
+      if (!ref.skipAutoAdd) {
+        addReference(
+          refs,
+          seen,
+          ref.url,
+          `referência citada no prompt: ${name.replace(/-/g, " ")}`
+        );
+      }
       return name.replace(/-/g, " ");
     }
     return match;
@@ -112,17 +120,35 @@ function extractPipelineJob(
   const seen = new Set<string>();
   let logoUrl: string | null = null;
 
-  const namedRefMap = new Map<string, string>();
+  const namedRefMap = new Map<string, NamedRef>();
 
   if (promptId) {
     for (const refId of predecessors.get(promptId) ?? []) {
       const refNode = nodeById.get(refId);
-      if (refNode?.type !== "referenciaImagem") continue;
-      const data = refNode.data as ReferenciaImagemData;
-      if (!data.imageUrl) continue;
-      const key = normalizeRefName(data.label ?? refId);
-      namedRefMap.set(key, data.imageUrl);
-      addReferenciaImagemNode(refNode, refs, seen);
+      if (!refNode) continue;
+
+      if (refNode.type === "referenciaImagem") {
+        const data = refNode.data as ReferenciaImagemData;
+        if (!data.imageUrl) continue;
+        const key = normalizeRefName(data.label ?? refId);
+        namedRefMap.set(key, { url: data.imageUrl });
+        addReferenciaImagemNode(refNode, refs, seen);
+        continue;
+      }
+
+      // Logo/refs do cliente conectados ao promptArte só habilitam o @(mention) no
+      // texto — já entram como flow_logo_url/flow_references pela edge com
+      // gerarImagem, então skipAutoAdd evita duplicar a referência.
+      if (refNode.type === "clienteLogo" && refNode.data.logoUrl) {
+        namedRefMap.set("logo", { url: refNode.data.logoUrl, skipAutoAdd: true });
+        continue;
+      }
+
+      if (refNode.type === "clienteReferencias") {
+        (refNode.data.referenceUrls ?? []).forEach((url, i) => {
+          namedRefMap.set(`ref-cliente-${i + 1}`, { url, skipAutoAdd: true });
+        });
+      }
     }
   }
 
@@ -185,6 +211,8 @@ function extractPipelineJob(
     informacoesExtras,
     aspect_ratio: gerarNode.data.aspectRatio ?? "1:1",
     image_size: gerarNode.data.imageSize ?? "2K",
+    model: gerarNode.data.model ?? "gpt-2",
+    quality: gerarNode.data.quality ?? "low",
     briefing_titulo: briefing.titulo ?? null,
     briefing_tipo: briefing.tipo ?? null,
     flow_logo_url: logoUrl,
@@ -194,7 +222,8 @@ function extractPipelineJob(
 
 export function extractFlowJobParams(
   graph: FlowGraph,
-  briefing: { titulo?: string | null; tipo?: string | null }
+  briefing: { titulo?: string | null; tipo?: string | null },
+  opts?: { demandId?: string }
 ): FlowJobParams[] {
   const nodeById = new Map<string, FlowNode>(graph.nodes.map((n) => [n.id, n]));
   const predecessors = buildPredecessorMap(graph);
@@ -202,6 +231,7 @@ export function extractFlowJobParams(
 
   for (const node of graph.nodes) {
     if (node.type !== "saidaArte") continue;
+    if (opts?.demandId && (node.data as SaidaArteData).demandId !== opts.demandId) continue;
 
     const gerarId = (predecessors.get(node.id) ?? []).find(
       (id) => nodeById.get(id)?.type === "gerarImagem"

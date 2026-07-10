@@ -45,7 +45,7 @@ import { SaidaArteNode } from "@/components/flow/nodes/saida-arte-node";
 import { ReferenciaImagemNode } from "@/components/flow/nodes/referencia-imagem-node";
 import { DeletableEdge } from "@/components/flow/edges/deletable-edge";
 import { FlowCanvasContext } from "@/components/flow/flow-canvas-context";
-import { gerarFluxoDaDemanda } from "@/lib/flow/generator";
+import { gerarFluxoDaDemanda, gerarSubfluxoDaDemanda, ROW_H } from "@/lib/flow/generator";
 import type { FlowGraph, SaidaArteData } from "@/lib/flow/types";
 import type { CreativeDemand } from "@/types/demand";
 
@@ -355,6 +355,15 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
           }
         : type === "referenciaImagem"
         ? { imageUrl: null, label: "Imagem" }
+        : type === "gerarImagem"
+        ? {
+            aspectRatio: "3:4",
+            imageSize: "2K",
+            model: "gpt-2",
+            quality: "low",
+            demandId: demanda.id,
+            clientId: demanda.client_id ?? "",
+          }
         : {};
 
     setNodes((ns) => [
@@ -402,11 +411,33 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
   }
 
   function reset() {
-    const fresh = gerarFluxoDaDemanda(demanda, numArtes);
-    const { nodes: n, edges: e } = graphToRF(fresh);
-    setNodes(n);
-    setEdges(e);
-    toast.info("Fluxo redefinido para o padrão");
+    // O fluxo é compartilhado por cliente — resetar só pode afetar o bloco DESTA
+    // demanda (identificado pelos IDs namespaced "..._${demanda.id}_..."), nunca o
+    // grafo inteiro, senão apaga o trabalho de outras demandas do mesmo cliente.
+    const currentNodes = getNodes();
+    const currentEdges = getEdges();
+    const belongsToThisDemand = (id: string) => id.includes(demanda.id);
+
+    const keptNodes = currentNodes.filter((n) => !belongsToThisDemand(n.id));
+    const keptEdges = currentEdges.filter(
+      (e) => !belongsToThisDemand(e.source) && !belongsToThisDemand(e.target)
+    );
+
+    const logoId = currentNodes.find((n) => n.type === "clienteLogo")?.id ?? "logo";
+    const refsId = currentNodes.find((n) => n.type === "clienteReferencias")?.id ?? "refs";
+
+    const maxY = keptNodes.reduce((max, n) => {
+      if (n.type === "clienteLogo" || n.type === "clienteReferencias") return max;
+      return Math.max(max, n.position.y);
+    }, -ROW_H);
+    const yOffset = keptNodes.length > 2 ? maxY + ROW_H : 0;
+
+    const subGraph = gerarSubfluxoDaDemanda(demanda, numArtes, { logoId, refsId, yOffset });
+    const { nodes: newNodes, edges: newEdges } = graphToRF(subGraph);
+
+    setNodes([...keptNodes, ...newNodes]);
+    setEdges([...keptEdges, ...newEdges]);
+    toast.info("Fluxo desta demanda redefinido para o padrão");
     scheduleAutoSave();
   }
 

@@ -3,9 +3,9 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { getDemandById } from "@/services/demands";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getOrCreateClientFlowGraph } from "@/services/flow";
+import { enrichFlowGraphWithProfile } from "@/lib/flow/enrich-graph";
 import { FlowCanvas } from "@/components/flow/flow-canvas";
-import { gerarFluxoDaDemanda } from "@/lib/flow/generator";
-import type { FlowGraph } from "@/lib/flow/types";
 
 type PageProps = { params: Promise<{ id: string }> };
 
@@ -14,55 +14,15 @@ type CreativeProfileRow = {
   style_reference_urls: string[] | null;
 };
 
-async function loadFlowData(demandId: string, clientId: string | null) {
+async function loadCreativeProfile(clientId: string | null): Promise<CreativeProfileRow | null> {
+  if (!clientId) return null;
   const supabase = createAdminClient();
-
-  const [demandRow, profileRow] = await Promise.all([
-    supabase
-      .from("creative_demands")
-      .select("flow_graph")
-      .eq("id", demandId)
-      .single(),
-    clientId
-      ? supabase
-          .from("client_creative_profile")
-          .select("logo_url, style_reference_urls")
-          .eq("client_id", clientId)
-          .maybeSingle()
-      : Promise.resolve({ data: null, error: null }),
-  ]);
-
-  const savedGraph = (demandRow.data?.flow_graph as FlowGraph | null) ?? null;
-  const profile = profileRow.data as CreativeProfileRow | null;
-
-  return { savedGraph, profile };
-}
-
-/** Enriches the graph's source nodes with actual image URLs. */
-function enrichGraph(
-  graph: FlowGraph,
-  profile: CreativeProfileRow | null
-): FlowGraph {
-  if (!profile) return graph;
-
-  return {
-    ...graph,
-    nodes: graph.nodes.map((n) => {
-      if (n.type === "clienteLogo") {
-        return { ...n, data: { ...n.data, logoUrl: profile.logo_url } };
-      }
-      if (n.type === "clienteReferencias") {
-        return {
-          ...n,
-          data: {
-            ...n.data,
-            referenceUrls: profile.style_reference_urls ?? [],
-          },
-        };
-      }
-      return n;
-    }),
-  };
+  const { data } = await supabase
+    .from("client_creative_profile")
+    .select("logo_url, style_reference_urls")
+    .eq("client_id", clientId)
+    .maybeSingle();
+  return data;
 }
 
 export default async function DemandFlowPage({ params }: PageProps) {
@@ -70,16 +30,16 @@ export default async function DemandFlowPage({ params }: PageProps) {
   const demand = await getDemandById(id);
   if (!demand) notFound();
 
-  const { savedGraph, profile } = await loadFlowData(id, demand.client_id ?? null);
-
   const numArtes =
     demand.briefing?.quantidadeArtes ??
     (demand.artes?.length > 0 ? demand.artes.length : 1);
 
-  // Build initial graph: saved (enriched) or fresh default (enriched)
-  const baseGraph =
-    savedGraph ?? gerarFluxoDaDemanda(demand, numArtes);
-  const initialGraph = enrichGraph(baseGraph, profile);
+  const [{ graph, clientId }, profile] = await Promise.all([
+    getOrCreateClientFlowGraph(demand, numArtes),
+    loadCreativeProfile(demand.client_id ?? null),
+  ]);
+
+  const initialGraph = enrichFlowGraphWithProfile(graph, profile);
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
@@ -98,8 +58,8 @@ export default async function DemandFlowPage({ params }: PageProps) {
           <p className="text-[0.6875rem] text-muted-foreground/50">
             Fluxo de geração · {numArtes}{" "}
             {numArtes === 1 ? "arte" : "artes"}
-            {savedGraph && (
-              <span className="ml-2 text-emerald-400/60">· fluxo salvo</span>
+            {clientId && (
+              <span className="ml-2 text-emerald-400/60">· fluxo compartilhado do cliente</span>
             )}
           </p>
         </div>

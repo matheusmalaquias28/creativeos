@@ -9,7 +9,7 @@ import {
   getPromptArteEditorText,
   parsePromptArteText,
 } from "@/lib/flow/prompt-arte-text";
-import type { PromptArteData, ReferenciaImagemData } from "@/lib/flow/types";
+import type { ClienteLogoData, PromptArteData, ReferenciaImagemData } from "@/lib/flow/types";
 
 // ─── Mention detection ────────────────────────────────────────────────────
 
@@ -55,16 +55,25 @@ export function PromptArteNode({ id, data, selected }: Props) {
     data.artIndex,
   ]);
 
-  const connectedImages = edges
+  const connectedSourceNodes = edges
     .filter((e) => e.target === id)
     .map((e) => getNode(e.source))
-    .filter((n) => n?.type === "referenciaImagem")
+    .filter((n): n is NonNullable<typeof n> => n != null);
+
+  const connectedImages = connectedSourceNodes
+    .filter((n) => n.type === "referenciaImagem")
     .map((n) => {
-      const imgData = n!.data as ReferenciaImagemData;
+      const imgData = n.data as ReferenciaImagemData;
       const label = imgData.label || "imagem";
       const token = `@(${label.toLowerCase().replace(/\s+/g, "-")})`;
       return { label, token };
-    });
+    })
+    .concat(
+      // Logo do cliente conectada ao node de texto também vira mencionável (@(logo)).
+      connectedSourceNodes
+        .filter((n) => n.type === "clienteLogo" && (n.data as ClienteLogoData).logoUrl)
+        .map(() => ({ label: "logo", token: "@(logo)" }))
+    );
 
   const mentionOptions =
     mention !== null

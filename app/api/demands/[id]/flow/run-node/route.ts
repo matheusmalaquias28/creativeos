@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { runWorker } from "@/lib/ai/imagegen/worker";
 import { extractFlowJobParams } from "@/lib/flow/extract-flow-jobs";
 import { enrichFlowGraphWithProfile } from "@/lib/flow/enrich-graph";
+import { getClientFlowGraph } from "@/services/flow";
 import type { FlowGraph } from "@/lib/flow/types";
 
 type Params = { params: Promise<{ id: string }> };
@@ -37,7 +38,10 @@ export async function POST(req: Request, { params }: Params) {
     return NextResponse.json({ error: "Demanda não encontrada" }, { status: 404 });
   }
 
-  const graph = demand.flow_graph as FlowGraph | null;
+  const graph = demand.client_id
+    ? await getClientFlowGraph(demand.client_id)
+    : ((demand.flow_graph as FlowGraph | null) ?? null);
+
   if (!graph || !graph.nodes?.length) {
     return NextResponse.json(
       { error: "Nenhum fluxo salvo — salve o fluxo antes de executar" },
@@ -58,7 +62,7 @@ export async function POST(req: Request, { params }: Params) {
 
   const enrichedGraph = enrichFlowGraphWithProfile(graph, profile);
   const briefing = (demand.briefing as { titulo?: string; tipo?: string }) ?? {};
-  const job = extractFlowJobParams(enrichedGraph, briefing).find(
+  const job = extractFlowJobParams(enrichedGraph, briefing, { demandId }).find(
     (entry) => entry.art_index === body.artIndex
   );
 
@@ -88,6 +92,8 @@ export async function POST(req: Request, { params }: Params) {
       informacoesExtras: job.informacoesExtras,
       aspect_ratio: job.aspect_ratio,
       image_size: job.image_size,
+      model: job.model,
+      quality: job.quality,
       briefing_titulo: job.briefing_titulo,
       briefing_tipo: job.briefing_tipo,
       flow_logo_url: job.flow_logo_url,

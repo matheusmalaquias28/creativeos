@@ -13,6 +13,7 @@ import { generateArt, type ImageSize, type AspectRatio } from "./client";
 import { urlsToInlineDataParts, urlToInlineDataPart } from "./storage-refs";
 import { compositeLogoFromBase64 } from "./logo-composite";
 import { compilePrompt, buildOrderedRefs } from "./prompt-compiler";
+import { generateMagnificArt } from "@/lib/magnific/generate-art";
 import type { LogoPlacement } from "./logo-composite";
 import type { CreativeProfile, ArtSpec, BriefingCopy, DemandReference } from "./prompt-compiler";
 
@@ -39,6 +40,8 @@ type JobRow = {
     informacoesExtras?: string | null;
     aspect_ratio?: string;
     image_size?: string;
+    model?: string;
+    quality?: "low" | "medium" | "high";
     briefing_titulo?: string | null;
     briefing_tipo?: string | null;
     extra_reference_urls?: string[] | null;
@@ -226,46 +229,77 @@ async function runJob(
       : ((profile?.style_reference_urls as string[]) ?? []),
   };
 
-  const promptFinal = compilePrompt(creativeProfile, briefing, artSpec, allDemandRefs);
-
   const effectiveLogoUrl = flowLogoUrl ?? profile?.logo_url ?? null;
+  const model = job.params.model ?? "gemini";
 
-  const refUrls: string[] = [
-    ...creativeProfile.style_reference_urls,
-    ...(creativeProfile.logo_mode === "reference" && effectiveLogoUrl
-      ? [effectiveLogoUrl]
-      : []),
-    ...allDemandRefs.map((r) => r.url),
-  ];
+  let base64: string;
+  let mimeType: string;
+  let promptFinal: string;
 
-  // Valida que a ordem bate com buildOrderedRefs (assertion em dev)
-  const expectedCount = buildOrderedRefs(creativeProfile, allDemandRefs).length;
-  if (refUrls.length !== expectedCount) {
-    console.warn(`[worker] ref count mismatch: urls=${refUrls.length} vs compiler=${expectedCount}`);
-  }
-
-  const references = await urlsToInlineDataParts(refUrls);
-
-  // Gera arte
-  let { base64, mimeType } = await generateArt({
-    prompt: promptFinal,
-    references,
-    imageSize: (artSpec.image_size as ImageSize) ?? "2K",
-    aspectRatio: (artSpec.aspect_ratio as AspectRatio) ?? "1:1",
-  });
-
-  // Composição do logo se mode=composite
-  if (creativeProfile.logo_mode === "composite" && effectiveLogoUrl) {
-    const logoPart = await urlToInlineDataPart(effectiveLogoUrl);
-    const composited = await compositeLogoFromBase64({
-      artBase64: base64,
-      artMimeType: mimeType,
-      logoBase64: logoPart.inlineData.data,
-      logoMimeType: logoPart.inlineData.mimeType,
-      placement: profile?.logo_placement ?? {},
+  if (model !== "gemini") {
+    // Caminho Magnific (ex: gpt-2) — não precisa de composite pixel-a-pixel nem da
+    // ordenação posicional de referências do Gemini; a logo/copy vão direto no
+    // prompt do agente (ver lib/magnific/generate-art.ts).
+    const result = await generateMagnificArt({
+      model,
+      quality: job.params.quality ?? "low",
+      aspectRatio: artSpec.aspect_ratio ?? "3:4",
+      resolution: (artSpec.image_size ?? "2K").toLowerCase(),
+      headline: artSpec.headline,
+      subheadline: artSpec.subheadline,
+      cta: artSpec.cta,
+      informacoesExtras: artSpec.informacoesExtras,
+      briefingTitulo: briefing.titulo,
+      briefingTipo: briefing.tipo,
+      logoUrl: effectiveLogoUrl,
+      references: allDemandRefs,
     });
-    base64 = composited.base64;
-    mimeType = composited.mimeType;
+
+    promptFinal = `[Magnific ${model}] ${JSON.stringify({ artSpec, briefing })}`;
+    const part = await urlToInlineDataPart(result.imageUrl);
+    base64 = part.inlineData.data;
+    mimeType = part.inlineData.mimeType;
+  } else {
+    promptFinal = compilePrompt(creativeProfile, briefing, artSpec, allDemandRefs);
+
+    const refUrls: string[] = [
+      ...creativeProfile.style_reference_urls,
+      ...(creativeProfile.logo_mode === "reference" && effectiveLogoUrl
+        ? [effectiveLogoUrl]
+        : []),
+      ...allDemandRefs.map((r) => r.url),
+    ];
+
+    // Valida que a ordem bate com buildOrderedRefs (assertion em dev)
+    const expectedCount = buildOrderedRefs(creativeProfile, allDemandRefs).length;
+    if (refUrls.length !== expectedCount) {
+      console.warn(`[worker] ref count mismatch: urls=${refUrls.length} vs compiler=${expectedCount}`);
+    }
+
+    const references = await urlsToInlineDataParts(refUrls);
+
+    const generated = await generateArt({
+      prompt: promptFinal,
+      references,
+      imageSize: (artSpec.image_size as ImageSize) ?? "2K",
+      aspectRatio: (artSpec.aspect_ratio as AspectRatio) ?? "1:1",
+    });
+    base64 = generated.base64;
+    mimeType = generated.mimeType;
+
+    // Composição do logo se mode=composite
+    if (creativeProfile.logo_mode === "composite" && effectiveLogoUrl) {
+      const logoPart = await urlToInlineDataPart(effectiveLogoUrl);
+      const composited = await compositeLogoFromBase64({
+        artBase64: base64,
+        artMimeType: mimeType,
+        logoBase64: logoPart.inlineData.data,
+        logoMimeType: logoPart.inlineData.mimeType,
+        placement: profile?.logo_placement ?? {},
+      });
+      base64 = composited.base64;
+      mimeType = composited.mimeType;
+    }
   }
 
   // Upload ao Storage

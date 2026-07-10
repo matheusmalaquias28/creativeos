@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { mergeLegacyDemandFlowIntoClient } from "@/services/flow";
 import type { Database } from "@/types/database";
 
 type DemandUpdate = Database["public"]["Tables"]["creative_demands"]["Update"];
@@ -147,6 +148,12 @@ export async function linkDemandToClientAction(
   if (!data) {
     return { error: "Não foi possível vincular a demanda." };
   }
+
+  // Se a demanda já tinha um fluxo próprio (gerado enquanto sem cliente), funde no
+  // fluxo compartilhado do cliente em vez de descartar o trabalho já feito.
+  await mergeLegacyDemandFlowIntoClient(demandId, client.id).catch((err) => {
+    console.error("[linkDemandToClientAction] merge de fluxo falhou:", err);
+  });
 
   return {
     success: true,

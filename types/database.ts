@@ -437,6 +437,27 @@ export type Database = {
         }>;
         Relationships: [];
       };
+      client_flow_graph: {
+        Row: {
+          id: string;
+          client_id: string;
+          graph: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          client_id: string;
+          graph?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<{
+          graph: Json;
+          updated_at: string;
+        }>;
+        Relationships: [];
+      };
       art_generation_job: {
         Row: {
           id: string;
