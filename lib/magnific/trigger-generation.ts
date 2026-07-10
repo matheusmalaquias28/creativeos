@@ -32,6 +32,7 @@ export async function triggerMagnificGeneration(demandId: string): Promise<void>
     const clientName = Array.isArray(clientsRel) ? clientsRel[0]?.name : clientsRel?.name;
 
     const result = await generateMagnificSpace({
+      demandId: demand.id,
       clientId: demand.client_id,
       clientName: clientName ?? demand.client_name_external,
       tipo: demand.tipo,

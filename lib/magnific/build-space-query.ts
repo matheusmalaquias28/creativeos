@@ -1,11 +1,15 @@
-import type { BrandDna } from "@/types";
 import type { DemandArte } from "@/types/demand";
 
-/** Instrução em linguagem natural para `spaces_edit` — adaptado de lib/ai/build-spaces-prompt.ts. */
+export type CreativeProfileBrief = {
+  basePrompt: string;
+  palette: string[];
+};
+
+/** Instrução em linguagem natural para `spaces_edit` — não depende de Creative Brain/brand DNA. */
 export function buildMagnificSpaceQuery(
-  brandDna: BrandDna,
   artes: DemandArte[],
-  tipo: string | null
+  tipo: string | null,
+  profile: CreativeProfileBrief | null
 ): string {
   const parts: string[] = [];
 
@@ -15,20 +19,12 @@ export function buildMagnificSpaceQuery(
       : "Crie um conjunto de artes premium usando as imagens de referência já adicionadas neste Space."
   );
 
-  const colors = brandDna.preferredColors.slice(0, 5).join(", ");
-  if (colors) parts.push(`Utilize as cores: ${colors}.`);
-
-  parts.push(`Estilo da marca: ${brandDna.brandStyle}.`);
-  parts.push(`Direção visual: ${brandDna.visualDirection}.`);
-
-  if (brandDna.visualKeywords?.length) {
-    parts.push(`Referências de estilo: ${brandDna.visualKeywords.slice(0, 5).join(", ")}.`);
+  if (profile?.basePrompt.trim()) {
+    parts.push(profile.basePrompt.trim());
   }
-  if (brandDna.compositionPreferences?.length) {
-    parts.push(`Composição: ${brandDna.compositionPreferences.slice(0, 3).join(", ")}.`);
-  }
-  if (brandDna.negativeStyles?.length) {
-    parts.push(`Evitar: ${brandDna.negativeStyles.slice(0, 4).join(", ")}.`);
+
+  if (profile?.palette.length) {
+    parts.push(`Utilize as cores: ${profile.palette.slice(0, 6).join(", ")}.`);
   }
 
   artes.forEach((arte, index) => {

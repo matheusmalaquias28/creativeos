@@ -1,8 +1,8 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { parseOnboardingAnswers } from "@/services/onboarding";
 import { runMagnificSpaceAgent } from "./mcp-agent";
-import { buildMagnificSpaceQuery } from "./build-space-query";
+import { buildMagnificSpaceQuery, type CreativeProfileBrief } from "./build-space-query";
 import type { DemandArte } from "@/types/demand";
-import type { BrandDna } from "@/types";
 
 export class MagnificGenerationError extends Error {
   constructor(
@@ -15,6 +15,7 @@ export class MagnificGenerationError extends Error {
 }
 
 export type GenerateSpaceInput = {
+  demandId: string;
   clientId: string;
   clientName: string;
   tipo: string | null;
@@ -24,63 +25,118 @@ export type GenerateSpaceInput = {
 
 export type GenerateSpaceResult = { spaceId: string; spaceUrl: string };
 
-async function fetchBrandDna(clientId: string): Promise<BrandDna | null> {
-  const supabase = createAdminClient();
-  const { data } = await supabase
-    .from("creative_brains")
-    .select("brand_dna")
-    .eq("client_id", clientId)
-    .order("version", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  return (data?.brand_dna as BrandDna | undefined) ?? null;
-}
-
 async function fetchClientPhotoUrls(clientId: string): Promise<string[]> {
   const supabase = createAdminClient();
-  const { data, error } = await supabase
+  const { data } = await supabase
     .from("client_photos")
     .select("public_url")
     .eq("client_id", clientId)
     .order("sort_order", { ascending: true });
 
-  if (error) throw new MagnificGenerationError("fetch_photos", error.message);
   return (data ?? []).map((row) => row.public_url);
+}
+
+async function fetchDemandReferenceUrls(demandId: string): Promise<string[]> {
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from("demand_reference_image")
+    .select("storage_url")
+    .eq("demand_id", demandId)
+    .order("position", { ascending: true });
+
+  return (data ?? []).map((row) => row.storage_url);
+}
+
+async function fetchCreativeProfile(
+  clientId: string
+): Promise<{ logoUrl: string | null; brief: CreativeProfileBrief; styleUrls: string[] } | null> {
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from("client_creative_profile")
+    .select("base_prompt, palette, style_reference_urls, logo_url")
+    .eq("client_id", clientId)
+    .maybeSingle();
+
+  if (!data) return null;
+
+  return {
+    logoUrl: data.logo_url ?? null,
+    brief: {
+      basePrompt: data.base_prompt ?? "",
+      palette: Array.isArray(data.palette) ? (data.palette as string[]) : [],
+    },
+    styleUrls: Array.isArray(data.style_reference_urls)
+      ? (data.style_reference_urls as string[])
+      : [],
+  };
+}
+
+async function fetchOnboardingLogoUrl(clientId: string): Promise<string | null> {
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from("onboarding_answers")
+    .select("*")
+    .eq("client_id", clientId)
+    .maybeSingle();
+
+  const parsed = parseOnboardingAnswers(data ?? null);
+  return parsed.logoUrl?.trim() ? parsed.logoUrl : null;
 }
 
 function buildAgentPrompt(
   input: GenerateSpaceInput,
-  brandDna: BrandDna,
-  photoUrls: string[]
+  logoUrl: string | null,
+  imageUrls: string[],
+  brief: string
 ): string {
-  const brief = buildMagnificSpaceQuery(brandDna, input.artes, input.tipo);
   const spaceName = `${input.clientName} — ${input.tipo ?? "Demanda"} ${input.externalId}`;
+  const parts: string[] = [`Crie um novo Space no Magnific chamado "${spaceName}".`];
 
-  return [
-    `Crie um novo Space no Magnific chamado "${spaceName}".`,
-    `Suba estas fotos de referência do cliente (via creations_upload_image, uma URL pública por vez) e adicione todas ao Space com spaces_add_creations:`,
-    photoUrls.map((url, i) => `${i + 1}. ${url}`).join("\n"),
-    `Depois, use spaces_edit para gerar as artes com esta instrução: ${brief}`,
-    `Acompanhe a edição com spaces_edit_status até terminar (allTerminal) antes de responder.`,
-    `Quando finalizar, responda SOMENTE com um JSON no formato {"spaceId": "...", "spaceUrl": "..."} do Space criado — sem texto antes ou depois.`,
-  ].join("\n\n");
+  if (logoUrl) {
+    parts.push(
+      `Suba a logo do cliente (${logoUrl}) via creations_upload_image e adicione ao Space com spaces_add_creations.`
+    );
+  }
+
+  if (imageUrls.length > 0) {
+    parts.push(
+      [
+        "Suba estas imagens de referência (via creations_upload_image, uma URL por vez) e adicione todas ao Space com spaces_add_creations:",
+        imageUrls.map((url, i) => `${i + 1}. ${url}`).join("\n"),
+      ].join("\n")
+    );
+  } else {
+    parts.push(
+      "Não há imagens de referência disponíveis para este cliente/demanda — gere usando apenas as instruções de texto abaixo."
+    );
+  }
+
+  parts.push(`Depois, use spaces_edit com esta instrução: ${brief}`);
+  parts.push("Acompanhe a edição com spaces_edit_status até terminar (allTerminal) antes de responder.");
+  parts.push(
+    'Quando finalizar, responda SOMENTE com um JSON no formato {"spaceId": "...", "spaceUrl": "..."} do Space criado — sem texto antes ou depois.'
+  );
+
+  return parts.join("\n\n");
 }
 
 export async function generateMagnificSpace(
   input: GenerateSpaceInput
 ): Promise<GenerateSpaceResult> {
-  const brandDna = await fetchBrandDna(input.clientId);
-  if (!brandDna) {
-    throw new MagnificGenerationError("brand_dna", "Cliente não tem Creative Brain gerado.");
-  }
+  const [clientPhotoUrls, demandRefUrls, profile, onboardingLogoUrl] = await Promise.all([
+    fetchClientPhotoUrls(input.clientId),
+    fetchDemandReferenceUrls(input.demandId),
+    fetchCreativeProfile(input.clientId),
+    fetchOnboardingLogoUrl(input.clientId),
+  ]);
 
-  const photoUrls = await fetchClientPhotoUrls(input.clientId);
-  if (photoUrls.length === 0) {
-    throw new MagnificGenerationError("photos", "Cliente não tem material salvo.");
-  }
+  const logoUrl = profile?.logoUrl ?? onboardingLogoUrl;
+  const imageUrls = Array.from(
+    new Set([...clientPhotoUrls, ...(profile?.styleUrls ?? []), ...demandRefUrls])
+  );
 
-  const prompt = buildAgentPrompt(input, brandDna, photoUrls);
+  const brief = buildMagnificSpaceQuery(input.artes, input.tipo, profile?.brief ?? null);
+  const prompt = buildAgentPrompt(input, logoUrl, imageUrls, brief);
 
   try {
     return await runMagnificSpaceAgent(prompt);
