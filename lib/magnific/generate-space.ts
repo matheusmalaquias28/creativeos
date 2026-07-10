@@ -43,6 +43,22 @@ async function fetchClientPhotoUrls(clientId: string): Promise<string[]> {
   return (data ?? []).map((row) => row.public_url);
 }
 
+/**
+ * `client_references` é a tabela por trás da página "Referências" do cliente
+ * (upload manual de referências visuais, ver actions/references.ts) — é o que
+ * o usuário chama de "referências" no dia a dia, distinto de `client_photos`.
+ */
+async function fetchClientReferenceUrls(clientId: string): Promise<string[]> {
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from("client_references")
+    .select("public_url")
+    .eq("client_id", clientId)
+    .order("sort_order", { ascending: true });
+
+  return (data ?? []).map((row) => row.public_url);
+}
+
 async function fetchDemandReferenceUrls(demandId: string): Promise<string[]> {
   const supabase = createAdminClient();
   const { data } = await supabase
@@ -158,9 +174,10 @@ export async function generateMagnificSpace(
   opts: { signal?: AbortSignal } = {}
 ): Promise<GenerateSpaceResult> {
   const { signal } = opts;
-  const [clientPhotoUrls, demandRefUrls, profile, onboardingLogoUrl, existingSpace] =
+  const [clientPhotoUrls, clientReferenceUrls, demandRefUrls, profile, onboardingLogoUrl, existingSpace] =
     await Promise.all([
       fetchClientPhotoUrls(input.clientId),
+      fetchClientReferenceUrls(input.clientId),
       fetchDemandReferenceUrls(input.demandId),
       fetchCreativeProfile(input.clientId),
       fetchOnboardingLogoUrl(input.clientId),
@@ -169,7 +186,13 @@ export async function generateMagnificSpace(
 
   const logoUrl = profile?.logoUrl ?? onboardingLogoUrl;
   const imageUrls = Array.from(
-    new Set([...(logoUrl ? [logoUrl] : []), ...clientPhotoUrls, ...(profile?.styleUrls ?? []), ...demandRefUrls])
+    new Set([
+      ...(logoUrl ? [logoUrl] : []),
+      ...clientPhotoUrls,
+      ...clientReferenceUrls,
+      ...(profile?.styleUrls ?? []),
+      ...demandRefUrls,
+    ])
   );
 
   const brief = buildMagnificSpaceQuery(
