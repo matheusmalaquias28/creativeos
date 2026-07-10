@@ -26,6 +26,7 @@ import {
   RotateCcw,
   Save,
   Play,
+  Pause,
   Loader2,
   ImageIcon,
   GitBranch,
@@ -410,6 +411,33 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
     }
   }
 
+  const hasActiveJobs = nodes.some((n) => {
+    if (n.type !== "saidaArte") return false;
+    const status = (n.data as SaidaArteData).generatingStatus;
+    return status === "queued" || status === "processing";
+  });
+
+  async function pause() {
+    try {
+      const res = await fetch("/api/art-gen/cancel-demand", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ demandId: demanda.id }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = (await res.json()) as { cancelled: number };
+      toast.info(
+        data.cancelled > 0
+          ? `${data.cancelled} geração(ões) pausada(s)`
+          : "Nada em andamento pra pausar"
+      );
+    } catch (err) {
+      toast.error("Erro ao pausar", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
   function reset() {
     // O fluxo é compartilhado por cliente — resetar só pode afetar o bloco DESTA
     // demanda (identificado pelos IDs namespaced "..._${demanda.id}_..."), nunca o
@@ -480,6 +508,15 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
               <Play className="size-3 fill-current" />
             )}
             Executar
+          </button>
+          <button
+            onClick={pause}
+            disabled={!hasActiveJobs}
+            title="Cancela as gerações em andamento desta demanda"
+            className="flex items-center gap-1.5 rounded-lg border border-red-500/40 bg-red-500/12 px-3 py-1.5 text-[0.6875rem] font-medium text-red-400 transition-colors hover:border-red-500/60 hover:bg-red-500/20 disabled:pointer-events-none disabled:opacity-40"
+          >
+            <Pause className="size-3" />
+            Pausar
           </button>
         </div>
       </div>

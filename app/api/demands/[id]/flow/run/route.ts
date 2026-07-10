@@ -1,10 +1,15 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { runWorker } from "@/lib/ai/imagegen/worker";
 import { extractFlowJobParams } from "@/lib/flow/extract-flow-jobs";
 import { enrichFlowGraphWithProfile } from "@/lib/flow/enrich-graph";
 import { getClientFlowGraph } from "@/services/flow";
 import type { FlowGraph } from "@/lib/flow/types";
+
+// Cobre o worker de geração (rodado via after() abaixo) — cada job tem seu próprio
+// timeout de 2min (IMAGE_JOB_TIMEOUT_MS em lib/ai/imagegen/worker.ts), mas isso só
+// funciona se a função em si não for encerrada antes disso.
+export const maxDuration = 300;
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -92,9 +97,11 @@ export async function POST(_req: Request, { params }: Params) {
     return NextResponse.json({ error: insertError.message }, { status: 500 });
   }
 
-  void runWorker(demandId).catch((err: unknown) => {
-    console.error("[flow/run] worker error:", err instanceof Error ? err.message : err);
-  });
+  after(() =>
+    runWorker(demandId).catch((err: unknown) => {
+      console.error("[flow/run] worker error:", err instanceof Error ? err.message : err);
+    })
+  );
 
   return NextResponse.json({ ok: true, jobsCreated: rows.length });
 }
