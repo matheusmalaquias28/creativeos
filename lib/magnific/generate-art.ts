@@ -1,7 +1,8 @@
-import { runMagnificAgent } from "./mcp-agent";
+import { MagnificMcpSession, MagnificToolError } from "./mcp-client";
+import { firstString } from "./extract";
 
 // Aspect ratios conhecidos por modelo Magnific — usado só pra validar antes de
-// chamar (evitar um erro tardio dentro do agente). Adicionar aqui conforme surgirem
+// chamar (evitar um erro tardio no servidor). Adicionar aqui conforme surgirem
 // outros modelos.
 const KNOWN_ASPECT_RATIOS: Record<string, string[]> = {
   "gpt-2": [
@@ -18,6 +19,10 @@ const KNOWN_ASPECT_RATIOS: Record<string, string[]> = {
     "21:9",
   ],
 };
+
+// creations_wait long-polla até 25s por chamada; o loop abaixo limita o total.
+const WAIT_TIMEOUT_SECONDS = 25;
+const MAX_WAIT_CALLS = 8; // ~3,5 min de teto — o job do worker expira antes (2 min)
 
 export class MagnificArtGenerationError extends Error {
   constructor(message: string) {
@@ -44,13 +49,6 @@ export type GenerateMagnificArtInput = {
 
 export type GenerateMagnificArtResult = { imageUrl: string };
 
-const IMAGE_RESULT_SCHEMA = {
-  type: "object",
-  properties: { imageUrl: { type: "string" } },
-  required: ["imageUrl"],
-  additionalProperties: false,
-} as const;
-
 function validateAspectRatio(model: string, aspectRatio: string): void {
   const allowed = KNOWN_ASPECT_RATIOS[model];
   if (allowed && !allowed.includes(aspectRatio)) {
@@ -60,7 +58,7 @@ function validateAspectRatio(model: string, aspectRatio: string): void {
   }
 }
 
-function buildCopyBrief(input: GenerateMagnificArtInput): string {
+function buildPrompt(input: GenerateMagnificArtInput): string {
   const parts: string[] = [];
 
   if (input.briefingTitulo || input.briefingTipo) {
@@ -75,68 +73,130 @@ function buildCopyBrief(input: GenerateMagnificArtInput): string {
 
   if (input.informacoesExtras) parts.push(input.informacoesExtras);
 
-  return parts.join("\n\n");
+  // Regra que antes ia no prompt do agente: a logo entra como referência visual e
+  // só é posicionada — nunca descrita ou usada como direção de estilo.
+  if (input.logoUrl) {
+    parts.push(
+      "Posicione a logo (fornecida como imagem de referência) no canto superior esquerdo, em tamanho pequeno, sem alterações — não a use como referência de estilo, cor ou composição."
+    );
+  }
+
+  return parts.join("\n\n") || "Arte para redes sociais baseada nas referências visuais fornecidas.";
 }
 
+function extractIdentifier(result: unknown, context: string): string {
+  const id = firstString(result, ["identifier", "creationIdentifier", "id"]);
+  if (!id) {
+    throw new MagnificArtGenerationError(
+      `${context}: resposta sem identifier — ${JSON.stringify(result).slice(0, 300)}`
+    );
+  }
+  return id;
+}
+
+type CreationState = { status: string | null; url: string | null; error: string | null };
+
+function extractCreationState(result: unknown): CreationState {
+  return {
+    status: firstString(result, ["status", "state"]),
+    // `url` é o full-res (creations_get); originalUrl cobre o retorno de creation_status.
+    url: firstString(result, ["url", "originalUrl", "imageUrl"]),
+    error: firstString(result, ["error", "errorMessage", "failureReason"]),
+  };
+}
+
+const TERMINAL_FAILED = new Set(["failed", "error", "canceled", "cancelled"]);
+
 /**
- * Gera UMA arte via um modelo Magnific (ex: gpt-2), delegando a um agente Claude
- * com o conector MCP — mesma abordagem de generate-space.ts. Ao contrário do
- * caminho Gemini existente (lib/ai/imagegen), não precisa de composite de logo
- * pixel-a-pixel: a logo e as referências viram entradas de `images_generate.references`
- * (type: "image", identifier retornado por creations_upload_image) — a mesma tool
- * que o agente usaria manualmente. O segredo de uma boa geração com IA é a imagem
- * de referência influenciando visualmente o resultado, não uma descrição em texto
- * dela — por isso o prompt final nunca deve narrar o conteúdo das referências.
+ * Gera UMA arte via um modelo Magnific (ex: gpt-2) chamando o MCP direto do
+ * backend — sem agente Claude no meio. Todos os passos são determinísticos:
+ * upload da logo/referências (creations_upload_image), geração (images_generate)
+ * e polling (creations_wait → creations_get). A logo e as referências entram em
+ * `images_generate.references` como {type: "image", identifier} — influência
+ * visual real, sem descrever o conteúdo delas no prompt.
  */
 export async function generateMagnificArt(
   input: GenerateMagnificArtInput
 ): Promise<GenerateMagnificArtResult> {
   validateAspectRatio(input.model, input.aspectRatio);
 
-  const refUrls = input.references.map((r) => r.url);
-  const brief = buildCopyBrief(input);
-
-  const uploadSteps: string[] = [];
-  if (input.logoUrl) {
-    uploadSteps.push(
-      `Suba a logo do cliente via creations_upload_image: ${input.logoUrl} — guarde o \`identifier\` retornado.`
-    );
-  }
-  if (refUrls.length) {
-    uploadSteps.push(
-      [
-        "Suba estas imagens de referência via creations_upload_image (uma URL por vez) e guarde o `identifier` retornado por cada uma:",
-        refUrls.map((url, i) => `${i + 1}. ${url}`).join("\n"),
-      ].join("\n")
-    );
-  }
-
-  const prompt = [
-    `Gere uma arte usando o modelo Magnific "${input.model}".`,
-    uploadSteps.length ? uploadSteps.join("\n\n") : null,
-    uploadSteps.length
-      ? 'Ao chamar images_generate, inclua todos os identifiers que você acabou de subir (logo e referências) no array `references`, cada um como {"type": "image", "identifier": "<identifier>"}. Essa é a única forma correta de usar essas imagens.'
-      : null,
-    input.logoUrl
-      ? "O identifier da logo deve ser usado SOMENTE para posicioná-la, sem alterações, no canto superior esquerdo da arte, em tamanho pequeno — não a use como referência de estilo, cor ou composição da arte."
-      : null,
-    refUrls.length
-      ? "Os identifiers das referências devem influenciar a arte apenas visualmente através do `references` — não descreva o conteúdo delas (cores, objetos, pessoas, estilo etc.) no campo `prompt` de images_generate."
-      : null,
-    "O campo `prompt` de images_generate deve conter apenas a copy/briefing abaixo e, se houver logo, a instrução de posicionamento dela. Não adicione adjetivos, estilos ou direção artística que não estejam no briefing abaixo.",
-    brief || "Sem copy adicional — gere a arte com base apenas nas referências visuais e na logo, se houver.",
-    `Chame images_generate com mode="${input.model}", aspectRatio="${input.aspectRatio}", resolution="${input.resolution}", quality="${input.quality}".`,
-    "Aguarde a geração terminar antes de responder, e use a URL final do arquivo gerado — nunca a webUrl de preview.",
-    'Quando finalizar, responda SOMENTE com um JSON no formato {"imageUrl": "..."} — sem texto antes ou depois.',
-  ]
-    .filter(Boolean)
-    .join("\n\n");
-
   try {
-    return await runMagnificAgent<GenerateMagnificArtResult>(prompt, IMAGE_RESULT_SCHEMA);
+    const session = await MagnificMcpSession.connect();
+
+    // 1. Upload da logo + referências → identifiers
+    const uploadUrls = [
+      ...(input.logoUrl ? [input.logoUrl] : []),
+      ...input.references.map((r) => r.url),
+    ];
+    const identifiers: string[] = [];
+    for (const url of uploadUrls) {
+      const uploaded = await session.callTool("creations_upload_image", { url });
+      identifiers.push(extractIdentifier(uploaded, "creations_upload_image"));
+    }
+
+    // 2. Geração
+    const generated = await session.callTool("images_generate", {
+      prompt: buildPrompt(input),
+      ...(input.model && input.model !== "auto" ? { mode: input.model } : {}),
+      aspectRatio: input.aspectRatio,
+      resolution: input.resolution,
+      quality: input.quality,
+      count: 1,
+      ...(identifiers.length
+        ? { references: identifiers.map((identifier) => ({ type: "image", identifier })) }
+        : {}),
+    });
+    const creationId = extractIdentifier(generated, "images_generate");
+
+    // 3. Espera terminar (long-poll)
+    let state = extractCreationState(generated);
+    for (let i = 0; i < MAX_WAIT_CALLS && !isDone(state); i++) {
+      const waited = await session.callTool("creations_wait", {
+        identifiers: [creationId],
+        timeoutSeconds: WAIT_TIMEOUT_SECONDS,
+      });
+      state = extractCreationState(waited);
+    }
+
+    if (state.status && TERMINAL_FAILED.has(state.status.toLowerCase())) {
+      throw new MagnificArtGenerationError(
+        `Geração falhou no Magnific (${state.status}): ${state.error ?? "sem detalhes"}`
+      );
+    }
+    if (!isDone(state)) {
+      throw new MagnificArtGenerationError(
+        `Geração não terminou a tempo (último status: ${state.status ?? "desconhecido"}).`
+      );
+    }
+
+    // 4. URL full-res — o payload do wait pode não trazer a URL final
+    let imageUrl = state.url;
+    if (!imageUrl) {
+      const creation = await session.callTool("creations_get", {
+        creationIdentifier: creationId,
+      });
+      imageUrl = extractCreationState(creation).url;
+    }
+    if (!imageUrl) {
+      throw new MagnificArtGenerationError("Geração concluída, mas sem URL de imagem no retorno.");
+    }
+
+    return { imageUrl };
   } catch (error) {
     if (error instanceof MagnificArtGenerationError) throw error;
+    if (error instanceof MagnificToolError) {
+      throw new MagnificArtGenerationError(error.message);
+    }
     const message = error instanceof Error ? error.message : "Erro desconhecido";
     throw new MagnificArtGenerationError(message);
   }
+}
+
+function isDone(state: CreationState): boolean {
+  const status = state.status?.toLowerCase() ?? null;
+  if (status && (status === "completed" || status === "succeeded" || status === "done")) {
+    return true;
+  }
+  // Sem status reconhecível mas com URL final → considera pronto.
+  return status === null && state.url !== null;
 }
