@@ -134,9 +134,17 @@ export function compilePrompt(
 
   if (textLines.length > 0) {
     parts.push(
-      "Incorpore os seguintes textos na composição visual de forma elegante e legível:\n" +
+      "A IMAGEM DEVE CONTER SOMENTE ESSES TEXTOS, NADA MAIS:\n" +
         textLines.map((l) => `- ${l}`).join("\n")
     );
+    parts.push(
+      "NÃO adicione nenhum outro texto na imagem além dos listados acima — nada de frases, preços, datas ou informações inventadas."
+    );
+    if (artSpec.cta) {
+      parts.push(
+        "O call-to-action (CTA) é um BOTÃO: renderize-o como um botão gráfico, SEMPRE centralizado na parte inferior da imagem."
+      );
+    }
   }
 
   // 5. Paleta de cores

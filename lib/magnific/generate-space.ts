@@ -4,7 +4,8 @@ import { MagnificMcpSession, MagnificToolError } from "./mcp-client";
 import { firstString } from "./extract";
 import { buildMagnificSpaceQuery, type CreativeProfileBrief } from "./build-space-query";
 import { getClientMagnificSpace, saveClientMagnificSpace } from "./client-space";
-import type { DemandArte } from "@/types/demand";
+import { parseSpaceStateNodes } from "./space-state";
+import type { DemandArte, MagnificSpaceNode } from "@/types/demand";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ADD_CREATIONS_BATCH = 20; // limite do spaces_add_creations
@@ -31,6 +32,43 @@ export type GenerateSpaceInput = {
 };
 
 export type GenerateSpaceResult = { spaceId: string; spaceUrl: string };
+
+export type GenerateSpaceOutcome = GenerateSpaceResult & { nodes: MagnificSpaceNode[] };
+
+/**
+ * Falha cedo quando a conta Magnific está sem créditos — o spaces_edit lá na
+ * frente consumiria a cota e falharia depois de já ter subido as referências.
+ * A leitura em si é best-effort: se o account_balance quebrar, segue o fluxo.
+ */
+async function assertMagnificCredits(
+  session: MagnificMcpSession,
+  signal?: AbortSignal
+): Promise<void> {
+  let balance: unknown;
+  try {
+    balance = await session.callTool("account_balance", {}, signal);
+  } catch (err) {
+    console.warn(
+      "[generate-space] account_balance falhou — seguindo sem pre-check:",
+      err instanceof Error ? err.message : err
+    );
+    return;
+  }
+
+  const parsed = balance as {
+    plan?: { isUnlimitedMode?: boolean; unlimitedAppliesHere?: boolean };
+    credits?: { available?: number };
+  };
+  if (parsed?.plan?.isUnlimitedMode || parsed?.plan?.unlimitedAppliesHere) return;
+
+  const available = parsed?.credits?.available;
+  if (typeof available === "number" && available <= 0) {
+    throw new MagnificGenerationError(
+      "account_balance",
+      "Conta Magnific sem créditos disponíveis — a edição do Space seria cobrada e falharia."
+    );
+  }
+}
 
 async function fetchClientPhotoUrls(clientId: string): Promise<string[]> {
   const supabase = createAdminClient();
@@ -139,6 +177,25 @@ async function findSpaceByName(
   return null;
 }
 
+function isBoardNotFound(err: unknown): boolean {
+  return err instanceof MagnificToolError && /board not found/i.test(err.message);
+}
+
+async function addCreationsInBatches(
+  session: MagnificMcpSession,
+  spaceId: string,
+  identifiers: string[],
+  signal?: AbortSignal
+): Promise<void> {
+  for (let i = 0; i < identifiers.length; i += ADD_CREATIONS_BATCH) {
+    await session.callTool(
+      "spaces_add_creations",
+      { spaceId, creationIdentifiers: identifiers.slice(i, i + ADD_CREATIONS_BATCH) },
+      signal
+    );
+  }
+}
+
 function spaceWebUrl(spaceId: string): string {
   return `https://www.magnific.com/app/spaces/${spaceId}`;
 }
@@ -167,12 +224,13 @@ function extractSpace(result: unknown): GenerateSpaceResult {
  *   3. dispara a edição headless (spaces_edit) e espera terminar
  *      (spaces_edit_status até allTerminal)
  *
- * O único passo que consome créditos Magnific é o spaces_edit (generativo).
+ * O único passo que consome créditos Magnific é o spaces_edit (generativo) —
+ * por isso o pre-check de créditos logo após conectar.
  */
 export async function generateMagnificSpace(
   input: GenerateSpaceInput,
   opts: { signal?: AbortSignal } = {}
-): Promise<GenerateSpaceResult> {
+): Promise<GenerateSpaceOutcome> {
   const { signal } = opts;
   const [clientPhotoUrls, clientReferenceUrls, demandRefUrls, profile, onboardingLogoUrl, existingSpace] =
     await Promise.all([
@@ -206,6 +264,9 @@ export async function generateMagnificSpace(
   try {
     const session = await MagnificMcpSession.connect(signal);
 
+    step = "account_balance";
+    await assertMagnificCredits(session, signal);
+
     // 1. Resolve o Space: mapeamento salvo → busca por nome → cria
     step = "resolve-space";
     let space = existingSpace;
@@ -229,19 +290,34 @@ export async function generateMagnificSpace(
     }
 
     step = "spaces_add_creations";
-    for (let i = 0; i < identifiers.length; i += ADD_CREATIONS_BATCH) {
-      await session.callTool(
-        "spaces_add_creations",
-        { spaceId: space.spaceId, creationIdentifiers: identifiers.slice(i, i + ADD_CREATIONS_BATCH) },
-        signal
+    try {
+      await addCreationsInBatches(session, space.spaceId, identifiers, signal);
+    } catch (err) {
+      // "Board not found": o Space resolvido (mapeamento salvo ou busca por nome)
+      // foi deletado no Magnific. Cria um novo e segue — o mapeamento é re-gravado
+      // no fim do fluxo, então a próxima demanda já aponta pro Space certo.
+      if (!isBoardNotFound(err)) throw err;
+      console.warn(
+        `[generate-space] Space ${space.spaceId} não existe mais no Magnific — criando um novo`
       );
+      step = "spaces_create";
+      const created = await session.callTool("spaces_create", { name: input.clientName }, signal);
+      space = extractSpace(created);
+      step = "spaces_add_creations";
+      await addCreationsInBatches(session, space.spaceId, identifiers, signal);
     }
 
-    // 3. Edição headless + espera
+    // 3. Edição headless + espera. O agente do spaces_edit tende a REBATIZAR o
+    // board com um título derivado do prompt (e o MCP não tem spaces_rename pra
+    // desfazer) — a instrução explícita de manter o nome do cliente é a única
+    // defesa. O nome importa: findSpaceByName reusa o Space pelo nome exato.
     step = "spaces_edit";
     const edit = await session.callTool(
       "spaces_edit",
-      { spaceId: space.spaceId, query: brief },
+      {
+        spaceId: space.spaceId,
+        query: `${brief} IMPORTANTE: NÃO renomeie este Space — o nome dele deve permanecer exatamente "${input.clientName}".`,
+      },
       signal
     );
     const operationId = firstString(edit, ["operationId", "operation_id", "threadId", "thread_id"]);
@@ -272,6 +348,19 @@ export async function generateMagnificSpace(
       console.warn("[generate-space] spaces_edit sem operationId no retorno — sem como acompanhar; seguindo");
     }
 
+    // 4. Snapshot do board (best-effort): sincroniza os nós de volta pro app.
+    step = "spaces_state";
+    let nodes: MagnificSpaceNode[] = [];
+    try {
+      const state = await session.callTool("spaces_state", { spaceId: space.spaceId }, signal);
+      nodes = parseSpaceStateNodes(state);
+    } catch (err) {
+      console.warn(
+        "[generate-space] spaces_state falhou — seguindo sem snapshot dos nós:",
+        err instanceof Error ? err.message : err
+      );
+    }
+
     // Best-effort: grava (ou re-grava) o mapeamento cliente → Space pra próximas
     // demandas reaproveitarem.
     await saveClientMagnificSpace(input.clientId, space).catch((err: unknown) => {
@@ -281,7 +370,7 @@ export async function generateMagnificSpace(
       );
     });
 
-    return space;
+    return { ...space, nodes };
   } catch (error) {
     if (error instanceof MagnificGenerationError) throw error;
     const message =

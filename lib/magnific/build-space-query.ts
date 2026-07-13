@@ -59,13 +59,19 @@ export function buildMagnificSpaceQuery(
 
   if (textLines.length) {
     parts.push(
-      ["Utilize somente estes textos, exatamente como estão, em cada arte correspondente:", ...textLines].join(
-        "\n"
-      )
+      [
+        "A IMAGEM DE CADA ARTE DEVE CONTER SOMENTE ESSES TEXTOS, NADA MAIS (use em cada arte apenas os textos da linha correspondente):",
+        ...textLines,
+      ].join("\n")
     );
     parts.push(
       "NÃO adicione nenhum outro texto nas artes além dos listados acima — nada de frases, informações, preços ou datas inventadas."
     );
+    if (artes.some((arte) => arte.cta)) {
+      parts.push(
+        "O CTA é um BOTÃO: em cada arte, renderize o CTA como um botão gráfico, SEMPRE centralizado na parte inferior da imagem."
+      );
+    }
   } else {
     parts.push("NÃO adicione nenhum texto nas artes.");
   }

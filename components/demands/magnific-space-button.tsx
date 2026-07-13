@@ -1,13 +1,18 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { ExternalLink, Loader2, Pause, RefreshCw, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   cancelMagnificSpaceGenerationAction,
   generateMagnificSpaceAction,
+  getMagnificSpaceStatusAction,
 } from "@/actions/magnific";
+import { createClient } from "@/lib/supabase/client";
 import type { MagnificSpaceStatus } from "@/types/database";
+
+const POLL_INTERVAL_MS = 5000;
 
 type Props = {
   demandId: string;
@@ -17,16 +22,85 @@ type Props = {
 };
 
 export function MagnificSpaceButton({ demandId, status, spaceUrl, errorMessage }: Props) {
+  const router = useRouter();
   const [localStatus, setLocalStatus] = useState(status);
+  const [localSpaceUrl, setLocalSpaceUrl] = useState(spaceUrl);
+  const [localError, setLocalError] = useState(errorMessage ?? null);
   const [isPending, startTransition] = useTransition();
 
-  // O status "de verdade" chega via realtime (router.refresh() em demands-realtime-listener) —
-  // sincroniza aqui pra generating → ready/failed aparecer sem depender só do clique local.
+  // Props novas (ex: router.refresh() de outro lugar) continuam mandando.
   useEffect(() => setLocalStatus(status), [status]);
+  useEffect(() => setLocalSpaceUrl(spaceUrl), [spaceUrl]);
+  useEffect(() => setLocalError(errorMessage ?? null), [errorMessage]);
+
+  // Enquanto está gerando, o botão acompanha o desfecho por conta própria:
+  // realtime filtrado nesta demanda + polling de fallback (o listener global de
+  // router.refresh() pode não entregar — ex: evento descartado por payload
+  // grande da linha). O estado local atualiza na hora; o refresh sincroniza o
+  // resto da página depois.
+  useEffect(() => {
+    if (localStatus !== "generating") return;
+
+    let finished = false;
+
+    const applySnapshot = (next: {
+      status: string;
+      spaceUrl: string | null;
+      errorMessage: string | null;
+    }) => {
+      if (finished || next.status === "generating" || next.status === "not_generated") return;
+      finished = true;
+      setLocalStatus(next.status as MagnificSpaceStatus);
+      setLocalSpaceUrl(next.spaceUrl);
+      setLocalError(next.errorMessage);
+      if (next.status === "ready") {
+        toast.success("Magnific Space pronto");
+      } else if (next.errorMessage && next.errorMessage !== "Cancelado pelo operador") {
+        toast.error("Falha ao gerar o Space", { description: next.errorMessage });
+      }
+      router.refresh();
+    };
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`magnific-space-${demandId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "creative_demands",
+          filter: `id=eq.${demandId}`,
+        },
+        (payload) => {
+          const row = payload.new as Record<string, unknown>;
+          if (typeof row.magnific_space_status !== "string") return;
+          applySnapshot({
+            status: row.magnific_space_status,
+            spaceUrl: typeof row.magnific_space_url === "string" ? row.magnific_space_url : null,
+            errorMessage:
+              typeof row.magnific_space_error === "string" ? row.magnific_space_error : null,
+          });
+        }
+      )
+      .subscribe();
+
+    const poller = setInterval(() => {
+      void getMagnificSpaceStatusAction(demandId).then((snapshot) => {
+        if (snapshot) applySnapshot(snapshot);
+      });
+    }, POLL_INTERVAL_MS);
+
+    return () => {
+      clearInterval(poller);
+      void supabase.removeChannel(channel);
+    };
+  }, [localStatus, demandId, router]);
 
   function handleGenerate() {
     if (isPending || localStatus === "generating") return;
     setLocalStatus("generating");
+    setLocalError(null);
 
     startTransition(async () => {
       const result = await generateMagnificSpaceAction(demandId);
@@ -70,11 +144,11 @@ export function MagnificSpaceButton({ demandId, status, spaceUrl, errorMessage }
     );
   }
 
-  if (localStatus === "ready" && spaceUrl) {
+  if (localStatus === "ready" && localSpaceUrl) {
     return (
       <span className="inline-flex items-center gap-1.5">
         <a
-          href={spaceUrl}
+          href={localSpaceUrl}
           target="_blank"
           rel="noreferrer"
           className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 text-sm font-medium text-emerald-300 transition-premium hover:bg-emerald-500/20"
@@ -102,7 +176,7 @@ export function MagnificSpaceButton({ demandId, status, spaceUrl, errorMessage }
         type="button"
         disabled={isPending}
         onClick={handleGenerate}
-        title={errorMessage ?? undefined}
+        title={localError ?? undefined}
         className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-red-500/40 bg-red-500/10 px-3 text-sm font-medium text-red-300 transition-premium hover:bg-red-500/20 disabled:opacity-60"
       >
         <RefreshCw className="size-3.5" />

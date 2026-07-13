@@ -76,6 +76,7 @@ export async function triggerMagnificGeneration(demandId: string): Promise<void>
         magnific_space_status: "ready",
         magnific_space_id: result.spaceId,
         magnific_space_url: result.spaceUrl,
+        magnific_space_nodes: result.nodes,
         magnific_space_generated_at: new Date().toISOString(),
         magnific_space_cancel_requested: false,
       })

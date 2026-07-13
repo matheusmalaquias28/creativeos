@@ -1,5 +1,12 @@
 import type { MagnificSpaceStatus } from "./database";
 
+/** Nó do board do Magnific Space, sincronizado via spaces_state após a geração. */
+export type MagnificSpaceNode = {
+  id: string;
+  type: string;
+  name: string;
+};
+
 export type DemandArte = {
   headline: string;
   subheadline: string;
@@ -52,6 +59,7 @@ export type CreativeDemand = {
   magnific_space_url: string | null;
   magnific_space_status: MagnificSpaceStatus;
   magnific_space_error: string | null;
+  magnific_space_nodes: MagnificSpaceNode[];
   created_at: string;
   updated_at: string;
 };

@@ -47,6 +47,35 @@ export async function generateMagnificSpaceAction(
   return { success: true };
 }
 
+export type MagnificSpaceStatusSnapshot = {
+  status: string;
+  spaceUrl: string | null;
+  errorMessage: string | null;
+};
+
+/**
+ * Snapshot leve do status da geração — usado pelo polling do MagnificSpaceButton
+ * enquanto o status é "generating", como fallback do realtime.
+ */
+export async function getMagnificSpaceStatusAction(
+  demandId: string
+): Promise<MagnificSpaceStatusSnapshot | null> {
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("creative_demands")
+    .select("magnific_space_status, magnific_space_url, magnific_space_error")
+    .eq("id", demandId)
+    .maybeSingle();
+
+  if (!data) return null;
+  return {
+    status: data.magnific_space_status,
+    spaceUrl: data.magnific_space_url,
+    errorMessage: data.magnific_space_error,
+  };
+}
+
 export type CancelMagnificSpaceState = {
   error?: string;
   success?: boolean;

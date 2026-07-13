@@ -72,10 +72,18 @@ function buildPrompt(input: GenerateMagnificArtInput): string {
 
   const parts: string[] = [];
   if (textLines.length) {
-    parts.push(["Utilize somente esses textos na criação da arte:", ...textLines].join("\n"));
-    parts.push("NÃO É PARA ADICIONAR NENHUM OUTRO TEXTO na arte além dos listados acima.");
+    parts.push(["A IMAGEM DEVE CONTER SOMENTE ESSES TEXTOS, NADA MAIS:", ...textLines].join("\n"));
+    parts.push(
+      "NÃO É PARA ADICIONAR NENHUM OUTRO TEXTO na arte além dos listados acima — nada de frases, preços, datas ou informações inventadas."
+    );
   } else {
     parts.push("NÃO adicione nenhum texto na arte.");
+  }
+
+  if (input.cta) {
+    parts.push(
+      "O CTA é um BOTÃO: renderize-o como um botão gráfico, SEMPRE centralizado na parte inferior da imagem."
+    );
   }
 
   if (input.logoUrl) {

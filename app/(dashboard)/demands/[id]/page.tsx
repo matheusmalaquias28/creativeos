@@ -31,6 +31,14 @@ import { getAuthUser } from "@/lib/auth/session";
 // (upload de fotos + create + edit + polling pode passar de 1 minuto).
 export const maxDuration = 300;
 
+// Tipos de nó que o spaces_state devolve hoje (fallback: mostra o type cru)
+const SPACE_NODE_TYPE_LABELS: Record<string, string> = {
+  "image-generator": "Geração",
+  image: "Imagem",
+  text: "Texto",
+  video: "Vídeo",
+};
+
 type PageProps = {
   params: Promise<{ id: string }>;
 };
@@ -212,6 +220,32 @@ export default async function DemandDetailPage({ params }: PageProps) {
             />
           </SurfaceContent>
         </Surface>
+
+        {demand.magnific_space_status === "ready" && demand.magnific_space_nodes.length > 0 && (
+          <Surface variant="elevated">
+            <SurfaceHeader>
+              <SurfaceTitle>Conteúdo do Magnific Space</SurfaceTitle>
+              <SurfaceDescription>
+                Nós do board sincronizados ao fim da geração — a visualização completa fica no Spaces
+              </SurfaceDescription>
+            </SurfaceHeader>
+            <SurfaceContent>
+              <ul className="flex flex-wrap gap-2">
+                {demand.magnific_space_nodes.map((node) => (
+                  <li
+                    key={node.id}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-black/20 px-2.5 py-1 text-xs text-foreground/80"
+                  >
+                    <span className="text-muted-foreground">
+                      {SPACE_NODE_TYPE_LABELS[node.type] ?? node.type}
+                    </span>
+                    {node.name && <span className="font-medium">{node.name}</span>}
+                  </li>
+                ))}
+              </ul>
+            </SurfaceContent>
+          </Surface>
+        )}
 
         <Surface variant="elevated">
           <SurfaceHeader>

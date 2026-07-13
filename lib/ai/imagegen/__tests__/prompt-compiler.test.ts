@@ -49,13 +49,26 @@ describe("compilePrompt", () => {
   it("não menciona logo quando logo_mode=composite", () => {
     const result = compilePrompt(baseProfile, baseBriefing, baseSpec);
     // No modo composite, o logo é sobreposto depois — não entra no prompt
-    expect(result).not.toContain("logo da marca aparece na imagem de referência");
+    expect(result).not.toContain("este é o logo da marca");
   });
 
   it("menciona logo quando logo_mode=reference", () => {
     const profile: CreativeProfile = { ...baseProfile, logo_mode: "reference" };
     const result = compilePrompt(profile, baseBriefing, baseSpec);
-    expect(result).toContain("logo da marca aparece na imagem de referência");
+    expect(result).toContain("este é o logo da marca");
+  });
+
+  it("restringe os textos da imagem e trata o CTA como botão centralizado embaixo", () => {
+    const result = compilePrompt(baseProfile, baseBriefing, baseSpec);
+    expect(result).toContain("A IMAGEM DEVE CONTER SOMENTE ESSES TEXTOS, NADA MAIS:");
+    expect(result).toContain("BOTÃO");
+    expect(result).toContain("centralizado na parte inferior da imagem");
+  });
+
+  it("sem CTA não inclui a regra do botão", () => {
+    const spec: ArtSpec = { ...baseSpec, cta: null };
+    const result = compilePrompt(baseProfile, baseBriefing, spec);
+    expect(result).not.toContain("BOTÃO");
   });
 
   it("funciona sem paleta", () => {

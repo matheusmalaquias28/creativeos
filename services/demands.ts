@@ -10,6 +10,7 @@ import type {
   DemandMonthStat,
 } from "@/types/demand";
 import type { MagnificSpaceStatus } from "@/types/database";
+import { parseStoredSpaceNodes } from "@/lib/magnific/space-state";
 
 export const getNewDemandsCount = cache(async (): Promise<number> => {
   const supabase = await createClient();
@@ -47,7 +48,7 @@ function parseArtesCount(value: unknown): number {
 }
 
 const DEMAND_LIST_SELECT =
-  "id, external_id, client_id, client_name_external, client_not_found, tipo, gestor, status, is_archived, is_new, started_at, completed_at, elapsed_seconds, due_date, external_created_at, created_at, updated_at, briefing, artes, magnific_space_id, magnific_space_url, magnific_space_status, magnific_space_error, clients(name)";
+  "id, external_id, client_id, client_name_external, client_not_found, tipo, gestor, status, is_archived, is_new, started_at, completed_at, elapsed_seconds, due_date, external_created_at, created_at, updated_at, briefing, artes, magnific_space_id, magnific_space_url, magnific_space_status, magnific_space_error, magnific_space_nodes, clients(name)";
 
 function mapDemandListRow(
   row: Record<string, unknown>,
@@ -83,6 +84,7 @@ function mapDemandListRow(
     magnific_space_status:
       (row.magnific_space_status as MagnificSpaceStatus | undefined) ?? "not_generated",
     magnific_space_error: row.magnific_space_error ? String(row.magnific_space_error) : null,
+    magnific_space_nodes: parseStoredSpaceNodes(row.magnific_space_nodes),
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
     client_name: clientName ?? null,
@@ -155,6 +157,7 @@ function mapDemandRow(
     magnific_space_status:
       (row.magnific_space_status as MagnificSpaceStatus | undefined) ?? "not_generated",
     magnific_space_error: row.magnific_space_error ? String(row.magnific_space_error) : null,
+    magnific_space_nodes: parseStoredSpaceNodes(row.magnific_space_nodes),
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
     client_name: clientName ?? null,

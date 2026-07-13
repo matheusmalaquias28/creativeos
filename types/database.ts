@@ -234,6 +234,7 @@ export type Database = {
           magnific_space_requested_at: string | null;
           magnific_space_generated_at: string | null;
           magnific_space_cancel_requested: boolean;
+          magnific_space_nodes: Json | null;
           flow_graph: Json | null;
           created_at: string;
           updated_at: string;
@@ -267,6 +268,7 @@ export type Database = {
           magnific_space_requested_at?: string | null;
           magnific_space_generated_at?: string | null;
           magnific_space_cancel_requested?: boolean;
+          magnific_space_nodes?: Json | null;
           flow_graph?: Json | null;
           created_at?: string;
           updated_at?: string;
@@ -298,6 +300,7 @@ export type Database = {
           magnific_space_requested_at: string | null;
           magnific_space_generated_at: string | null;
           magnific_space_cancel_requested: boolean;
+          magnific_space_nodes: Json | null;
           flow_graph: Json | null;
           updated_at: string;
         }>;
