@@ -253,13 +253,6 @@ export async function generateMagnificSpace(
     ])
   );
 
-  const brief = buildMagnificSpaceQuery(
-    input.artes,
-    input.tipo,
-    profile?.brief ?? null,
-    Boolean(logoUrl)
-  );
-
   let step = "connect";
   try {
     const session = await MagnificMcpSession.connect(signal);
@@ -282,12 +275,17 @@ export async function generateMagnificSpace(
     // 2. Upload das imagens → identifiers → nós no Space
     step = "upload-references";
     const identifiers: string[] = [];
+    let logoIdentifier: string | null = null;
     for (const url of imageUrls) {
       const uploaded = await session.callTool("creations_upload_image", { url }, signal);
       const id = firstString(uploaded, ["identifier", "creationIdentifier"]);
-      if (id) identifiers.push(id);
-      else console.warn(`[generate-space] upload sem identifier: ${url}`);
+      if (id) {
+        identifiers.push(id);
+        if (logoUrl && url === logoUrl) logoIdentifier = id;
+      } else console.warn(`[generate-space] upload sem identifier: ${url}`);
     }
+
+    const brief = buildMagnificSpaceQuery(input.artes, profile?.brief ?? null, logoIdentifier);
 
     step = "spaces_add_creations";
     try {
