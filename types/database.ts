@@ -314,6 +314,75 @@ export type Database = {
           },
         ];
       };
+      mvp_projects: {
+        Row: {
+          id: string;
+          user_id: string;
+          title: string;
+          docx_file_name: string | null;
+          raw_content: string | null;
+          pages: Json;
+          logo_url: string | null;
+          reference_urls: Json;
+          status: string;
+          error: string | null;
+          space_id: string | null;
+          space_url: string | null;
+          space_nodes: Json | null;
+          cancel_requested: boolean;
+          organize_progress: number;
+          generated_batches: number;
+          total_batches: number;
+          requested_at: string | null;
+          generated_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          title: string;
+          docx_file_name?: string | null;
+          raw_content?: string | null;
+          pages?: Json;
+          logo_url?: string | null;
+          reference_urls?: Json;
+          status?: string;
+          error?: string | null;
+          space_id?: string | null;
+          space_url?: string | null;
+          space_nodes?: Json | null;
+          cancel_requested?: boolean;
+          organize_progress?: number;
+          generated_batches?: number;
+          total_batches?: number;
+          requested_at?: string | null;
+          generated_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<{
+          title: string;
+          docx_file_name: string | null;
+          raw_content: string | null;
+          pages: Json;
+          logo_url: string | null;
+          reference_urls: Json;
+          status: string;
+          error: string | null;
+          space_id: string | null;
+          space_url: string | null;
+          space_nodes: Json | null;
+          cancel_requested: boolean;
+          organize_progress: number;
+          generated_batches: number;
+          total_batches: number;
+          requested_at: string | null;
+          generated_at: string | null;
+          updated_at: string;
+        }>;
+        Relationships: [];
+      };
       creative_brains: {
         Row: {
           id: string;

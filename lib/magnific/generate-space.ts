@@ -3,7 +3,6 @@ import { parseOnboardingAnswers } from "@/services/onboarding";
 import { MagnificMcpSession, MagnificToolError } from "./mcp-client";
 import { firstString } from "./extract";
 import { buildMagnificSpaceQuery, type CreativeProfileBrief } from "./build-space-query";
-import { getClientMagnificSpace, saveClientMagnificSpace } from "./client-space";
 import { parseSpaceStateNodes } from "./space-state";
 import type { DemandArte, MagnificSpaceNode } from "@/types/demand";
 
@@ -144,43 +143,6 @@ async function fetchOnboardingLogoUrl(clientId: string): Promise<string | null> 
   return parsed.logoUrl?.trim() ? parsed.logoUrl : null;
 }
 
-/**
- * Procura um Space existente cujo nome seja exatamente o nome do cliente.
- * O spaces_list devolve texto TOON: uma linha CSV-like por space começando com o
- * UUID; o webUrl é derivável do id, então basta casar UUID + nome na linha.
- */
-async function findSpaceByName(
-  session: MagnificMcpSession,
-  name: string,
-  signal?: AbortSignal
-): Promise<GenerateSpaceResult | null> {
-  const listed = await session.callTool<unknown>(
-    "spaces_list",
-    { query: name, perPage: 25 },
-    signal
-  );
-  const text =
-    typeof listed === "string" ? listed : firstString(listed, ["text"]) ?? JSON.stringify(listed);
-
-  for (const line of text.split("\n")) {
-    const match = line.trim().match(/^([0-9a-f-]{36}),(.*)$/i);
-    if (!match) continue;
-    const [, id, rest] = match;
-    // Nome vem logo após o id: sem aspas até a próxima vírgula, ou entre aspas.
-    const rowName = rest.startsWith('"')
-      ? rest.slice(1, rest.indexOf('"', 1) === -1 ? undefined : rest.indexOf('"', 1))
-      : rest.slice(0, rest.indexOf(",") === -1 ? undefined : rest.indexOf(","));
-    if (rowName.trim().toLowerCase() === name.trim().toLowerCase()) {
-      return { spaceId: id, spaceUrl: spaceWebUrl(id) };
-    }
-  }
-  return null;
-}
-
-function isBoardNotFound(err: unknown): boolean {
-  return err instanceof MagnificToolError && /board not found/i.test(err.message);
-}
-
 async function addCreationsInBatches(
   session: MagnificMcpSession,
   spaceId: string,
@@ -219,7 +181,7 @@ function extractSpace(result: unknown): GenerateSpaceResult {
  * Gera o Space da demanda chamando o MCP do Magnific direto do backend — sem
  * agente Claude (custo Anthropic zero; todos os passos são determinísticos):
  *
- *   1. resolve o Space (mapeamento salvo → busca por nome → spaces_create)
+ *   1. cria um Space novo (cada demanda tem o seu próprio)
  *   2. sobe logo + referências (creations_upload_image) e adiciona ao Space
  *   3. dispara a edição headless (spaces_edit) e espera terminar
  *      (spaces_edit_status até allTerminal)
@@ -232,14 +194,13 @@ export async function generateMagnificSpace(
   opts: { signal?: AbortSignal } = {}
 ): Promise<GenerateSpaceOutcome> {
   const { signal } = opts;
-  const [clientPhotoUrls, clientReferenceUrls, demandRefUrls, profile, onboardingLogoUrl, existingSpace] =
+  const [clientPhotoUrls, clientReferenceUrls, demandRefUrls, profile, onboardingLogoUrl] =
     await Promise.all([
       fetchClientPhotoUrls(input.clientId),
       fetchClientReferenceUrls(input.clientId),
       fetchDemandReferenceUrls(input.demandId),
       fetchCreativeProfile(input.clientId),
       fetchOnboardingLogoUrl(input.clientId),
-      getClientMagnificSpace(input.clientId),
     ]);
 
   const logoUrl = profile?.logoUrl ?? onboardingLogoUrl;
@@ -260,17 +221,11 @@ export async function generateMagnificSpace(
     step = "account_balance";
     await assertMagnificCredits(session, signal);
 
-    // 1. Resolve o Space: mapeamento salvo → busca por nome → cria
-    step = "resolve-space";
-    let space = existingSpace;
-    if (!space) {
-      space = await findSpaceByName(session, input.clientName, signal).catch(() => null);
-    }
-    if (!space) {
-      step = "spaces_create";
-      const created = await session.callTool("spaces_create", { name: input.clientName }, signal);
-      space = extractSpace(created);
-    }
+    // Cada demanda recebe um Space próprio — reutilizar o Space do cliente faz
+    // o spaces_edit sobrescrever o fluxo de demandas anteriores.
+    step = "spaces_create";
+    const created = await session.callTool("spaces_create", { name: input.clientName }, signal);
+    const space = extractSpace(created);
 
     // 2. Upload das imagens → identifiers → nós no Space
     step = "upload-references";
@@ -288,27 +243,11 @@ export async function generateMagnificSpace(
     const brief = buildMagnificSpaceQuery(input.artes, profile?.brief ?? null, logoIdentifier);
 
     step = "spaces_add_creations";
-    try {
-      await addCreationsInBatches(session, space.spaceId, identifiers, signal);
-    } catch (err) {
-      // "Board not found": o Space resolvido (mapeamento salvo ou busca por nome)
-      // foi deletado no Magnific. Cria um novo e segue — o mapeamento é re-gravado
-      // no fim do fluxo, então a próxima demanda já aponta pro Space certo.
-      if (!isBoardNotFound(err)) throw err;
-      console.warn(
-        `[generate-space] Space ${space.spaceId} não existe mais no Magnific — criando um novo`
-      );
-      step = "spaces_create";
-      const created = await session.callTool("spaces_create", { name: input.clientName }, signal);
-      space = extractSpace(created);
-      step = "spaces_add_creations";
-      await addCreationsInBatches(session, space.spaceId, identifiers, signal);
-    }
+    await addCreationsInBatches(session, space.spaceId, identifiers, signal);
 
     // 3. Edição headless + espera. O agente do spaces_edit tende a REBATIZAR o
     // board com um título derivado do prompt (e o MCP não tem spaces_rename pra
-    // desfazer) — a instrução explícita de manter o nome do cliente é a única
-    // defesa. O nome importa: findSpaceByName reusa o Space pelo nome exato.
+    // desfazer) — a instrução explícita de manter o nome do cliente é a única defesa.
     step = "spaces_edit";
     const edit = await session.callTool(
       "spaces_edit",
@@ -358,15 +297,6 @@ export async function generateMagnificSpace(
         err instanceof Error ? err.message : err
       );
     }
-
-    // Best-effort: grava (ou re-grava) o mapeamento cliente → Space pra próximas
-    // demandas reaproveitarem.
-    await saveClientMagnificSpace(input.clientId, space).catch((err: unknown) => {
-      console.error(
-        "[generate-space] falha ao salvar client_magnific_space:",
-        err instanceof Error ? err.message : err
-      );
-    });
 
     return { ...space, nodes };
   } catch (error) {
