@@ -31,7 +31,11 @@ export function buildMagnificSpaceQuery(
   );
 
   parts.push(
-    `Configure TODOS os nodes de geração de imagem com: modelo ${IMAGE_GEN_DEFAULTS.model}, aspect ratio ${IMAGE_GEN_DEFAULTS.aspectRatio}, resolução ${IMAGE_GEN_DEFAULTS.imageSize}, qualidade ${IMAGE_GEN_DEFAULTS.quality}. Não use 1:1 nem outros formatos.`
+    `OBRIGATÓRIO — TODOS os nodes de geração de imagem devem usar: modelo ${IMAGE_GEN_DEFAULTS.model}, aspect ratio ${IMAGE_GEN_DEFAULTS.aspectRatio} (NUNCA 1:1 ou qualquer outro), resolução ${IMAGE_GEN_DEFAULTS.imageSize}, qualidade ${IMAGE_GEN_DEFAULTS.quality}. Sem exceções.`
+  );
+
+  parts.push(
+    `FLUXO OBRIGATÓRIO após gerar todos os nodes de imagem: (1) conecte TODOS os nodes de imagem a um único node de Lista; (2) conecte essa Lista como entrada (como lista) a um node de imagem com aspect ratio 9:16, modelo ${IMAGE_GEN_DEFAULTS.model}, resolução ${IMAGE_GEN_DEFAULTS.imageSize}, qualidade ${IMAGE_GEN_DEFAULTS.quality} e prompt exatamente: "Adapte essa arte para o formato 9:16, não adicione nada novo e nem distorça as imagens".`
   );
 
   if (logoIdentifier) {
