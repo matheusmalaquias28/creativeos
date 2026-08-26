@@ -1,16 +1,17 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ExternalLink, GitBranch, Zap } from "lucide-react";
+import { ArrowLeft, ExternalLink } from "lucide-react";
 import { DashboardPage } from "@/components/layout/dashboard-page";
 import { DemandDetailStatusBar } from "@/components/demands/demand-detail-status-bar";
 import { MagnificSpaceButton } from "@/components/demands/magnific-space-button";
-import { CopyArteTextsButton } from "@/components/demands/copy-arte-texts-button";
+import { MagnificSpaceEmbed } from "@/components/demands/magnific-space-embed";
 import { MarkDemandReadOnMount } from "@/components/demands/mark-demand-read-on-mount";
-import { DemandClientLinker } from "@/components/demands/demand-client-linker";
 import {
   DemandClientAssets,
   DemandClientAssetsEmpty,
 } from "@/components/demands/demand-client-assets";
+import { DemandArteFeed } from "@/components/demands/demand-arte-feed";
+import { DemandReferenceManager } from "@/components/demands/demand-reference-manager";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Surface,
@@ -20,24 +21,16 @@ import {
   SurfaceTitle,
 } from "@/components/ui/surface";
 import { cn } from "@/lib/utils";
-import { layout } from "@/lib/design/tokens";
 import { getDemandById } from "@/services/demands";
-import { getClientOptionsForCurrentUser, getClientVisualAssets } from "@/services/clients";
+import {
+  getClientOptionsForCurrentUser,
+  getClientVisualAssets,
+} from "@/services/clients";
 import { getDemandReferenceImages } from "@/services/art-gen";
-import { DemandReferenceManager } from "@/components/demands/demand-reference-manager";
 import { getAuthUser } from "@/lib/auth/session";
+import { displayExternalClientName } from "@/lib/demands/normalize-client-name";
 
-// Cobre a geração de Magnific Space disparada por generateMagnificSpaceAction
-// (upload de fotos + create + edit + polling pode passar de 1 minuto).
 export const maxDuration = 300;
-
-// Tipos de nó que o spaces_state devolve hoje (fallback: mostra o type cru)
-const SPACE_NODE_TYPE_LABELS: Record<string, string> = {
-  "image-generator": "Geração",
-  image: "Imagem",
-  text: "Texto",
-  video: "Vídeo",
-};
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -47,27 +40,30 @@ function formatDate(value: string | null): string {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("pt-BR");
+  return date.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
-function InfoRow({ label, value }: { label: string; value: string | null | undefined }) {
+function MetaItem({ label, value }: { label: string; value: string | null | undefined }) {
   if (!value) return null;
   return (
-    <div className="grid gap-1 sm:grid-cols-[140px_1fr]">
-      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-      <dd className="text-sm text-foreground">{value}</dd>
-    </div>
+    <span className="inline-flex items-center gap-1.5">
+      <span className="text-muted-foreground/70">{label}</span>
+      <span className="text-foreground/85">{value}</span>
+    </span>
   );
 }
 
 function ExternalHref({
   href,
   label,
-  className,
 }: {
   href: string;
   label: string;
-  className?: string;
 }) {
   if (!href) return null;
   return (
@@ -75,27 +71,19 @@ function ExternalHref({
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className={cn(
-        buttonVariants({ variant: "outline", size: "sm" }),
-        "inline-flex gap-2",
-        className
-      )}
+      className="inline-flex items-center gap-1 text-foreground/85 underline-offset-2 hover:underline"
     >
       {label}
-      <ExternalLink className="size-3.5" />
+      <ExternalLink className="size-3" />
     </a>
   );
 }
 
-const arteCardClassName =
-  "border-zinc-200 bg-white shadow-sm transition-none dark:border-zinc-600 dark:bg-zinc-100";
-
-const arteTextPrimary = "!text-zinc-950";
-const arteTextSecondary = "!text-zinc-700";
-const arteTextMuted = "!text-zinc-600";
-
-const arteButtonClassName =
-  "border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100 dark:border-zinc-400 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200";
+function instagramHref(value: string): string {
+  if (value.startsWith("http")) return value;
+  const handle = value.replace(/^@/, "");
+  return `https://instagram.com/${handle}`;
+}
 
 export default async function DemandDetailPage({ params }: PageProps) {
   const { id } = await params;
@@ -114,79 +102,88 @@ export default async function DemandDetailPage({ params }: PageProps) {
     getDemandReferenceImages(id),
   ]);
 
-  const title = demand.briefing.titulo || demand.client_name_external;
+  const title =
+    demand.briefing.titulo ||
+    displayExternalClientName(demand.client_name_external) ||
+    "Demanda";
+  const instagram = demand.briefing.instagramCliente.trim();
 
   return (
-    <DashboardPage title={title} description="Detalhes da demanda recebida via Make">
+    <DashboardPage title={title}>
       <MarkDemandReadOnMount demandId={id} isNew={demand.is_new} />
-      <div className={layout.sectionGap}>
-        {/* Status + timer + ações */}
+      <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <DemandDetailStatusBar
-            demandId={demand.id}
-            status={demand.status}
-            startedAt={demand.started_at}
-            elapsedSeconds={demand.elapsed_seconds}
-          />
           <div className="flex flex-wrap items-center gap-2">
-            {!demand.client_not_found && (
-              <MagnificSpaceButton
-                demandId={demand.id}
-                status={demand.magnific_space_status}
-                spaceUrl={demand.magnific_space_url}
-                errorMessage={demand.magnific_space_error}
-              />
-            )}
-            <Link
-              href={`/demands/${id}/flow`}
-              className={cn(
-                buttonVariants({ variant: "outline", size: "sm" }),
-                "gap-2"
-              )}
-            >
-              <GitBranch className="size-3.5" />
-              Fluxo
-            </Link>
-            <Link
-              href={`/demands/${id}/curation`}
-              className={cn(
-                buttonVariants({ size: "sm" }),
-                "gap-2 bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md hover:from-violet-500 hover:to-indigo-500 hover:shadow-lg transition-all"
-              )}
-            >
-              <Zap className="size-4 fill-current" />
-              Curadoria de artes
-            </Link>
-          </div>
-        </div>
-
-        <Surface variant="elevated">
-          <SurfaceHeader>
-            <SurfaceTitle>Cliente</SurfaceTitle>
-            <SurfaceDescription>
-              Vínculo automático pelo nome externo ou seleção manual
-            </SurfaceDescription>
-          </SurfaceHeader>
-          <SurfaceContent>
-            <DemandClientLinker
+            <DemandDetailStatusBar
               demandId={demand.id}
+              status={demand.status}
+              startedAt={demand.started_at}
+              elapsedSeconds={demand.elapsed_seconds}
               currentClientId={demand.client_id}
               currentClientName={demand.client_name}
               externalClientName={demand.client_name_external}
               clientNotFound={demand.client_not_found}
               clients={clients}
             />
-          </SurfaceContent>
-        </Surface>
+          </div>
+          {!demand.client_not_found && (
+            <MagnificSpaceButton
+              demandId={demand.id}
+              status={demand.magnific_space_status}
+              spaceUrl={demand.magnific_space_url}
+              errorMessage={demand.magnific_space_error}
+            />
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
+          <MetaItem label="Tipo" value={demand.tipo ?? demand.briefing.tipo} />
+          <MetaItem
+            label="Artes"
+            value={
+              demand.briefing.quantidadeArtes != null
+                ? String(demand.briefing.quantidadeArtes)
+                : String(demand.artes.length)
+            }
+          />
+          <MetaItem label="Squad" value={demand.squad} />
+          <MetaItem label="Gestor" value={demand.gestor} />
+          <MetaItem label="Webdesigner" value={demand.webdesigner} />
+          <MetaItem label="Solicitante" value={demand.solicitante} />
+          <MetaItem
+            label="Criada"
+            value={formatDate(demand.external_created_at ?? demand.created_at)}
+          />
+          <MetaItem label="Prazo" value={formatDate(demand.due_date)} />
+          {instagram ? (
+            <a
+              href={instagramHref(instagram)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-foreground/85 underline-offset-2 hover:underline"
+            >
+              Instagram
+              <ExternalLink className="size-3" />
+            </a>
+          ) : null}
+          <ExternalHref
+            href={demand.briefing.materiaisEditados}
+            label="Materiais"
+          />
+          <ExternalHref
+            href={demand.briefing.driveMateriais}
+            label="Drive"
+          />
+        </div>
 
         <Surface variant="elevated">
-          <SurfaceHeader>
+          <SurfaceHeader className="pb-4">
             <SurfaceTitle>Logo e referências</SurfaceTitle>
             <SurfaceDescription>
-              Materiais visuais cadastrados na página do cliente vinculado
+              Materiais do cliente e referências específicas desta demanda
             </SurfaceDescription>
           </SurfaceHeader>
-          <SurfaceContent>
+          <SurfaceContent className="space-y-6">
             {clientAssets ? (
               <DemandClientAssets
                 clientId={clientAssets.clientId}
@@ -197,20 +194,10 @@ export default async function DemandDetailPage({ params }: PageProps) {
             ) : (
               <DemandClientAssetsEmpty />
             )}
-          </SurfaceContent>
-        </Surface>
-
-        <Surface variant="elevated">
-          <SurfaceHeader>
-            <SurfaceTitle>Referências desta demanda</SurfaceTitle>
-            <SurfaceDescription>
-              Imagens de referência específicas para esta demanda (além das do perfil do cliente)
-            </SurfaceDescription>
-          </SurfaceHeader>
-          <SurfaceContent>
             <DemandReferenceManager
               demandId={id}
               initialRefs={demandRefs}
+              showClientRefs={false}
               clientRefs={
                 clientAssets?.references.map((r) => ({
                   public_url: r.public_url,
@@ -221,130 +208,33 @@ export default async function DemandDetailPage({ params }: PageProps) {
           </SurfaceContent>
         </Surface>
 
-        {demand.magnific_space_status === "ready" && demand.magnific_space_nodes.length > 0 && (
+        {demand.magnific_space_status === "ready" && demand.magnific_space_url && (
           <Surface variant="elevated">
             <SurfaceHeader>
-              <SurfaceTitle>Conteúdo do Magnific Space</SurfaceTitle>
+              <SurfaceTitle>Magnific Space</SurfaceTitle>
               <SurfaceDescription>
-                Nós do board sincronizados ao fim da geração — a visualização completa fica no Spaces
+                Board gerado para esta demanda — ajuste as artes sem sair do CreativeOS
               </SurfaceDescription>
             </SurfaceHeader>
             <SurfaceContent>
-              <ul className="flex flex-wrap gap-2">
-                {demand.magnific_space_nodes.map((node) => (
-                  <li
-                    key={node.id}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-black/20 px-2.5 py-1 text-xs text-foreground/80"
-                  >
-                    <span className="text-muted-foreground">
-                      {SPACE_NODE_TYPE_LABELS[node.type] ?? node.type}
-                    </span>
-                    {node.name && <span className="font-medium">{node.name}</span>}
-                  </li>
-                ))}
-              </ul>
+              <MagnificSpaceEmbed
+                spaceUrl={demand.magnific_space_url}
+                nodes={demand.magnific_space_nodes}
+              />
             </SurfaceContent>
           </Surface>
         )}
 
-        <Surface variant="elevated">
-          <SurfaceHeader>
-            <SurfaceTitle>Informações gerais</SurfaceTitle>
-            <SurfaceDescription>
-              Dados enviados pelos gestores na plataforma externa
-            </SurfaceDescription>
-          </SurfaceHeader>
-          <SurfaceContent>
-            <dl className="space-y-3">
-              <InfoRow label="Cliente (externo)" value={demand.client_name_external} />
-              <InfoRow label="Tipo" value={demand.tipo} />
-              <InfoRow label="Squad" value={demand.squad} />
-              <InfoRow label="Gestor" value={demand.gestor} />
-              <InfoRow label="Webdesigner" value={demand.webdesigner} />
-              <InfoRow label="Solicitante" value={demand.solicitante} />
-              <InfoRow
-                label="Criada em"
-                value={formatDate(demand.external_created_at ?? demand.created_at)}
-              />
-              <InfoRow label="Prazo" value={formatDate(demand.due_date)} />
-            </dl>
-          </SurfaceContent>
-        </Surface>
-
-        <Surface variant="elevated">
-          <SurfaceHeader>
-            <SurfaceTitle>Briefing</SurfaceTitle>
-          </SurfaceHeader>
-          <SurfaceContent className="space-y-4">
-            <dl className="space-y-3">
-              <InfoRow label="Título" value={demand.briefing.titulo} />
-              <InfoRow label="Instagram" value={demand.briefing.instagramCliente} />
-              <InfoRow label="Tipo de arte" value={demand.briefing.tipo} />
-              <InfoRow
-                label="Quantidade"
-                value={
-                  demand.briefing.quantidadeArtes != null
-                    ? String(demand.briefing.quantidadeArtes)
-                    : null
-                }
-              />
-            </dl>
-            <div className="flex flex-wrap gap-2">
-              <ExternalHref href={demand.briefing.materiaisEditados} label="Materiais editados" />
-              <ExternalHref href={demand.briefing.driveMateriais} label="Drive de materiais" />
-            </div>
-          </SurfaceContent>
-        </Surface>
-
         <section className="space-y-4">
           <div>
-            <h2 className="text-lg font-medium tracking-heading">Artes ({demand.artes.length})</h2>
+            <h2 className="text-lg font-medium tracking-heading">
+              Briefing das artes ({demand.artes.length})
+            </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Headlines e CTAs definidos no briefing
+              Headlines e CTAs no formato 3:4
             </p>
           </div>
-
-          <div className="grid gap-4">
-            {demand.artes.map((arte, index) => (
-              <Surface key={`${arte.headline}-${index}`} variant="default" className={arteCardClassName}>
-                <SurfaceHeader className="flex-row items-start justify-between gap-3 space-y-0">
-                  <div className="min-w-0 space-y-1">
-                    <SurfaceTitle className={cn("text-base", arteTextPrimary)}>
-                      Arte {index + 1}
-                    </SurfaceTitle>
-                    {arte.cta && (
-                      <SurfaceDescription className={arteTextMuted}>
-                        CTA: {arte.cta}
-                      </SurfaceDescription>
-                    )}
-                  </div>
-                  <CopyArteTextsButton
-                    arte={arte}
-                    arteIndex={index}
-                    className={arteButtonClassName}
-                  />
-                </SurfaceHeader>
-                <SurfaceContent className="space-y-2">
-                  {arte.headline && (
-                    <p className={cn("text-sm font-medium", arteTextPrimary)}>{arte.headline}</p>
-                  )}
-                  {arte.subheadline && (
-                    <p className={cn("text-sm", arteTextSecondary)}>{arte.subheadline}</p>
-                  )}
-                  {arte.informacoesExtras && (
-                    <p className={cn("text-xs", arteTextMuted)}>{arte.informacoesExtras}</p>
-                  )}
-                  {arte.linkReferencias && (
-                    <ExternalHref
-                      href={arte.linkReferencias}
-                      label="Referências"
-                      className={arteButtonClassName}
-                    />
-                  )}
-                </SurfaceContent>
-              </Surface>
-            ))}
-          </div>
+          <DemandArteFeed artes={demand.artes} />
         </section>
 
         <Link

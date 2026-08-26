@@ -33,6 +33,7 @@ type ImageDropzoneProps = {
   className?: string;
   minHeight?: "sm" | "md" | "lg";
   children?: ReactNode;
+  variant?: "default" | "neon";
 };
 
 export function ImageDropzone({
@@ -47,9 +48,11 @@ export function ImageDropzone({
   className,
   minHeight = "md",
   children,
+  variant = "default",
 }: ImageDropzoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const dragDepth = useRef(0);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFiles = useCallback(
     (incoming: FileList | File[]) => {
@@ -97,36 +100,63 @@ export function ImageDropzone({
   };
 
   const heightClass = {
-    sm: "py-6",
-    md: "py-10",
-    lg: "py-14",
+    sm: "min-h-28 py-5",
+    md: "min-h-36 py-8",
+    lg: "min-h-44 py-12",
   }[minHeight];
+
+  const interactive = !disabled && !isUploading;
 
   return (
     <div
-      role="region"
+      role="button"
+      tabIndex={interactive ? 0 : -1}
       aria-label={title || "Área de upload de imagens"}
+      onClick={() => {
+        if (!interactive) return;
+        inputRef.current?.click();
+      }}
+      onKeyDown={(e) => {
+        if (!interactive) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          inputRef.current?.click();
+        }
+      }}
       onDragEnter={onDragEnter}
       onDragLeave={onDragLeave}
       onDragOver={onDragOver}
       onDrop={onDrop}
       className={cn(
-        "relative flex w-full flex-col items-center justify-center gap-3 rounded-xl border border-dashed px-6 transition-premium",
+        "relative flex w-full flex-col items-center justify-center gap-2.5 rounded-2xl border border-dashed px-5 outline-none transition-premium",
         heightClass,
-        isDragging
-          ? "border-foreground/40 bg-accent/20 scale-[1.01]"
-          : "border-border/50 bg-card/25",
-        disabled || isUploading
-          ? "cursor-not-allowed opacity-50"
-          : "cursor-default",
+        variant === "neon" && "dropzone-neon",
+        variant === "neon" && isDragging && "dropzone-neon-active",
+        variant === "default" &&
+          (isDragging
+            ? "border-foreground/40 bg-accent/20"
+            : "border-border/50 bg-card/25"),
+        interactive
+          ? "cursor-pointer hover:border-white/30"
+          : "cursor-not-allowed opacity-50",
         className
       )}
     >
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        multiple={multiple}
+        className="sr-only"
+        disabled={!interactive}
+        onChange={(e) => {
+          if (e.target.files) handleFiles(e.target.files);
+          e.target.value = "";
+        }}
+      />
       {children && isDragging && (
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-accent/25 backdrop-blur-[2px]">
-          <p className="text-sm font-medium text-foreground">
-            Solte a imagem aqui
-          </p>
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-white/6 backdrop-blur-[2px]">
+          <p className="text-sm font-medium text-foreground">Solte a imagem aqui</p>
         </div>
       )}
       {children ? (
@@ -134,7 +164,7 @@ export function ImageDropzone({
       ) : (
         <>
           {isUploading ? (
-            <Loader2 className="size-8 animate-spin text-muted-foreground" />
+            <Loader2 className="size-6 animate-spin text-muted-foreground" />
           ) : (
             icon
           )}
@@ -142,7 +172,7 @@ export function ImageDropzone({
             <p
               className={cn(
                 "text-sm font-medium transition-colors",
-                isDragging ? "text-foreground" : "text-foreground/90"
+                isDragging ? "text-foreground" : "text-foreground/80"
               )}
             >
               {isDragging ? "Solte as imagens aqui" : title}

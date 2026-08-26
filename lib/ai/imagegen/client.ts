@@ -6,6 +6,7 @@ import {
   type Content,
   type Part,
 } from "@google/genai";
+import { IMAGE_GEN_DEFAULTS } from "./defaults";
 
 // ---------------------------------------------------------------------------
 // Config
@@ -137,7 +138,7 @@ function extractImagePart(
 export async function generateArt(
   params: GenerateArtParams
 ): Promise<GenerateArtResult> {
-  const { prompt, references = [], imageSize = "2K", aspectRatio = "1:1" } =
+  const { prompt, references = [], imageSize = IMAGE_GEN_DEFAULTS.imageSize, aspectRatio = IMAGE_GEN_DEFAULTS.aspectRatio } =
     params;
   const client = getClient();
 
@@ -200,8 +201,8 @@ export async function editArtInSession(
   currentImageBase64: string,
   currentMimeType: string,
   instruction: string,
-  imageSize: ImageSize = "2K",
-  aspectRatio: AspectRatio = "1:1"
+  imageSize: ImageSize = IMAGE_GEN_DEFAULTS.imageSize,
+  aspectRatio: AspectRatio = IMAGE_GEN_DEFAULTS.aspectRatio
 ): Promise<GenerateArtResult> {
   let lastError: Error | null = null;
 

@@ -1,151 +1,94 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Controller, useForm } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { ImageIcon, Loader2, Sparkles } from "lucide-react";
 import {
   completeOnboardingAction,
   saveOnboardingDraft,
   type OnboardingActionState,
 } from "@/actions/onboarding";
 import { onboardingSchema, type OnboardingFormValues } from "@/lib/schemas/client";
-import type { ClientPhotoRow } from "@/services/client-photos";
-import { splitFontStyles } from "@/lib/utils/font-styles";
-import { BrandColorPicker } from "@/components/clients/brand-color-picker";
-import { FontStyleSelector } from "@/components/clients/font-style-selector";
+import type { ClientPhotoRow } from "@/types/client-photos";
+import type { ClientVisualIdentityState } from "@/lib/schemas/visual-identity";
+import { isVisualIdentityReady } from "@/lib/schemas/visual-identity";
 import { LogoUploadField } from "@/components/clients/logo-upload-field";
 import { ClientPhotosField } from "@/components/clients/client-photos-field";
+import {
+  VisualIdentityDnaPreview,
+  VisualIdentityField,
+} from "@/components/clients/visual-identity-field";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { cn } from "@/lib/utils";
-import { isNegativeOpportunity, parseStoredBoolean } from "@/lib/utils/parse-stored-boolean";
 
 type OnboardingFormProps = {
   clientId: string;
   defaultValues: Partial<OnboardingFormValues> & { clientPhotos?: ClientPhotoRow[] };
+  visualIdentity: ClientVisualIdentityState;
   completedAt: string | null;
 };
 
-function YesNoToggle({
-  value,
-  onChange,
+function BriefingColumn({
+  icon: Icon,
+  title,
+  description,
+  accent = "text-foreground/60",
+  children,
 }: {
-  value: boolean | null | undefined;
-  onChange: (v: boolean | null) => void;
+  icon: typeof ImageIcon;
+  title: string;
+  description: string;
+  accent?: string;
+  children: ReactNode;
 }) {
-  const boolValue = parseStoredBoolean(value);
-
   return (
-    <div className="flex gap-2">
-      <button
-        type="button"
-        onClick={() => onChange(boolValue === true ? null : true)}
-        className={cn(
-          "rounded-lg border px-5 py-2 text-sm font-medium transition-premium",
-          boolValue === true
-            ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-            : "border-border bg-card text-muted-foreground hover:border-border/80 hover:text-foreground"
-        )}
-      >
-        Sim
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange(boolValue === false ? null : false)}
-        className={cn(
-          "rounded-lg border px-5 py-2 text-sm font-medium transition-premium",
-          boolValue === false
-            ? "border-rose-500/60 bg-rose-500/15 text-rose-600 dark:text-rose-400"
-            : "border-border bg-card text-muted-foreground hover:border-border/80 hover:text-foreground"
-        )}
-      >
-        Não
-      </button>
+    <div className="flex min-h-[320px] flex-col gap-3 rounded-xl border border-white/8 bg-card/20 p-4 backdrop-blur-sm">
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <Icon className={`size-4 ${accent}`} strokeWidth={1.5} />
+          <h2 className="text-sm font-semibold tracking-heading text-foreground">{title}</h2>
+        </div>
+        <p className="text-xs leading-relaxed text-muted-foreground">{description}</p>
+      </div>
+      <div className="flex flex-1 flex-col">{children}</div>
     </div>
   );
 }
 
-function OpportunityFlag({ label }: { label: string }) {
-  return (
-    <p className="text-xs text-amber-700 dark:text-amber-400">
-      <span className="font-medium">Oportunidade:</span> {label}
-    </p>
-  );
-}
-
-function boolToHidden(v: boolean | null | undefined): string {
-  if (v === null || v === undefined) return "";
-  return String(v);
-}
-
-const EMPTY_REFS = ["", "", "", "", ""];
-
 export function OnboardingForm({
   clientId,
   defaultValues,
+  visualIdentity,
   completedAt,
 }: OnboardingFormProps) {
   const router = useRouter();
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [isPending, startTransition] = useTransition();
+  const [identityState, setIdentityState] = useState(visualIdentity);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialState: OnboardingActionState = {};
 
-  const savedFont = splitFontStyles(defaultValues.fontStyles);
-  const [fontPresets, setFontPresets] = useState<string[]>(savedFont.presetIds);
-  const [fontNotes, setFontNotes] = useState(savedFont.notes);
-  const [clientPhotos, setClientPhotos] = useState(
-    defaultValues.clientPhotos ?? []
-  );
-
-  const savedRefs = Array.isArray(defaultValues.references) && defaultValues.references.length > 0
-    ? [...defaultValues.references, ...EMPTY_REFS.slice(defaultValues.references.length)]
-    : [...EMPTY_REFS];
-  const refInputsRef = useRef<string[]>(savedRefs);
-  const [refInputs, setRefInputs] = useState<string[]>(savedRefs);
+  const [clientPhotos, setClientPhotos] = useState(defaultValues.clientPhotos ?? []);
 
   const form = useForm<OnboardingFormValues>({
     resolver: zodResolver(onboardingSchema),
     defaultValues: {
-      brandColors: defaultValues.brandColors ?? [],
-      fontStyles: defaultValues.fontStyles ?? "",
       logoUrl: defaultValues.logoUrl,
       logoStoragePath: defaultValues.logoStoragePath,
-      logoQualityOk: parseStoredBoolean(defaultValues.logoQualityOk),
-      hasClientImages: parseStoredBoolean(defaultValues.hasClientImages),
-      hasSite: parseStoredBoolean(defaultValues.hasSite),
-      siteUrl: defaultValues.siteUrl ?? "",
-      instagramHandle: defaultValues.instagramHandle ?? "",
-      hasGMB: parseStoredBoolean(defaultValues.hasGMB),
-      hasVisualIdentity: parseStoredBoolean(defaultValues.hasVisualIdentity),
-      visualIdentityOption: defaultValues.visualIdentityOption ?? null,
     },
     mode: "onChange",
   });
 
-  const brandColors = form.watch("brandColors");
-  const fontStyles = form.watch("fontStyles");
   const logoUrl = form.watch("logoUrl");
   const logoStoragePath = form.watch("logoStoragePath");
-  const logoQualityOk = form.watch("logoQualityOk");
-  const hasClientImages = form.watch("hasClientImages");
-  const hasSite = form.watch("hasSite");
-  const hasGMB = form.watch("hasGMB");
-  const hasVisualIdentity = form.watch("hasVisualIdentity");
-  const visualIdentityOption = form.watch("visualIdentityOption");
+  const identityReady = isVisualIdentityReady(identityState);
 
   const persistDraft = useCallback(
     async (values: Partial<OnboardingFormValues>) => {
       setSaveStatus("saving");
-      const result = await saveOnboardingDraft(clientId, {
-        ...values,
-        references: refInputsRef.current.filter((r) => r.trim()),
-      });
+      const result = await saveOnboardingDraft(clientId, values);
       if (result.error) {
         setSaveStatus("idle");
         toast.error(result.error);
@@ -170,36 +113,32 @@ export function OnboardingForm({
     };
   }, [form, persistDraft]);
 
-  const handleRefChange = (index: number, value: string) => {
-    const newRefs = [...refInputsRef.current];
-    newRefs[index] = value;
-    refInputsRef.current = newRefs;
-    setRefInputs([...newRefs]);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      persistDraft(form.getValues());
-    }, 1200);
-  };
+  useEffect(() => {
+    if (identityState.identityExtractionStatus !== "extracting") return;
+    const timer = setInterval(() => router.refresh(), 4000);
+    return () => clearInterval(timer);
+  }, [identityState.identityExtractionStatus, router]);
 
   const onComplete = (formData: FormData) => {
+    if (!identityReady) {
+      toast.error("Aguarde a extração do DNA visual antes de concluir");
+      return;
+    }
+
     startTransition(async () => {
-      const result = await completeOnboardingAction(
-        clientId,
-        initialState,
-        formData
-      );
+      const result = await completeOnboardingAction(clientId, initialState, formData);
       if (result.error) {
         toast.error(result.error);
         return;
       }
-      toast.success("Onboarding concluído");
+      toast.success("Briefing concluído");
       router.push(`/clients/${clientId}`);
       router.refresh();
     });
   };
 
   return (
-    <form action={onComplete} className="space-y-10">
+    <form action={onComplete} className="space-y-8">
       <div className="flex items-center justify-between gap-4">
         <p className="text-xs text-muted-foreground">
           {completedAt
@@ -217,335 +156,67 @@ export function OnboardingForm({
         )}
       </div>
 
-      {/* ── [1] Identidade Visual ─────────────────────────── */}
-      <section className="space-y-8">
-        <div>
-          <h2 className="text-lg font-medium tracking-heading">
-            Identidade Visual
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Cores, tipografia e logo que definem a marca do cliente
-          </p>
-        </div>
-
-        <Controller
-          name="brandColors"
-          control={form.control}
-          render={({ field, fieldState }) => (
-            <BrandColorPicker
-              value={field.value ?? []}
-              onChange={(colors) => field.onChange(colors)}
-              error={fieldState.error?.message}
-            />
-          )}
-        />
-
-        <FontStyleSelector
-          selectedPresets={fontPresets}
-          customNotes={fontNotes}
-          onPresetsChange={setFontPresets}
-          onCustomNotesChange={setFontNotes}
-          composedValue={fontStyles ?? ""}
-          onComposedChange={(value) =>
-            form.setValue("fontStyles", value, { shouldDirty: true })
-          }
-          error={form.formState.errors.fontStyles?.message}
-        />
-
-        {/* [2] Logo com qualidade? */}
-        <div className="space-y-4">
+      <div className="grid gap-4 lg:grid-cols-3">
+        <BriefingColumn
+          icon={ImageIcon}
+          title="Logo"
+          description="Logo oficial para composição nas artes."
+        >
           <LogoUploadField
+            compact
             clientId={clientId}
             logoUrl={logoUrl}
             onLogoChange={({ logoUrl: url, logoStoragePath: path }) => {
               form.setValue("logoUrl", url, { shouldDirty: true });
               form.setValue("logoStoragePath", path, { shouldDirty: true });
-              persistDraft({
-                ...form.getValues(),
-                logoUrl: url,
-                logoStoragePath: path,
-              });
+              persistDraft({ ...form.getValues(), logoUrl: url, logoStoragePath: path });
             }}
           />
+        </BriefingColumn>
 
-          <div className="space-y-3 rounded-lg border border-border bg-muted/45 dark:border-border/50 dark:bg-card/40 p-4">
-            <Label>O logo do cliente tem qualidade suficiente para uso?</Label>
-            <Controller
-              name="logoQualityOk"
-              control={form.control}
-              render={({ field }) => (
-                <YesNoToggle
-                  value={field.value}
-                  onChange={(v) => field.onChange(v)}
-                />
-              )}
-            />
-            {isNegativeOpportunity(logoQualityOk) && (
-              <OpportunityFlag label="Vetorização de logo necessária" />
-            )}
-          </div>
-        </div>
-
-        {/* [3] Imagens do cliente? */}
-        <div className="space-y-4">
+        <BriefingColumn
+          icon={ImageIcon}
+          title="Fotos"
+          description="Produto, espaço ou contexto da marca — até 5 imagens."
+        >
           <ClientPhotosField
+            compact
             clientId={clientId}
             photos={clientPhotos}
             onChange={(photos) => setClientPhotos(photos)}
           />
+        </BriefingColumn>
 
-          <div className="space-y-3 rounded-lg border border-border bg-muted/45 dark:border-border/50 dark:bg-card/40 p-4">
-            <Label>O cliente tem fotos/imagens para uso nos criativos?</Label>
-            <Controller
-              name="hasClientImages"
-              control={form.control}
-              render={({ field }) => (
-                <YesNoToggle
-                  value={field.value}
-                  onChange={(v) => field.onChange(v)}
-                />
-              )}
-            />
-            {isNegativeOpportunity(hasClientImages) && (
-              <OpportunityFlag label="Ensaio de IA" />
-            )}
-          </div>
-        </div>
-      </section>
-
-      <Separator className="opacity-50" />
-
-      {/* ── [4] Referências ───────────────────────────────── */}
-      <section className="space-y-6">
-        <div>
-          <h2 className="text-lg font-medium tracking-heading">Referências</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Separe até 5 referências como base para os criativos
-          </p>
-        </div>
-
-        <div className="space-y-3">
-          {refInputs.map((ref, i) => (
-            <div key={i} className="space-y-1.5 rounded-lg border border-border bg-muted/45 dark:border-border/50 dark:bg-card/40 p-3">
-              <Label className="text-xs text-muted-foreground">Referência {i + 1}</Label>
-              <Input
-                value={ref}
-                onChange={(e) => handleRefChange(i, e.target.value)}
-                placeholder="URL ou descrição da referência"
-                className="border-border bg-card dark:border-border/70 dark:bg-background"
-              />
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <Separator className="opacity-50" />
-
-      {/* ── [5–7] Canais Digitais ─────────────────────────── */}
-      <section className="space-y-6">
-        <div>
-          <h2 className="text-lg font-medium tracking-heading">
-            Canais Digitais
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Presença online do cliente
-          </p>
-        </div>
-
-        {/* [5] Site? */}
-        <div className="space-y-3 rounded-lg border border-border bg-muted/45 dark:border-border/50 dark:bg-card/40 p-4">
-          <Label>O cliente tem site?</Label>
-          <Controller
-            name="hasSite"
-            control={form.control}
-            render={({ field }) => (
-              <YesNoToggle
-                value={field.value}
-                onChange={(v) => field.onChange(v)}
-              />
-            )}
+        <BriefingColumn
+          icon={Sparkles}
+          title="Extrator"
+          description="Arte de referência para a IA extrair cores, tipografia e estilo."
+          accent="text-foreground/60"
+        >
+          <VisualIdentityField
+            compact
+            showDnaDetails={false}
+            clientId={clientId}
+            state={identityState}
+            onStateChange={setIdentityState}
           />
-          {hasSite === true && (
-            <Input
-              {...form.register("siteUrl")}
-              placeholder="https://..."
-              className="border-border bg-card dark:border-border/70 dark:bg-background"
-            />
-          )}
-          {isNegativeOpportunity(hasSite) && (
-            <OpportunityFlag label="LP ou Site Institucional" />
-          )}
-        </div>
+        </BriefingColumn>
+      </div>
 
-        {/* [6] Instagram */}
-        <div className="space-y-2 rounded-lg border border-border bg-muted/45 dark:border-border/50 dark:bg-card/40 p-4">
-          <Label>Instagram</Label>
-          <Input
-            {...form.register("instagramHandle")}
-            placeholder="@nomedocliente"
-            className="border-border bg-card dark:border-border/70 dark:bg-background"
-          />
-        </div>
+      <VisualIdentityDnaPreview state={identityState} />
 
-        {/* [7] Google Meu Negócio? */}
-        <div className="space-y-3 rounded-lg border border-border bg-muted/45 dark:border-border/50 dark:bg-card/40 p-4">
-          <Label>O cliente tem Google Meu Negócio?</Label>
-          <Controller
-            name="hasGMB"
-            control={form.control}
-            render={({ field }) => (
-              <YesNoToggle
-                value={field.value}
-                onChange={(v) => field.onChange(v)}
-              />
-            )}
-          />
-          {isNegativeOpportunity(hasGMB) && (
-            <OpportunityFlag label="Google Meu Negócio" />
-          )}
-        </div>
-      </section>
-
-      <Separator className="opacity-50" />
-
-      {/* ── [8] ID Visual ─────────────────────────────────── */}
-      <section className="space-y-6">
-        <div>
-          <h2 className="text-lg font-medium tracking-heading">
-            Identidade Visual do Cliente
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Defina o ponto de partida visual
-          </p>
-        </div>
-
-        <div className="space-y-4 rounded-lg border border-border bg-muted/45 dark:border-border/50 dark:bg-card/40 p-4">
-          <div className="space-y-3">
-            <Label>O cliente tem identidade visual?</Label>
-            <Controller
-              name="hasVisualIdentity"
-              control={form.control}
-              render={({ field }) => (
-                <YesNoToggle
-                  value={field.value}
-                  onChange={(v) => field.onChange(v)}
-                />
-              )}
-            />
-          </div>
-
-          {hasVisualIdentity === false && (
-            <div className="space-y-2 border-t border-border/40 pt-4">
-              <Label className="text-sm text-muted-foreground">Escolha uma opção</Label>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    form.setValue(
-                      "visualIdentityOption",
-                      visualIdentityOption === "sell" ? null : "sell",
-                      { shouldDirty: true }
-                    )
-                  }
-                  className={cn(
-                    "rounded-lg border px-4 py-2 text-sm font-medium transition-premium",
-                    visualIdentityOption === "sell"
-                      ? "border-primary/50 bg-primary/10 text-primary"
-                      : "border-border bg-card text-muted-foreground hover:border-border/80 hover:text-foreground"
-                  )}
-                >
-                  Opção A — Vender ID Visual
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    form.setValue(
-                      "visualIdentityOption",
-                      visualIdentityOption === "name_only" ? null : "name_only",
-                      { shouldDirty: true }
-                    )
-                  }
-                  className={cn(
-                    "rounded-lg border px-4 py-2 text-sm font-medium transition-premium",
-                    visualIdentityOption === "name_only"
-                      ? "border-primary/50 bg-primary/10 text-primary"
-                      : "border-border bg-card text-muted-foreground hover:border-border/80 hover:text-foreground"
-                  )}
-                >
-                  Opção B — Usar somente nome
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* Hidden inputs para serialização no FormData */}
-      <input
-        type="hidden"
-        name="brandColors"
-        value={JSON.stringify(brandColors ?? [])}
-        readOnly
-      />
       <input type="hidden" name="logoUrl" value={logoUrl ?? ""} readOnly />
-      <input
-        type="hidden"
-        name="logoStoragePath"
-        value={logoStoragePath ?? ""}
-        readOnly
-      />
-      <input
-        type="hidden"
-        name="logoQualityOk"
-        value={boolToHidden(logoQualityOk)}
-        readOnly
-      />
-      <input
-        type="hidden"
-        name="hasClientImages"
-        value={boolToHidden(hasClientImages)}
-        readOnly
-      />
-      <input
-        type="hidden"
-        name="references"
-        value={JSON.stringify(refInputs.filter((r) => r.trim()))}
-        readOnly
-      />
-      <input
-        type="hidden"
-        name="hasSite"
-        value={boolToHidden(hasSite)}
-        readOnly
-      />
-      <input
-        type="hidden"
-        name="hasGMB"
-        value={boolToHidden(hasGMB)}
-        readOnly
-      />
-      <input
-        type="hidden"
-        name="hasVisualIdentity"
-        value={boolToHidden(hasVisualIdentity)}
-        readOnly
-      />
-      <input
-        type="hidden"
-        name="visualIdentityOption"
-        value={visualIdentityOption ?? ""}
-        readOnly
-      />
+      <input type="hidden" name="logoStoragePath" value={logoStoragePath ?? ""} readOnly />
 
       <div className="flex flex-wrap gap-3">
-        <Button type="submit" disabled={isPending}>
+        <Button type="submit" disabled={isPending || !identityReady}>
           {isPending ? (
             <>
               <Loader2 className="size-4 animate-spin" />
               Finalizando...
             </>
           ) : (
-            "Concluir onboarding"
+            "Concluir briefing"
           )}
         </Button>
         <Button
@@ -556,6 +227,14 @@ export function OnboardingForm({
           Voltar ao cliente
         </Button>
       </div>
+
+      {!identityReady && (
+        <p className="text-xs text-muted-foreground">
+          {identityState.identityExtractionStatus === "extracting"
+            ? "Aguarde a extração do DNA visual para concluir."
+            : "Envie uma arte de referência no extrator para concluir."}
+        </p>
+      )}
     </form>
   );
 }

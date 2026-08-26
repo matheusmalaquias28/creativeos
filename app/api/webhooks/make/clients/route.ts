@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { slugify } from "@/lib/utils/slug";
-import { normalizeClientName } from "@/lib/demands/normalize-client-name";
+import {
+  isUsableClientName,
+  normalizeClientName,
+} from "@/lib/demands/normalize-client-name";
+import { linkUnmatchedDemandsByExternalName } from "@/lib/demands/link-unmatched-siblings";
 
 function verifyWebhookSecret(request: Request): boolean {
   const secret = process.env.MAKE_WEBHOOK_SECRET;
@@ -45,6 +49,16 @@ export async function POST(request: Request) {
     );
   }
 
+  if (!isUsableClientName(parsed.name)) {
+    return NextResponse.json(
+      {
+        error:
+          "Nome do cliente inválido. Identificadores automáticos não podem ser cadastrados.",
+      },
+      { status: 400 }
+    );
+  }
+
   const supabase = createAdminClient();
   const normalizedName = normalizeClientName(parsed.name);
 
@@ -58,9 +72,14 @@ export async function POST(request: Request) {
   );
 
   if (existingMatch) {
+    const linkedIds = await linkUnmatchedDemandsByExternalName(supabase, {
+      clientId: existingMatch.id,
+      externalName: parsed.name,
+    });
     return NextResponse.json({
       ok: true,
       clientId: existingMatch.id,
+      demandsLinked: linkedIds.length,
       message: "Cliente já existe no CreativeOS",
       skipped: true,
     });
@@ -84,6 +103,12 @@ export async function POST(request: Request) {
 
   // Generate unique slug
   const baseSlug = slugify(parsed.name);
+  if (!baseSlug) {
+    return NextResponse.json(
+      { error: "Nome do cliente inválido para cadastro" },
+      { status: 400 }
+    );
+  }
   let slug = baseSlug;
   const { data: existingSlugs } = await supabase
     .from("clients")
@@ -118,40 +143,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: clientError.message }, { status: 500 });
   }
 
-  // Link unmatched demands with the same client name
-  const { data: unmatchedDemands } = await supabase
-    .from("creative_demands")
-    .select("id, client_name_external")
-    .eq("client_not_found", true);
-
-  const toLink = (unmatchedDemands ?? []).filter((d) => {
-    const norm = normalizeClientName(d.client_name_external);
-    return norm === normalizedName || norm.includes(normalizedName) || normalizedName.includes(norm);
+  const linkedIds = await linkUnmatchedDemandsByExternalName(supabase, {
+    clientId: client.id,
+    externalName: parsed.name,
   });
-
-  if (toLink.length > 0) {
-    await supabase
-      .from("creative_demands")
-      .update({
-        client_id: client.id,
-        client_not_found: false,
-        updated_at: new Date().toISOString(),
-      })
-      .in(
-        "id",
-        toLink.map((d) => d.id)
-      );
-  }
 
   return NextResponse.json({
     ok: true,
     clientId: client.id,
     clientName: client.name,
     slug: client.slug,
-    demandsLinked: toLink.length,
+    demandsLinked: linkedIds.length,
     message:
-      toLink.length > 0
-        ? `Cliente criado e ${toLink.length} demanda(s) vinculada(s)`
+      linkedIds.length > 0
+        ? `Cliente criado e ${linkedIds.length} demanda(s) vinculada(s)`
         : "Cliente criado com sucesso",
   });
 }

@@ -1,14 +1,9 @@
 import type { FlowGraph, FlowNode, FlowEdge } from './types';
 import type { CreativeDemand } from '@/types/demand';
+import { IMAGE_GEN_DEFAULTS } from '@/lib/ai/imagegen/defaults';
 
 const COL_W = 280;
 export const ROW_H = 200;
-
-// Defaults novos de gerarImagem — Magnific gpt-2 (ver lib/magnific/generate-art.ts).
-const DEFAULT_MODEL = 'gpt-2';
-const DEFAULT_QUALITY = 'low' as const;
-const DEFAULT_ASPECT_RATIO = '3:4';
-const DEFAULT_IMAGE_SIZE = '2K';
 
 
 /**
@@ -75,10 +70,10 @@ export function gerarFluxoDaDemanda(
       id: gerarId,
       type: 'gerarImagem',
       data: {
-        aspectRatio: DEFAULT_ASPECT_RATIO,
-        imageSize: DEFAULT_IMAGE_SIZE,
-        model: DEFAULT_MODEL,
-        quality: DEFAULT_QUALITY,
+        aspectRatio: IMAGE_GEN_DEFAULTS.aspectRatio,
+        imageSize: IMAGE_GEN_DEFAULTS.imageSize,
+        model: IMAGE_GEN_DEFAULTS.model,
+        quality: IMAGE_GEN_DEFAULTS.quality,
         demandId: demanda.id,
         clientId: demanda.client_id ?? '',
         briefingTitulo: demanda.briefing?.titulo ?? null,
@@ -149,10 +144,10 @@ export function gerarSubfluxoDaDemanda(
       id: gerarId,
       type: 'gerarImagem',
       data: {
-        aspectRatio: DEFAULT_ASPECT_RATIO,
-        imageSize: DEFAULT_IMAGE_SIZE,
-        model: DEFAULT_MODEL,
-        quality: DEFAULT_QUALITY,
+        aspectRatio: IMAGE_GEN_DEFAULTS.aspectRatio,
+        imageSize: IMAGE_GEN_DEFAULTS.imageSize,
+        model: IMAGE_GEN_DEFAULTS.model,
+        quality: IMAGE_GEN_DEFAULTS.quality,
         demandId: demanda.id,
         clientId: demanda.client_id ?? '',
         briefingTitulo: demanda.briefing?.titulo ?? null,

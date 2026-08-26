@@ -483,6 +483,12 @@ export type Database = {
           logo_placement: Json;
           image_size: "1K" | "2K" | "4K";
           aspect_ratio: string;
+          identity_sample_url: string | null;
+          identity_sample_storage_path: string | null;
+          visual_identity_dna: Json | null;
+          identity_extracted_at: string | null;
+          identity_extraction_status: "idle" | "extracting" | "ready" | "failed";
+          identity_extraction_error: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -497,6 +503,12 @@ export type Database = {
           logo_placement?: Json;
           image_size?: "1K" | "2K" | "4K";
           aspect_ratio?: string;
+          identity_sample_url?: string | null;
+          identity_sample_storage_path?: string | null;
+          visual_identity_dna?: Json | null;
+          identity_extracted_at?: string | null;
+          identity_extraction_status?: "idle" | "extracting" | "ready" | "failed";
+          identity_extraction_error?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -509,6 +521,12 @@ export type Database = {
           logo_placement: Json;
           image_size: "1K" | "2K" | "4K";
           aspect_ratio: string;
+          identity_sample_url: string | null;
+          identity_sample_storage_path: string | null;
+          visual_identity_dna: Json | null;
+          identity_extracted_at: string | null;
+          identity_extraction_status: "idle" | "extracting" | "ready" | "failed";
+          identity_extraction_error: string | null;
         }>;
         Relationships: [];
       };
@@ -621,6 +639,36 @@ export type Database = {
         Update: Partial<{
           is_current: boolean;
           instruction: string | null;
+        }>;
+        Relationships: [];
+      };
+      carousels: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          format: "carousel" | "square" | "stories";
+          post_style: "minimal" | "profile" | "creator" | "techviral" | "viralsaas";
+          slides: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name?: string;
+          format?: "carousel" | "square" | "stories";
+          post_style?: "minimal" | "profile" | "creator" | "techviral" | "viralsaas";
+          slides?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<{
+          name: string;
+          format: "carousel" | "square" | "stories";
+          post_style: "minimal" | "profile" | "creator" | "techviral" | "viralsaas";
+          slides: Json;
+          updated_at: string;
         }>;
         Relationships: [];
       };

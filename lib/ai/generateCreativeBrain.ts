@@ -1,6 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { brandDnaSchema, type BrandDnaInput } from "@/lib/schemas/creative-brain";
 import type { OnboardingFormValues } from "@/lib/schemas/client";
+import type { VisualIdentityDna } from "@/lib/schemas/visual-identity";
 import type { ClientReference } from "@/types";
 import { DEFAULT_CLAUDE_MODEL, getAnthropicClient } from "@/lib/ai/client";
 import { buildClaudeReferenceImageBlocks } from "@/lib/ai/reference-media";
@@ -85,7 +86,8 @@ async function callClaude(
 export async function generateCreativeBrain(
   onboarding: Partial<OnboardingFormValues>,
   references: ClientReference[] = [],
-  clientName?: string
+  clientName?: string,
+  visualIdentity?: VisualIdentityDna | null
 ): Promise<BrandDnaInput> {
   const { blocks: imageBlocks, labels, skipped } =
     await buildClaudeReferenceImageBlocks(references, onboarding.logoUrl);
@@ -95,7 +97,8 @@ export async function generateCreativeBrain(
     references,
     labels,
     clientName,
-    skipped
+    skipped,
+    visualIdentity
   );
 
   let lastError: Error | null = null;

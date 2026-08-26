@@ -2,30 +2,12 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { OnboardingFormValues } from "@/lib/schemas/client";
 import { isSchemaMissingError, schemaNotReadyError } from "@/lib/errors/database";
-import { parseStoredBoolean } from "@/lib/utils/parse-stored-boolean";
 import type { OnboardingAnswers } from "@/types";
-
-const ONBOARDING_BOOLEAN_FIELDS = [
-  "logoQualityOk",
-  "hasClientImages",
-  "hasSite",
-  "hasGMB",
-  "hasVisualIdentity",
-] as const satisfies readonly (keyof OnboardingFormValues)[];
-
-function normalizeOnboardingBooleans(
-  answers: Partial<OnboardingFormValues>
-): Partial<OnboardingFormValues> {
-  const normalized = { ...answers };
-
-  for (const field of ONBOARDING_BOOLEAN_FIELDS) {
-    if (field in answers) {
-      normalized[field] = parseStoredBoolean(answers[field]) as never;
-    }
-  }
-
-  return normalized;
-}
+import type { ClientVisualIdentityState } from "@/lib/schemas/visual-identity";
+import {
+  getClientVisualIdentity,
+  isVisualIdentityReady,
+} from "@/services/visual-identity";
 
 function throwIfDbError(error: { message: string }) {
   if (isSchemaMissingError(error.message)) {
@@ -54,31 +36,26 @@ export function parseOnboardingAnswers(
   record: OnboardingAnswers | null
 ): ParsedOnboardingAnswers {
   if (!record?.answers || typeof record.answers !== "object") {
-    return { brandColors: [], fontStyles: "" };
+    return {};
   }
   const raw = record.answers as Partial<OnboardingFormValues>;
-  return normalizeOnboardingBooleans({
-    ...raw,
-    brandColors: Array.isArray(raw.brandColors) ? raw.brandColors : [],
-    fontStyles: raw.fontStyles ?? "",
+  return {
     logoUrl: raw.logoUrl,
     logoStoragePath: raw.logoStoragePath,
-    references: Array.isArray(raw.references) ? raw.references : [],
-  });
+  };
 }
 
-export { normalizeOnboardingBooleans };
+/** Briefing completo quando o DNA visual foi extraído da amostra de identidade. */
+export async function isClientBriefingComplete(clientId: string): Promise<boolean> {
+  const visualIdentity = await getClientVisualIdentity(clientId);
+  return isVisualIdentityReady(visualIdentity);
+}
 
+/** @deprecated Use isClientBriefingComplete(clientId) — mantido para compatibilidade síncrona. */
 export function isOnboardingComplete(
-  answers: Partial<OnboardingFormValues>
+  _answers: Partial<OnboardingFormValues>,
+  visualIdentity?: ClientVisualIdentityState
 ): boolean {
-  const fontStylesOk =
-    typeof answers.fontStyles === "string" && answers.fontStyles.trim().length > 0;
-
-  const colorsOk =
-    Array.isArray(answers.brandColors) &&
-    answers.brandColors.length >= 1 &&
-    answers.brandColors.length <= 5;
-
-  return fontStylesOk && colorsOk;
+  if (visualIdentity) return isVisualIdentityReady(visualIdentity);
+  return false;
 }

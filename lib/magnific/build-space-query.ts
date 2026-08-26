@@ -1,4 +1,5 @@
 import type { DemandArte } from "@/types/demand";
+import { IMAGE_GEN_DEFAULTS } from "@/lib/ai/imagegen/defaults";
 
 export type CreativeProfileBrief = {
   basePrompt: string;
@@ -8,9 +9,9 @@ export type CreativeProfileBrief = {
 /**
  * Instrução em linguagem natural para `spaces_edit`, seguindo o modelo de
  * prompt validado manualmente no Magnific. Deliberadamente enxuto: NÃO envia
- * tipo da demanda, base_prompt do perfil nem formato/proporção da imagem — o
- * formato é configuração do node de imagem, não do prompt, e parâmetros extras
- * atrapalham mais do que ajudam. O que varia por cliente são só as cores.
+ * tipo da demanda, base_prompt do perfil — o formato/modelo/qualidade dos nodes
+ * de imagem são fixos (ver IMAGE_GEN_DEFAULTS) e vão explícitos no prompt para o
+ * spaces_edit não inventar 1:1 ou modelos diferentes por arte.
  *
  * `logoIdentifier` é o creation identifier retornado pelo upload da logo —
  * a menção `@[id:Logo:output]` é como o spaces_edit referencia um node
@@ -29,6 +30,10 @@ export function buildMagnificSpaceQuery(
       : "Desenvolva uma arte para as redes sociais,"
   );
 
+  parts.push(
+    `Configure TODOS os nodes de geração de imagem com: modelo ${IMAGE_GEN_DEFAULTS.model}, aspect ratio ${IMAGE_GEN_DEFAULTS.aspectRatio}, resolução ${IMAGE_GEN_DEFAULTS.imageSize}, qualidade ${IMAGE_GEN_DEFAULTS.quality}. Não use 1:1 nem outros formatos.`
+  );
+
   if (logoIdentifier) {
     parts.push(
       `use a logo @[${logoIdentifier}:Logo:output] no canto superior esquerdo, em pequeno tamanho.`
@@ -39,6 +44,10 @@ export function buildMagnificSpaceQuery(
   }
 
   parts.push("Adicione uma imagem em destaque condizente com o tema da arte.");
+
+  if (profile?.basePrompt.trim()) {
+    parts.push(`Identidade visual do cliente: ${profile.basePrompt.trim()}`);
+  }
 
   if (profile?.palette.length) {
     parts.push(`Use as cores ${profile.palette.slice(0, 6).join(" e ")}.`);

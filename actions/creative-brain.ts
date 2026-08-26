@@ -21,11 +21,11 @@ import {
 import {
   getOnboardingAnswers,
   parseOnboardingAnswers,
-  isOnboardingComplete,
+  isClientBriefingComplete,
 } from "@/services/onboarding";
 import { getClientReferences } from "@/services/clients";
 import { withTimeout } from "@/lib/utils/with-timeout";
-import type { OnboardingFormValues } from "@/lib/schemas/client";
+import { getClientVisualIdentity } from "@/services/visual-identity";
 
 export type CreativeBrainActionState = {
   error?: string;
@@ -57,9 +57,9 @@ export async function generateCreativeBrainAction(
   const onboardingRecord = await getOnboardingAnswers(clientId);
   const answers = parseOnboardingAnswers(onboardingRecord);
 
-  if (!isOnboardingComplete(answers)) {
+  if (!(await isClientBriefingComplete(clientId))) {
     return {
-      error: "Complete o onboarding antes de gerar o Creative Brain",
+      error: "Complete o briefing (DNA visual) antes de gerar o Creative Brain",
     };
   }
 
@@ -74,6 +74,7 @@ export async function generateCreativeBrainAction(
   }
 
   const references = await getClientReferences(clientId);
+  const visualIdentity = await getClientVisualIdentity(clientId);
   const supabase = await createClient();
   const version = await getNextBrainVersion(clientId);
 
@@ -96,9 +97,10 @@ export async function generateCreativeBrainAction(
   try {
     const brandDna = await withTimeout(
       generateCreativeBrain(
-        answers as OnboardingFormValues,
+        answers,
         references,
-        owned.client.name
+        owned.client.name,
+        visualIdentity.visualIdentityDna
       ),
       CREATIVE_BRAIN_GENERATION_TIMEOUT_MS,
       CreativeBrainGenerationTimeoutError

@@ -1,3 +1,4 @@
+import { IMAGE_GEN_DEFAULTS } from "@/lib/ai/imagegen/defaults";
 import type { FlowGraph } from "@/lib/flow/types";
 
 type CreativeProfileRow = {
@@ -32,6 +33,18 @@ export function enrichFlowGraphWithProfile(
             ...node.data,
             referenceUrls:
               existing.length > 0 ? existing : fromProfile,
+          },
+        };
+      }
+      if (node.type === "gerarImagem") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            aspectRatio: IMAGE_GEN_DEFAULTS.aspectRatio,
+            imageSize: IMAGE_GEN_DEFAULTS.imageSize,
+            model: IMAGE_GEN_DEFAULTS.model,
+            quality: IMAGE_GEN_DEFAULTS.quality,
           },
         };
       }

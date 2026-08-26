@@ -21,7 +21,7 @@ import { getClientById, getLatestCreativeBrain } from "@/services/clients";
 import {
   getOnboardingAnswers,
   parseOnboardingAnswers,
-  isOnboardingComplete,
+  isClientBriefingComplete,
 } from "@/services/onboarding";
 import {
   expireStaleGeneratingBrains,
@@ -63,7 +63,7 @@ export default async function BrainPage({ params, searchParams }: PageProps) {
     getCreativeBrainHistory(id),
   ]);
 
-  const canGenerate = isOnboardingComplete(parseOnboardingAnswers(onboarding));
+  const canGenerate = await isClientBriefingComplete(id);
   const brain = !fetchedBrain && brainQuery
     ? await getLatestCreativeBrain(id)
     : fetchedBrain;

@@ -39,11 +39,17 @@ type Props = {
   demandId: string;
   initialRefs: DemandRef[];
   clientRefs: ClientRef[];
+  showClientRefs?: boolean;
 };
 
 const initialState: DemandReferenceActionState = {};
 
-export function DemandReferenceManager({ demandId, initialRefs, clientRefs }: Props) {
+export function DemandReferenceManager({
+  demandId,
+  initialRefs,
+  clientRefs,
+  showClientRefs = true,
+}: Props) {
   const [demandRefs, setOptimisticRefs] = useOptimistic(initialRefs);
   const [isPending, startTransition] = useTransition();
 
@@ -86,7 +92,7 @@ export function DemandReferenceManager({ demandId, initialRefs, clientRefs }: Pr
   return (
     <div className="space-y-5">
       {/* Referências fixas do cliente (somente leitura) */}
-      {clientRefs.length > 0 && (
+      {showClientRefs && clientRefs.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <p className="text-xs font-medium text-muted-foreground">

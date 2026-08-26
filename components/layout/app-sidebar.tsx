@@ -7,6 +7,7 @@ import {
   ClipboardList,
   Globe,
   LayoutDashboard,
+  Layers,
   LogOut,
   Users,
 } from "lucide-react";
@@ -22,6 +23,7 @@ const navItems = [
   { href: "/clients", label: "Clientes", icon: Users },
   { href: "/demands", label: "Demandas", icon: ClipboardList },
   { href: "/web-demands", label: "Demandas Web", icon: Globe },
+  { href: "/carousel", label: "Carrosséis", icon: Layers },
 ];
 
 type AppSidebarProps = {

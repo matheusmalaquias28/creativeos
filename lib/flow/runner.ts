@@ -1,6 +1,7 @@
 import type { FlowGraph, FlowNode } from './types';
 import type { ArtSpec, CreativeProfile } from '@/lib/ai/imagegen/prompt-compiler';
 import { compilePrompt } from '@/lib/ai/imagegen/prompt-compiler';
+import { IMAGE_GEN_DEFAULTS } from '@/lib/ai/imagegen/defaults';
 
 // ─── ImageGenProvider ─────────────────────────────────────────────────────
 
@@ -250,8 +251,8 @@ export async function runGraph(graph: FlowGraph, context: RunContext): Promise<R
         const result = await context.imageProvider.generate({
           prompt: compiled,
           referenceUrls,
-          aspectRatio: node.data.aspectRatio ?? '3:4',
-          imageSize: node.data.imageSize ?? '2K',
+          aspectRatio: IMAGE_GEN_DEFAULTS.aspectRatio,
+          imageSize: IMAGE_GEN_DEFAULTS.imageSize,
         });
 
         imageOutputs.push(result);

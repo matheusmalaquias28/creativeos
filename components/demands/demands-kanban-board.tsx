@@ -6,6 +6,8 @@ import { AlertTriangle, ArrowUpRight, Calendar, Grip, Inbox, User } from "lucide
 import { toast } from "sonner";
 import { updateDemandStatusAction } from "@/actions/demands";
 import { getDemandColorState, CARD_NEON_THEMES, GROUP_DOT_CLASSES } from "@/lib/demands/demand-color";
+import { displayExternalClientName } from "@/lib/demands/normalize-client-name";
+import { getDemandCardTitle, getDemandCardTipo } from "@/lib/demands/demand-card-copy";
 import { cn } from "@/lib/utils";
 import type { DemandClientOption } from "@/components/demands/demand-client-linker";
 import type { CreativeDemandListItem, DemandStatus } from "@/types/demand";
@@ -98,7 +100,12 @@ function KanbanCard({
   const colorState = getDemandColorState(demand);
   const theme = CARD_NEON_THEMES[colorState];
   const overdue = isOverdue(demand.due_date, demand.status);
-  const title = demand.briefing.titulo || demand.client_name_external;
+  const clientLabel =
+    demand.client_name ||
+    displayExternalClientName(demand.client_name_external) ||
+    "Pendente de cadastro";
+  const title = getDemandCardTitle(demand);
+  const tipo = getDemandCardTipo(demand);
 
   return (
     <article
@@ -121,23 +128,26 @@ function KanbanCard({
       />
 
       <div className="relative space-y-2.5">
-        {/* Title + drag handle */}
         <div className="flex items-start justify-between gap-2">
-          <h3 className="text-[0.8125rem] font-medium leading-snug tracking-tight text-foreground line-clamp-2 flex-1">
-            {title}
-          </h3>
-          <Grip className="size-3.5 shrink-0 mt-0.5 text-muted-foreground/30 group-hover:text-muted-foreground/60 transition-colors" />
+          <div className="min-w-0 flex-1 space-y-1">
+            <p className={cn("flex items-center gap-1 truncate text-[0.6875rem]", theme.muted)}>
+              <span className="truncate">{clientLabel}</span>
+              {demand.client_not_found && (
+                <AlertTriangle className="size-3 shrink-0 text-amber-400/80" />
+              )}
+            </p>
+            <h3 className="line-clamp-2 text-[0.8125rem] font-medium leading-snug tracking-tight text-foreground">
+              {title}
+            </h3>
+          </div>
+          <Grip className="mt-0.5 size-3.5 shrink-0 text-muted-foreground/30 transition-colors group-hover:text-muted-foreground/60" />
         </div>
 
-        {/* Client */}
-        <p className={cn("text-[0.6875rem] truncate", theme.muted)}>
-          {demand.client_name ?? demand.client_name_external}
-          {demand.client_not_found && (
-            <span className="ml-1.5 inline-flex items-center gap-0.5 text-amber-400/80">
-              <AlertTriangle className="size-3" />
-            </span>
-          )}
-        </p>
+        {tipo && (
+          <span className="inline-flex max-w-full truncate rounded-full border border-white/10 bg-black/20 px-2 py-0.5 text-[0.5625rem] font-medium text-foreground/80">
+            {tipo}
+          </span>
+        )}
 
         {/* Status externo (quando não é padrão do sistema) */}
         {demand.status && !KNOWN_STATUSES.has(demand.status) && (
@@ -170,9 +180,9 @@ function KanbanCard({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {demand.artes.length > 0 && (
+            {(demand.artes_count ?? demand.artes.length) > 0 && (
               <span className="text-[0.5625rem] font-medium text-muted-foreground/60 tabular-nums">
-                {demand.artes.length}
+                {demand.artes_count ?? demand.artes.length}
               </span>
             )}
             <Link

@@ -95,7 +95,10 @@ export async function getDemandReferenceImages(
 
 export async function upsertCreativeProfile(
   clientId: string,
-  data: Database["public"]["Tables"]["client_creative_profile"]["Insert"]
+  data: Omit<
+    Database["public"]["Tables"]["client_creative_profile"]["Insert"],
+    "client_id"
+  >
 ): Promise<void> {
   const supabase = createAdminClient();
   const { error } = await supabase

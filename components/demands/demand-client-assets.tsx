@@ -160,7 +160,7 @@ export function DemandClientAssets({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
           Materiais de{" "}
@@ -250,7 +250,8 @@ export function DemandClientAssets({
 export function DemandClientAssetsEmpty() {
   return (
     <p className="text-sm text-muted-foreground">
-      Vincule um cliente cadastrado para exibir logo e referências visuais.
+      Cliente pendente de cadastro. Você ainda pode anexar referências desta
+      demanda abaixo.
     </p>
   );
 }

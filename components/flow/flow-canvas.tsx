@@ -47,6 +47,7 @@ import { ReferenciaImagemNode } from "@/components/flow/nodes/referencia-imagem-
 import { DeletableEdge } from "@/components/flow/edges/deletable-edge";
 import { FlowCanvasContext } from "@/components/flow/flow-canvas-context";
 import { gerarFluxoDaDemanda, gerarSubfluxoDaDemanda, ROW_H } from "@/lib/flow/generator";
+import { IMAGE_GEN_DEFAULTS } from "@/lib/ai/imagegen/defaults";
 import type { FlowGraph, SaidaArteData } from "@/lib/flow/types";
 import type { CreativeDemand } from "@/types/demand";
 
@@ -358,10 +359,10 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
         ? { imageUrl: null, label: "Imagem" }
         : type === "gerarImagem"
         ? {
-            aspectRatio: "3:4",
-            imageSize: "2K",
-            model: "gpt-2",
-            quality: "low",
+            aspectRatio: IMAGE_GEN_DEFAULTS.aspectRatio,
+            imageSize: IMAGE_GEN_DEFAULTS.imageSize,
+            model: IMAGE_GEN_DEFAULTS.model,
+            quality: IMAGE_GEN_DEFAULTS.quality,
             demandId: demanda.id,
             clientId: demanda.client_id ?? "",
           }

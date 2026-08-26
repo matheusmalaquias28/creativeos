@@ -11,6 +11,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { runWorker } from "@/lib/ai/imagegen/worker";
+import { IMAGE_GEN_DEFAULTS } from "@/lib/ai/imagegen/defaults";
 import type { Database, Json } from "@/types/database";
 
 type ArtJobInsert = Database["public"]["Tables"]["art_generation_job"]["Insert"];
@@ -86,8 +87,10 @@ export async function POST(request: Request) {
         subheadline: (arte.subheadline as string) ?? null,
         cta: (arte.cta as string) ?? null,
         informacoesExtras: (arte.informacoesExtras as string) ?? null,
-        aspect_ratio: (arte.aspectRatio as string) ?? profile?.aspect_ratio ?? "1:1",
-        image_size: (arte.imageSize as string) ?? profile?.image_size ?? "2K",
+        aspect_ratio: (arte.aspectRatio as string) ?? profile?.aspect_ratio ?? IMAGE_GEN_DEFAULTS.aspectRatio,
+        image_size: (arte.imageSize as string) ?? profile?.image_size ?? IMAGE_GEN_DEFAULTS.imageSize,
+        model: IMAGE_GEN_DEFAULTS.model,
+        quality: IMAGE_GEN_DEFAULTS.quality,
         briefing_titulo: (briefing.titulo as string) ?? null,
         briefing_tipo: (briefing.tipo as string) ?? null,
       } as Json,

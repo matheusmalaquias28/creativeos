@@ -27,16 +27,13 @@ import {
 import {
   getOnboardingAnswers,
   parseOnboardingAnswers,
-  isOnboardingComplete,
+  isClientBriefingComplete,
 } from "@/services/onboarding";
+import { getClientVisualIdentity, isVisualIdentityReady } from "@/services/visual-identity";
 import { getClientPhotos } from "@/services/client-photos";
 import { ClientPhotosPanel } from "@/components/clients/client-photos-panel";
 import { ClientDemandsPanel } from "@/components/demands/client-demands-panel";
 import { getDemandsByClientId } from "@/services/demands";
-import {
-  getClientOpportunityFlags,
-  CLIENT_OPPORTUNITY_LABELS,
-} from "@/lib/clients/opportunities";
 import type { BrandDna } from "@/types";
 
 type PageProps = {
@@ -51,18 +48,20 @@ export default async function ClientDetailPage({ params }: PageProps) {
   const client = await getClientById(id, user.id);
   if (!client) notFound();
 
-  const [references, creativeBrain, onboarding, clientPhotos, demands] = await Promise.all([
+  const [references, creativeBrain, onboarding, clientPhotos, demands, visualIdentity, briefingComplete] =
+    await Promise.all([
     getClientReferences(id),
     getLatestCreativeBrain(id),
     getOnboardingAnswers(id),
     getClientPhotos(id),
     getDemandsByClientId(id),
+    getClientVisualIdentity(id),
+    isClientBriefingComplete(id),
   ]);
 
   const parsedOnboarding = parseOnboardingAnswers(onboarding);
-  const onboardingComplete = isOnboardingComplete(parsedOnboarding);
-  const onboardingDone = Boolean(onboarding?.completed_at);
-  const logoUrl = parsedOnboarding.logoUrl ?? null;
+  const onboardingDone = Boolean(onboarding?.completed_at) || isVisualIdentityReady(visualIdentity);
+  const logoUrl = parsedOnboarding.logoUrl ?? visualIdentity.identitySampleUrl ?? null;
   const brandDna = creativeBrain?.brand_dna as BrandDna | undefined;
   const hasBrandDna = Boolean(brandDna);
   const totalDemands = demands.length;
@@ -70,7 +69,7 @@ export default async function ClientDetailPage({ params }: PageProps) {
     (acc, demand) => acc + demand.artes.length,
     0
   );
-  const opportunityFlags = getClientOpportunityFlags(parsedOnboarding);
+  const opportunityFlags: string[] = [];
 
   return (
     <DashboardPage
@@ -105,10 +104,20 @@ export default async function ClientDetailPage({ params }: PageProps) {
                   variant="outline"
                   className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400"
                 >
-                  {CLIENT_OPPORTUNITY_LABELS[flag]}
+                  {flag}
                 </Badge>
               ))}
             </div>
+          </div>
+        )}
+
+        {isVisualIdentityReady(visualIdentity) && (
+          <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-4 text-sm">
+            <p className="font-medium text-emerald-300">DNA visual ativo</p>
+            <p className="mt-1 text-muted-foreground">
+              {visualIdentity.visualIdentityDna?.summary.slice(0, 180)}
+              {(visualIdentity.visualIdentityDna?.summary.length ?? 0) > 180 ? "…" : ""}
+            </p>
           </div>
         )}
 
@@ -132,8 +141,8 @@ export default async function ClientDetailPage({ params }: PageProps) {
             title="Onboarding"
             description={
               onboardingDone
-                ? "Briefing criativo preenchido"
-                : "Formulário criativo e contexto da marca"
+                ? "Logo, fotos e DNA visual configurados"
+                : "Logo, fotos e extrator de identidade visual"
             }
             icon={ClipboardList}
             actionLabel={onboardingDone ? "Editar briefing" : "Iniciar onboarding"}
@@ -165,7 +174,7 @@ export default async function ClientDetailPage({ params }: PageProps) {
             <div className="flex flex-wrap gap-2">
               <GenerateBrainButton
                 clientId={id}
-                disabled={!onboardingComplete}
+                disabled={!briefingComplete}
               />
               {creativeBrain && (
                 <Link
@@ -178,9 +187,9 @@ export default async function ClientDetailPage({ params }: PageProps) {
                 </Link>
               )}
             </div>
-            {!onboardingComplete && (
+            {!briefingComplete && (
               <p className="text-xs text-muted-foreground">
-                Complete o onboarding para habilitar a geração.
+                Extraia a identidade visual no briefing para habilitar a geração.
               </p>
             )}
           </div>

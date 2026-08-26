@@ -15,6 +15,7 @@ import {
 import { urlToInlineDataPart } from "@/lib/ai/imagegen/storage-refs";
 import { compositeLogoFromBase64 } from "@/lib/ai/imagegen/logo-composite";
 import type { LogoPlacement } from "@/lib/ai/imagegen/logo-composite";
+import { IMAGE_GEN_DEFAULTS } from "@/lib/ai/imagegen/defaults";
 
 type RouteContext = { params: Promise<{ jobId: string }> };
 
@@ -77,8 +78,8 @@ export async function POST(request: Request, { params }: RouteContext) {
       currentPart.inlineData.data,
       currentPart.inlineData.mimeType,
       instruction,
-      (jobParams.image_size as ImageSize) ?? profile?.image_size ?? "2K",
-      (jobParams.aspect_ratio as AspectRatio) ?? profile?.aspect_ratio ?? "1:1"
+      (jobParams.image_size as ImageSize) ?? profile?.image_size ?? IMAGE_GEN_DEFAULTS.imageSize,
+      (jobParams.aspect_ratio as AspectRatio) ?? profile?.aspect_ratio ?? IMAGE_GEN_DEFAULTS.aspectRatio
     );
 
     // Reaplica logo composite se necessário

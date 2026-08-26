@@ -1,4 +1,5 @@
 import type { OnboardingFormValues } from "@/lib/schemas/client";
+import type { VisualIdentityDna } from "@/lib/schemas/visual-identity";
 import type { ClientReference } from "@/types";
 import { buildLogoFileName } from "@/lib/utils/logo-filename";
 
@@ -30,7 +31,8 @@ Rules:
 - Output ONLY the JSON — first character must be { and last must be }`;
 
 export function pickOnboardingForAi(
-  onboarding: Partial<OnboardingFormValues>
+  onboarding: Partial<OnboardingFormValues>,
+  visualIdentity?: VisualIdentityDna | null
 ): Record<string, string | string[]> {
   const out: Record<string, string | string[]> = {};
   const set = (key: string, value: string | string[] | undefined) => {
@@ -40,11 +42,20 @@ export function pickOnboardingForAi(
     out[key] = value;
   };
 
-  set("fonts", onboarding.fontStyles);
-  if (onboarding.brandColors?.length) set("colors", onboarding.brandColors);
-  if (onboarding.references?.length) set("references", onboarding.references);
-  set("instagram", onboarding.instagramHandle);
-  set("siteUrl", onboarding.siteUrl);
+  if (visualIdentity) {
+    set("visualIdentitySummary", visualIdentity.summary);
+    set("colors", visualIdentity.palette);
+    set("typography", [
+      visualIdentity.typography.headlineStyle,
+      visualIdentity.typography.bodyStyle,
+      visualIdentity.typography.notes ?? "",
+    ].filter(Boolean));
+    set("compositionStyle", visualIdentity.compositionStyle);
+    set("visualKeywords", visualIdentity.visualKeywords);
+    set("mood", visualIdentity.mood);
+  }
+
+  if (onboarding.logoUrl) set("logoUrl", onboarding.logoUrl);
 
   return out;
 }
@@ -54,7 +65,8 @@ export function buildCreativeBrainUserPrompt(
   references: ClientReference[],
   imageLabels: string[],
   clientName?: string,
-  skippedImages: string[] = []
+  skippedImages: string[] = [],
+  visualIdentity?: VisualIdentityDna | null
 ): string {
   const logoFileName = clientName
     ? buildLogoFileName(clientName, "png")
@@ -66,7 +78,7 @@ export function buildCreativeBrainUserPrompt(
 
   const payload: Record<string, unknown> = {
     client: clientName ?? null,
-    onboarding: pickOnboardingForAi(onboarding),
+    onboarding: pickOnboardingForAi(onboarding, visualIdentity),
     logoFileName,
     refs,
   };

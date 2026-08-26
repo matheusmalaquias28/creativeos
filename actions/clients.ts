@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createClientSchema } from "@/lib/schemas/client";
 import { getOwnedClient } from "@/lib/auth/verify-client";
 import { slugify } from "@/lib/utils/slug";
+import { linkUnmatchedDemandsByExternalName } from "@/lib/demands/link-unmatched-siblings";
+import { isUsableClientName } from "@/lib/demands/normalize-client-name";
 import { ensureUserProfile } from "@/services/users";
 import type { ClientStatus } from "@/types";
 
@@ -13,6 +15,7 @@ export type ClientActionState = {
   success?: boolean;
   clientId?: string;
   clientName?: string;
+  linkedCount?: number;
 };
 
 const ARCHIVED_FROM_STATUS_KEY = "archivedFromStatus";
@@ -36,6 +39,10 @@ async function insertClientForUser(
   }
 
   const baseSlug = slugify(parsed.data.name);
+  if (!baseSlug) {
+    return { error: "Nome do cliente inválido para cadastro" };
+  }
+
   let slug = baseSlug;
 
   const { data: existingSlugs } = await supabase
@@ -170,6 +177,13 @@ export async function createClientFromDemandAction(
     return { error: "Demanda não encontrada" };
   }
 
+  if (!isUsableClientName(demand.client_name_external)) {
+    return {
+      error:
+        "Esta demanda não tem um nome de cliente válido. Cadastre o cliente manualmente e vincule depois.",
+    };
+  }
+
   const created = await insertClientForUser(
     supabase,
     user.id,
@@ -180,23 +194,31 @@ export async function createClientFromDemandAction(
     return { error: created.error };
   }
 
-  const { data: linked, error: linkError } = await supabase
-    .from("creative_demands")
-    .update({
-      client_id: created.clientId,
-      client_not_found: false,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", demandId)
-    .select("id")
-    .maybeSingle();
+  const linkedIds = await linkUnmatchedDemandsByExternalName(supabase, {
+    clientId: created.clientId,
+    externalName: demand.client_name_external,
+  });
 
-  if (linkError) {
-    return { error: linkError.message };
-  }
+  if (!linkedIds.includes(demandId)) {
+    const { data: linked, error: linkError } = await supabase
+      .from("creative_demands")
+      .update({
+        client_id: created.clientId,
+        client_not_found: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", demandId)
+      .select("id")
+      .maybeSingle();
 
-  if (!linked) {
-    return { error: "Cliente criado, mas não foi possível vincular a demanda." };
+    if (linkError) {
+      return { error: linkError.message };
+    }
+
+    if (!linked) {
+      return { error: "Cliente criado, mas não foi possível vincular a demanda." };
+    }
+    linkedIds.push(demandId);
   }
 
   revalidatePath("/dashboard");
@@ -204,11 +226,15 @@ export async function createClientFromDemandAction(
   revalidatePath("/demands");
   revalidatePath(`/demands/${demandId}`);
   revalidatePath(`/clients/${created.clientId}`);
+  for (const id of linkedIds) {
+    revalidatePath(`/demands/${id}`);
+  }
 
   return {
     success: true,
     clientId: created.clientId,
     clientName: created.clientName,
+    linkedCount: linkedIds.length,
   };
 }
 

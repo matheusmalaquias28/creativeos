@@ -1,3 +1,4 @@
+import { IMAGE_GEN_DEFAULTS } from "@/lib/ai/imagegen/defaults";
 import { resolvePromptArteFields } from "@/lib/flow/prompt-arte-text";
 import type {
   FlowGraph,
@@ -209,10 +210,10 @@ function extractPipelineJob(
     subheadline,
     cta,
     informacoesExtras,
-    aspect_ratio: gerarNode.data.aspectRatio ?? "3:4",
-    image_size: gerarNode.data.imageSize ?? "2K",
-    model: gerarNode.data.model ?? "gpt-2",
-    quality: gerarNode.data.quality ?? "low",
+    aspect_ratio: gerarNode.data.aspectRatio ?? IMAGE_GEN_DEFAULTS.aspectRatio,
+    image_size: gerarNode.data.imageSize ?? IMAGE_GEN_DEFAULTS.imageSize,
+    model: gerarNode.data.model ?? IMAGE_GEN_DEFAULTS.model,
+    quality: gerarNode.data.quality ?? IMAGE_GEN_DEFAULTS.quality,
     briefing_titulo: briefing.titulo ?? null,
     briefing_tipo: briefing.tipo ?? null,
     flow_logo_url: logoUrl,

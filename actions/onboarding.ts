@@ -6,8 +6,8 @@ import { onboardingSchema, type OnboardingFormValues } from "@/lib/schemas/clien
 import { getOwnedClient } from "@/lib/auth/verify-client";
 import { buildLogoStoragePath } from "@/lib/utils/logo-filename";
 import { isAllowedLogoFile, isSvgLogoFile } from "@/lib/utils/logo-file";
-import { parseStoredBoolean } from "@/lib/utils/parse-stored-boolean";
-import { normalizeOnboardingBooleans } from "@/services/onboarding";
+import { syncLogoToCreativeProfile } from "@/actions/visual-identity";
+import { isClientBriefingComplete } from "@/services/onboarding";
 
 type StoredAnswers = Partial<OnboardingFormValues>;
 
@@ -26,49 +26,13 @@ export type LogoActionState = {
 
 const LOGO_MAX_SIZE = 5 * 1024 * 1024;
 
-function parseBrandColors(raw: FormDataEntryValue | null): string[] {
-  if (!raw || typeof raw !== "string") return [];
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    return Array.isArray(parsed) ? parsed.map(String) : [];
-  } catch {
-    return [];
-  }
-}
-
-function parseBooleanField(raw: FormDataEntryValue | null): boolean | null {
-  return parseStoredBoolean(raw);
-}
-
-function parseJsonStringArray(raw: FormDataEntryValue | null): string[] {
-  if (!raw || typeof raw !== "string") return [];
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    return Array.isArray(parsed) ? parsed.map(String) : [];
-  } catch {
-    return [];
-  }
-}
-
 function parseFormToAnswers(formData: FormData): Partial<OnboardingFormValues> {
   const logoUrl = String(formData.get("logoUrl") ?? "").trim();
   const logoStoragePath = String(formData.get("logoStoragePath") ?? "").trim();
-  const viOption = String(formData.get("visualIdentityOption") ?? "").trim();
 
   return {
-    brandColors: parseBrandColors(formData.get("brandColors")),
-    fontStyles: String(formData.get("fontStyles") ?? ""),
     logoUrl: logoUrl || undefined,
     logoStoragePath: logoStoragePath || undefined,
-    logoQualityOk: parseBooleanField(formData.get("logoQualityOk")),
-    hasClientImages: parseBooleanField(formData.get("hasClientImages")),
-    references: parseJsonStringArray(formData.get("references")),
-    hasSite: parseBooleanField(formData.get("hasSite")),
-    siteUrl: String(formData.get("siteUrl") ?? "").trim() || undefined,
-    instagramHandle: String(formData.get("instagramHandle") ?? "").trim() || undefined,
-    hasGMB: parseBooleanField(formData.get("hasGMB")),
-    hasVisualIdentity: parseBooleanField(formData.get("hasVisualIdentity")),
-    visualIdentityOption: (viOption as "sell" | "name_only") || undefined,
   };
 }
 
@@ -76,7 +40,6 @@ async function mergeWithExistingAnswers(
   clientId: string,
   incoming: Partial<OnboardingFormValues>
 ): Promise<StoredAnswers> {
-  const normalizedIncoming = normalizeOnboardingBooleans(incoming);
   const supabase = await createClient();
   const { data } = await supabase
     .from("onboarding_answers")
@@ -89,19 +52,15 @@ async function mergeWithExistingAnswers(
       ? (data.answers as StoredAnswers)
       : {};
 
-  // Strip `undefined` values before spreading — spreading `undefined` would
-  // overwrite existing DB values for fields absent from FormData (e.g. siteUrl
-  // when the site input is conditionally hidden).
   const defined = Object.fromEntries(
-    Object.entries(normalizedIncoming).filter(([, v]) => v !== undefined)
+    Object.entries(incoming).filter(([, v]) => v !== undefined)
   ) as StoredAnswers;
 
   return {
     ...existing,
     ...defined,
-    logoUrl: normalizedIncoming.logoUrl ?? existing.logoUrl,
-    logoStoragePath:
-      normalizedIncoming.logoStoragePath ?? existing.logoStoragePath,
+    logoUrl: incoming.logoUrl ?? existing.logoUrl,
+    logoStoragePath: incoming.logoStoragePath ?? existing.logoStoragePath,
   };
 }
 
@@ -158,16 +117,6 @@ export async function saveOnboardingDraft(
   return persistAnswers(clientId, merged);
 }
 
-export async function saveOnboardingAction(
-  clientId: string,
-  _prev: OnboardingActionState,
-  formData: FormData
-): Promise<OnboardingActionState> {
-  const answers = parseFormToAnswers(formData);
-  const merged = await mergeWithExistingAnswers(clientId, answers);
-  return persistAnswers(clientId, merged);
-}
-
 export async function completeOnboardingAction(
   clientId: string,
   _prev: OnboardingActionState,
@@ -176,10 +125,13 @@ export async function completeOnboardingAction(
   const owned = await getOwnedClient(clientId);
   if (!owned) return { error: "Cliente não encontrado" };
 
-  const answers = await mergeWithExistingAnswers(
-    clientId,
-    parseFormToAnswers(formData)
-  );
+  if (!(await isClientBriefingComplete(clientId))) {
+    return {
+      error: "Extraia a identidade visual antes de concluir o briefing",
+    };
+  }
+
+  const answers = await mergeWithExistingAnswers(clientId, parseFormToAnswers(formData));
   const parsed = onboardingSchema.safeParse(answers);
 
   if (!parsed.success) {
@@ -264,10 +216,10 @@ export async function uploadClientLogoAction(
   };
 
   await persistAnswers(clientId, merged);
+  await syncLogoToCreativeProfile(clientId, logoUrl);
 
   return { success: true, logoUrl, logoStoragePath: storagePath };
 }
-
 
 export async function removeClientLogoAction(
   clientId: string
@@ -295,6 +247,7 @@ export async function removeClientLogoAction(
 
   const { logoUrl: _u, logoStoragePath: _p, ...rest } = prevAnswers;
   await persistAnswers(clientId, rest);
+  await syncLogoToCreativeProfile(clientId, null);
 
   return { success: true };
 }

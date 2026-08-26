@@ -1,5 +1,4 @@
 import type { OnboardingFormValues } from "@/lib/schemas/client";
-import { isNegativeOpportunity } from "@/lib/utils/parse-stored-boolean";
 
 export type ClientOpportunityId =
   | "logo_vectorization"
@@ -14,20 +13,9 @@ export const CLIENT_OPPORTUNITY_LABELS: Record<ClientOpportunityId, string> = {
   google_business: "Google Meu Negócio",
 };
 
-const OPPORTUNITY_FIELDS: {
-  id: ClientOpportunityId;
-  field: keyof OnboardingFormValues;
-}[] = [
-  { id: "logo_vectorization", field: "logoQualityOk" },
-  { id: "ai_photoshoot", field: "hasClientImages" },
-  { id: "landing_page", field: "hasSite" },
-  { id: "google_business", field: "hasGMB" },
-];
-
+/** Briefing enxuto — oportunidades comerciais desativadas nesta versão. */
 export function getClientOpportunityFlags(
-  answers: Partial<OnboardingFormValues>
+  _answers: Partial<OnboardingFormValues>
 ): ClientOpportunityId[] {
-  return OPPORTUNITY_FIELDS.filter(({ field }) =>
-    isNegativeOpportunity(answers[field])
-  ).map(({ id }) => id);
+  return [];
 }

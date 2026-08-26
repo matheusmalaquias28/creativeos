@@ -47,6 +47,26 @@ function parseArtesCount(value: unknown): number {
   return Array.isArray(value) ? value.length : 0;
 }
 
+function firstArteHeadline(value: unknown): DemandArte[] {
+  if (!Array.isArray(value)) return [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const headline = (item as Record<string, unknown>).headline;
+    if (typeof headline === "string" && headline.trim()) {
+      return [
+        {
+          headline: headline.trim(),
+          subheadline: "",
+          informacoesExtras: "",
+          cta: "",
+          linkReferencias: "",
+        },
+      ];
+    }
+  }
+  return [];
+}
+
 const DEMAND_LIST_SELECT =
   "id, external_id, client_id, client_name_external, client_not_found, tipo, gestor, status, is_archived, is_new, started_at, completed_at, elapsed_seconds, due_date, external_created_at, created_at, updated_at, briefing, artes, magnific_space_id, magnific_space_url, magnific_space_status, magnific_space_error, magnific_space_nodes, clients(name)";
 
@@ -67,7 +87,7 @@ function mapDemandListRow(
     webdesigner: null,
     solicitante: null,
     briefing: parseBriefingSummary(row.briefing),
-    artes: [],
+    artes: firstArteHeadline(row.artes),
     artes_count: artesCount,
     status: row.status ? String(row.status) : null,
     is_archived: Boolean(row.is_archived),

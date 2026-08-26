@@ -417,6 +417,17 @@
   50% { opacity: 1; }
 }
 
+@keyframes neon-dropzone-glow {
+  0%, 100% {
+    border-color: oklch(1 0 0 / 18%);
+    box-shadow: 0 0 18px oklch(1 0 0 / 4%);
+  }
+  50% {
+    border-color: oklch(1 0 0 / 28%);
+    box-shadow: 0 0 28px oklch(1 0 0 / 8%);
+  }
+}
+
 @layer utilities {
   .animate-pulse-soft {
     animation: pulse-soft 2s var(--ease-premium) infinite;
@@ -432,6 +443,20 @@
 
   .animate-glow-pulse {
     animation: glow-pulse 3s ease-in-out infinite;
+  }
+
+  .dropzone-neon {
+    border-color: oklch(1 0 0 / 18%);
+    background: oklch(1 0 0 / 2.5%);
+    box-shadow: 0 0 18px oklch(1 0 0 / 4%);
+    animation: neon-dropzone-glow 5s ease-in-out infinite;
+  }
+
+  .dropzone-neon-active {
+    animation: none;
+    border-color: oklch(1 0 0 / 45%);
+    background: oklch(1 0 0 / 6%);
+    box-shadow: 0 0 32px oklch(1 0 0 / 12%);
   }
 }
 

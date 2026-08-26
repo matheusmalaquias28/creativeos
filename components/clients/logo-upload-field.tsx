@@ -17,12 +17,14 @@ type LogoUploadFieldProps = {
   clientId: string;
   logoUrl?: string;
   onLogoChange: (data: { logoUrl?: string; logoStoragePath?: string }) => void;
+  compact?: boolean;
 };
 
 export function LogoUploadField({
   clientId,
   logoUrl,
   onLogoChange,
+  compact = false,
 }: LogoUploadFieldProps) {
   const [preview, setPreview] = useState(logoUrl ?? "");
   const [isPending, startTransition] = useTransition();
@@ -73,17 +75,20 @@ export function LogoUploadField({
   };
 
   return (
-    <div className="space-y-4">
-      <div>
-        <Label>Logo do cliente</Label>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Arraste a imagem para a área abaixo — PNG, JPG ou WebP (máx. 5MB)
-        </p>
-      </div>
+    <div className={cn("space-y-3", compact && "flex flex-1 flex-col")}>
+      {!compact && (
+        <div>
+          <Label>Logo do cliente</Label>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Arraste a imagem para a área abaixo — PNG, JPG ou WebP (máx. 5MB)
+          </p>
+        </div>
+      )}
 
       {preview ? (
-        <div className="space-y-3">
+        <div className="space-y-2">
           <ImageDropzone
+            variant="neon"
             disabled={isPending}
             isUploading={isPending}
             accept={LOGO_ACCEPT}
@@ -91,10 +96,10 @@ export function LogoUploadField({
             onFiles={(files) => handleUpload(files[0])}
             title=""
             minHeight="sm"
-            className={cn(isPending && "opacity-60")}
+            className={cn("flex-1", isPending && "opacity-60")}
           >
-            <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-center sm:justify-center">
-              <div className="relative flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border/40 bg-background">
+            <div className="flex flex-col items-center gap-2">
+              <div className="relative flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black/30">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={preview}
@@ -102,14 +107,9 @@ export function LogoUploadField({
                   className="max-h-full max-w-full object-contain p-2"
                 />
               </div>
-              <div className="text-center sm:text-left">
-                <p className="text-sm font-medium text-foreground/90">
-                  Arraste uma nova logo aqui para substituir
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Solte o arquivo sobre esta área
-                </p>
-              </div>
+              <p className="text-center text-xs text-muted-foreground">
+                Clique ou solte para substituir
+              </p>
             </div>
           </ImageDropzone>
           <Button
@@ -118,14 +118,15 @@ export function LogoUploadField({
             size="sm"
             disabled={isPending}
             onClick={handleRemove}
-            className="text-muted-foreground"
+            className="h-7 text-xs text-muted-foreground"
           >
-            <Trash2 className="size-4" />
-            Remover logo
+            <Trash2 className="size-3.5" />
+            Remover
           </Button>
         </div>
       ) : (
         <ImageDropzone
+          variant="neon"
           disabled={isPending}
           isUploading={isPending}
           accept={LOGO_ACCEPT}
@@ -133,12 +134,14 @@ export function LogoUploadField({
           onFiles={(files) => handleUpload(files[0])}
           icon={
             <ImageIcon
-              className="size-8 text-muted-foreground/60"
+              className="size-6 text-white/45"
               strokeWidth={1.25}
             />
           }
-          title="Arraste a logo para esta área"
-          subtitle="PNG, JPG ou WebP — máx. 5MB"
+          title="Clique ou arraste a logo"
+          subtitle="PNG, JPG ou WebP"
+          minHeight={compact ? "md" : "sm"}
+          className="flex-1"
         />
       )}
     </div>

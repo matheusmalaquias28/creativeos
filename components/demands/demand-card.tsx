@@ -15,6 +15,8 @@ import {
   getDemandColorState,
 } from "@/lib/demands/demand-color";
 import { cn } from "@/lib/utils";
+import { displayExternalClientName } from "@/lib/demands/normalize-client-name";
+import { getDemandCardTitle, getDemandCardTipo } from "@/lib/demands/demand-card-copy";
 import type { CreativeDemandListItem, DemandStatus } from "@/types/demand";
 
 function formatDate(value: string | null): string {
@@ -79,7 +81,11 @@ export function DemandCard({
   const [clientName, setClientName] = useState(demand.client_name ?? null);
   const [clientId, setClientId] = useState(demand.client_id);
 
-  const title = demand.briefing.titulo || demand.client_name_external;
+  const externalName = displayExternalClientName(demand.client_name_external);
+  const displayClient =
+    clientName || externalName || "Pendente de cadastro";
+  const title = getDemandCardTitle(demand);
+  const tipo = getDemandCardTipo(demand);
   const colorState = getDemandColorState({ ...demand, client_not_found: clientNotFound });
   const theme = CARD_NEON_THEMES[colorState];
 
@@ -115,14 +121,12 @@ export function DemandCard({
       <div className="relative flex flex-col gap-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 space-y-1">
-            <h3 className="truncate text-sm font-medium tracking-heading text-foreground">
+            <p className={cn("truncate text-xs", theme.muted)}>
+              {displayClient}
+            </p>
+            <h3 className="line-clamp-2 text-sm font-medium tracking-heading text-foreground">
               {title}
             </h3>
-            <p className={cn("text-xs", theme.muted)}>
-              {clientNotFound
-                ? demand.client_name_external
-                : (clientName ?? demand.client_name_external)}
-            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {demand.is_new && (
@@ -140,12 +144,12 @@ export function DemandCard({
                 Sem cliente
               </Badge>
             )}
-            {demand.tipo && (
+            {tipo && (
               <Badge
                 variant="outline"
                 className="border-white/10 bg-black/20 text-[0.65rem] text-foreground/80"
               >
-                {demand.tipo}
+                {tipo}
               </Badge>
             )}
           </div>

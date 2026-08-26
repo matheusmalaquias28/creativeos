@@ -7,6 +7,7 @@ import { uploadClientPhotoAction, deleteClientPhotoAction } from "@/actions/clie
 import { ImageDropzone } from "@/components/ui/image-dropzone";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 
 const MAX_PHOTOS = 5;
 const ACCEPT = "image/jpeg,image/png,image/webp";
@@ -17,12 +18,14 @@ type ClientPhotosFieldProps = {
   clientId: string;
   photos: Photo[];
   onChange: (photos: Photo[]) => void;
+  compact?: boolean;
 };
 
 export function ClientPhotosField({
   clientId,
   photos,
   onChange,
+  compact = false,
 }: ClientPhotosFieldProps) {
   const [isPending, startTransition] = useTransition();
   const remaining = MAX_PHOTOS - photos.length;
@@ -59,20 +62,22 @@ export function ClientPhotosField({
   };
 
   return (
-    <div className="space-y-4">
-      <div>
-        <Label>Fotos do cliente</Label>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Fotos do cliente, produto ou espaço físico — até {MAX_PHOTOS} imagens (PNG, JPG ou WebP, máx. 2MB cada)
-        </p>
-      </div>
+    <div className={cn("space-y-3", compact && "flex flex-1 flex-col")}>
+      {!compact && (
+        <div>
+          <Label>Fotos do cliente</Label>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Fotos do cliente, produto ou espaço físico — até {MAX_PHOTOS} imagens
+          </p>
+        </div>
+      )}
 
       {photos.length > 0 && (
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+        <div className={cn("grid gap-2", compact ? "grid-cols-2" : "grid-cols-3 sm:grid-cols-5")}>
           {photos.map((photo) => (
             <div
               key={photo.id}
-              className="group relative aspect-square overflow-hidden rounded-lg border border-border/50 bg-card/30"
+              className="group relative aspect-square overflow-hidden rounded-lg border border-white/10 bg-black/20"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -82,7 +87,7 @@ export function ClientPhotosField({
                 loading="lazy"
                 decoding="async"
               />
-              <div className="absolute inset-0 flex items-end justify-end bg-gradient-to-t from-black/50 to-transparent p-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+              <div className="absolute inset-0 flex items-end justify-end bg-gradient-to-t from-black/50 to-transparent p-1 opacity-0 transition-opacity group-hover:opacity-100">
                 <Button
                   type="button"
                   size="icon-xs"
@@ -101,6 +106,7 @@ export function ClientPhotosField({
 
       {remaining > 0 && (
         <ImageDropzone
+          variant="neon"
           accept={ACCEPT}
           multiple
           disabled={isPending}
@@ -108,19 +114,20 @@ export function ClientPhotosField({
           onFiles={handleFiles}
           icon={
             <ImageIcon
-              className="size-7 text-muted-foreground/60"
+              className="size-6 text-white/45"
               strokeWidth={1.25}
             />
           }
-          title={`Arraste até ${remaining} foto${remaining > 1 ? "s" : ""} aqui`}
-          subtitle="PNG, JPG ou WebP — máx. 2MB cada"
-          minHeight="sm"
+          title={compact ? `Clique ou arraste (${remaining})` : `Clique ou arraste até ${remaining} foto${remaining > 1 ? "s" : ""}`}
+          subtitle="PNG, JPG ou WebP"
+          minHeight={compact ? "md" : "sm"}
+          className="flex-1"
         />
       )}
 
       {remaining === 0 && (
         <p className="text-xs text-muted-foreground">
-          Limite de {MAX_PHOTOS} fotos atingido. Remova uma para adicionar outra.
+          Limite de {MAX_PHOTOS} fotos atingido.
         </p>
       )}
     </div>

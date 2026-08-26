@@ -17,10 +17,10 @@ export async function loadFlowCreativeProfile(
   if (!clientId) return null;
 
   const supabase = createAdminClient();
-  const [{ data: profile }, { data: refRows }] = await Promise.all([
+  const [{ data: profile }, { data: refRows }, { data: onboarding }] = await Promise.all([
     supabase
       .from("client_creative_profile")
-      .select("logo_url, style_reference_urls")
+      .select("logo_url, style_reference_urls, identity_sample_url")
       .eq("client_id", clientId)
       .maybeSingle(),
     supabase
@@ -28,16 +28,32 @@ export async function loadFlowCreativeProfile(
       .select("public_url")
       .eq("client_id", clientId)
       .order("sort_order", { ascending: true }),
+    supabase
+      .from("onboarding_answers")
+      .select("answers")
+      .eq("client_id", clientId)
+      .maybeSingle(),
   ]);
 
+  const onboardingLogo =
+    onboarding?.answers &&
+    typeof onboarding.answers === "object" &&
+    "logoUrl" in onboarding.answers
+      ? String((onboarding.answers as { logoUrl?: string }).logoUrl ?? "").trim() || null
+      : null;
+
   const referenceUrls = Array.from(
-    new Set([...(profile?.style_reference_urls ?? []), ...(refRows ?? []).map((r) => r.public_url)])
+    new Set([
+      ...(profile?.style_reference_urls ?? []),
+      ...(profile?.identity_sample_url ? [profile.identity_sample_url] : []),
+      ...(refRows ?? []).map((r) => r.public_url),
+    ])
   );
 
-  if (!profile && referenceUrls.length === 0) return null;
+  if (!profile && referenceUrls.length === 0 && !onboardingLogo) return null;
 
   return {
-    logo_url: profile?.logo_url ?? null,
+    logo_url: profile?.logo_url ?? onboardingLogo,
     style_reference_urls: referenceUrls,
   };
 }

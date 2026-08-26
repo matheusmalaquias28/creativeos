@@ -44,6 +44,8 @@ export type GenerateMagnificArtInput = {
   briefingTitulo?: string | null;
   briefingTipo?: string | null;
   logoUrl?: string | null;
+  /** DNA visual do cliente (base_prompt) — memória persistente. */
+  visualIdentityPrompt?: string | null;
   references: { url: string; role: string | null }[];
 };
 
@@ -71,6 +73,11 @@ function buildPrompt(input: GenerateMagnificArtInput): string {
   if (input.cta) textLines.push(`CTA: ${input.cta}`);
 
   const parts: string[] = [];
+
+  if (input.visualIdentityPrompt?.trim()) {
+    parts.push(`IDENTIDADE VISUAL DO CLIENTE (siga fielmente):\n${input.visualIdentityPrompt.trim()}`);
+  }
+
   if (textLines.length) {
     parts.push(["A IMAGEM DEVE CONTER SOMENTE ESSES TEXTOS, NADA MAIS:", ...textLines].join("\n"));
     parts.push(

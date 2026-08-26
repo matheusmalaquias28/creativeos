@@ -7,9 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import {
   Surface,
   SurfaceContent,
-  SurfaceDescription,
-  SurfaceHeader,
-  SurfaceTitle,
 } from "@/components/ui/surface";
 import { layout } from "@/lib/design/tokens";
 import { getDemandsForUser } from "@/services/demands";
@@ -42,46 +39,38 @@ export default async function DemandsPage({
       description="Briefings recebidos dos gestores via Make"
     >
       <div className={layout.sectionGap}>
-        {/* Tabs ativas / arquivadas */}
-        <div className="flex gap-1 rounded-xl border border-border/40 bg-muted/30 p-1 w-fit">
-          <Link
-            href="/demands"
-            className={`rounded-lg px-4 py-1.5 text-xs font-medium transition-colors ${
-              !showArchived
-                ? "bg-background shadow text-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Ativas
-          </Link>
-          <Link
-            href="/demands?archived=1"
-            className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-xs font-medium transition-colors ${
-              showArchived
-                ? "bg-background shadow text-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Archive className="size-3.5" />
-            Arquivadas
-          </Link>
-        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex w-fit shrink-0 gap-1 rounded-xl border border-border/40 bg-muted/30 p-1">
+            <Link
+              href="/demands"
+              className={`rounded-lg px-4 py-1.5 text-xs font-medium transition-colors ${
+                !showArchived
+                  ? "bg-background shadow text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Ativas
+            </Link>
+            <Link
+              href="/demands?archived=1"
+              className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-xs font-medium transition-colors ${
+                showArchived
+                  ? "bg-background shadow text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Archive className="size-3.5" />
+              Arquivadas
+            </Link>
+          </div>
 
-        {/* Aviso de clientes não encontrados */}
-        {unmatchedCount > 0 && !showArchived && (
-          <Surface variant="elevated">
-            <SurfaceHeader>
-              <SurfaceTitle className="flex items-center gap-2">
-                <AlertTriangle className="size-4 text-amber-600" />
-                Clientes pendentes de cadastro
-              </SurfaceTitle>
-              <SurfaceDescription>
-                {unmatchedCount} demanda(s) chegaram com clientes que ainda não existem
-                no CreativeOS.
-              </SurfaceDescription>
-            </SurfaceHeader>
-          </Surface>
-        )}
+          {unmatchedCount > 0 && !showArchived && (
+            <span className="inline-flex w-fit shrink-0 items-center gap-1.5 rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-300">
+              <AlertTriangle className="size-3.5 shrink-0" />
+              {unmatchedCount} pendente{unmatchedCount === 1 ? "" : "s"} de cadastro
+            </span>
+          )}
+        </div>
 
         {/* Lista agrupada (ativas) */}
         {!showArchived && (

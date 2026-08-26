@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { mergeLegacyDemandFlowIntoClient } from "@/services/flow";
+import { linkUnmatchedDemandsByExternalName } from "@/lib/demands/link-unmatched-siblings";
 import type { Database } from "@/types/database";
 
 type DemandUpdate = Database["public"]["Tables"]["creative_demands"]["Update"];
@@ -16,6 +17,7 @@ export type LinkDemandClientState = {
   success?: boolean;
   clientId?: string;
   clientName?: string;
+  linkedCount?: number;
 };
 
 const MAX_ELAPSED_SECONDS = 3600; // 1 hora
@@ -130,6 +132,20 @@ export async function linkDemandToClientAction(
     return { error: "Cliente não encontrado ou sem permissão." };
   }
 
+  const { data: demand, error: demandError } = await supabase
+    .from("creative_demands")
+    .select("id, client_name_external")
+    .eq("id", demandId)
+    .maybeSingle();
+
+  if (demandError) {
+    return { error: demandError.message };
+  }
+
+  if (!demand) {
+    return { error: "Demanda não encontrada." };
+  }
+
   const { data, error } = await supabase
     .from("creative_demands")
     .update({
@@ -149,15 +165,23 @@ export async function linkDemandToClientAction(
     return { error: "Não foi possível vincular a demanda." };
   }
 
+  const siblingIds = await linkUnmatchedDemandsByExternalName(supabase, {
+    clientId: client.id,
+    externalName: demand.client_name_external,
+  });
+
   // Se a demanda já tinha um fluxo próprio (gerado enquanto sem cliente), funde no
   // fluxo compartilhado do cliente em vez de descartar o trabalho já feito.
   await mergeLegacyDemandFlowIntoClient(demandId, client.id).catch((err) => {
     console.error("[linkDemandToClientAction] merge de fluxo falhou:", err);
   });
 
+  const linkedCount = new Set([demandId, ...siblingIds]).size;
+
   return {
     success: true,
     clientId: client.id,
     clientName: client.name,
+    linkedCount,
   };
 }

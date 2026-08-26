@@ -1,9 +1,25 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { normalizeClientName } from "@/lib/demands/normalize-client-name";
+import {
+  isGeneratedClientName,
+  isUsableClientName,
+  normalizeClientName,
+} from "@/lib/demands/normalize-client-name";
+
+function isPartialNameMatch(a: string, b: string): boolean {
+  if (a === b) return true;
+  const shorter = a.length <= b.length ? a : b;
+  const longer = a.length <= b.length ? b : a;
+  if (shorter.length < 8) return false;
+  return longer.includes(shorter);
+}
 
 export async function findClientByExternalName(
   clientName: string
 ): Promise<{ id: string; name: string } | null> {
+  if (!isUsableClientName(clientName) || isGeneratedClientName(clientName)) {
+    return null;
+  }
+
   const supabase = createAdminClient();
   const normalizedTarget = normalizeClientName(clientName);
 
@@ -11,18 +27,16 @@ export async function findClientByExternalName(
 
   if (error || !data?.length) return null;
 
-  const exact = data.find(
+  const named = data.filter((client) => isUsableClientName(client.name));
+
+  const exact = named.find(
     (client) => normalizeClientName(client.name) === normalizedTarget
   );
   if (exact) return exact;
 
-  const partial = data.find((client) => {
-    const normalizedClient = normalizeClientName(client.name);
-    return (
-      normalizedClient.includes(normalizedTarget) ||
-      normalizedTarget.includes(normalizedClient)
-    );
-  });
+  const partial = named.find((client) =>
+    isPartialNameMatch(normalizeClientName(client.name), normalizedTarget)
+  );
 
   return partial ?? null;
 }

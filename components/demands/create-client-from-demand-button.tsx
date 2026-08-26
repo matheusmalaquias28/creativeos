@@ -13,7 +13,11 @@ type Props = {
   clientName: string;
   className?: string;
   size?: "sm" | "default";
-  onCreated?: (clientId: string, clientName: string) => void;
+  onCreated?: (
+    clientId: string,
+    clientName: string,
+    linkedCount?: number
+  ) => void;
 };
 
 export function CreateClientFromDemandButton({
@@ -35,9 +39,17 @@ export function CreateClientFromDemandButton({
       }
 
       const name = result.clientName ?? clientName;
-      toast.success(`Cliente "${name}" criado e demanda vinculada`);
-      onCreated?.(result.clientId!, name);
-      router.push(`/clients/${result.clientId}`);
+      const linkedCount = result.linkedCount ?? 1;
+      if (onCreated) {
+        onCreated(result.clientId!, name, linkedCount);
+      } else {
+        toast.success(
+          linkedCount > 1
+            ? `Cliente "${name}" criado · ${linkedCount} demandas vinculadas`
+            : `Cliente "${name}" criado e demanda vinculada`
+        );
+        router.refresh();
+      }
     });
   }
 
@@ -54,7 +66,7 @@ export function CreateClientFromDemandButton({
       ) : (
         <UserPlus className="size-3.5" />
       )}
-      Criar cliente
+      Cadastrar cliente
     </Button>
   );
 }

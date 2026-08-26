@@ -1,36 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { Handle, Position, useReactFlow, useNodes, useEdges } from "@xyflow/react";
-import { Sparkles, Settings2, Play, Loader2, Check } from "lucide-react";
+import { Handle, Position, useNodes, useEdges } from "@xyflow/react";
+import { Sparkles, Play, Loader2, Check } from "lucide-react";
 import { toast } from "sonner";
+import { IMAGE_GEN_DEFAULTS } from "@/lib/ai/imagegen/defaults";
 import type { GerarImagemData, SaidaArteData } from "@/lib/flow/types";
-
-const ASPECT_RATIOS = ["1:1", "4:5", "3:4", "4:3", "9:16", "16:9", "3:2"];
-const IMAGE_SIZES = ["1K", "2K", "4K"];
-const MODELS = [
-  { value: "gpt-2", label: "Magnific" },
-  { value: "gemini", label: "Gemini" },
-];
-const QUALITIES = ["low", "medium", "high"] as const;
 
 type Props = { id: string; data: GerarImagemData; selected?: boolean };
 
 export function GerarImagemNode({ id, data, selected }: Props) {
-  const { setNodes } = useReactFlow();
   const nodes = useNodes();
   const edges = useEdges();
-  const [open, setOpen] = useState(false);
   const [executing, setExecuting] = useState(false);
   const [done, setDone] = useState(false);
-
-  function update(patch: Partial<GerarImagemData>) {
-    setNodes((ns) =>
-      ns.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...patch } } : n))
-    );
-  }
-
-  // ─── Individual execute ───────────────────────────────────────────────
 
   async function handleExecute() {
     if (!data.demandId) {
@@ -79,17 +62,13 @@ export function GerarImagemNode({ id, data, selected }: Props) {
           : "border-cyan-500/20"
       }`}
     >
-      {/* logo handle */}
       <Handle type="target" position={Position.Left} id="logo" style={{ top: "28%" }}
         className="!size-2.5 !border-blue-500/50 !bg-blue-500/30" />
-      {/* refs handle */}
       <Handle type="target" position={Position.Left} id="refs" style={{ top: "50%" }}
         className="!size-2.5 !border-violet-500/50 !bg-violet-500/30" />
-      {/* prompt handle */}
       <Handle type="target" position={Position.Left} id="prompt" style={{ top: "72%" }}
         className="!size-2.5 !border-amber-500/50 !bg-amber-500/30" />
 
-      {/* Header */}
       <div className="mb-2 flex items-center justify-between gap-1">
         <div className="flex items-center gap-1.5 min-w-0">
           <div className="flex size-5 shrink-0 items-center justify-center rounded-md border border-cyan-500/30 bg-cyan-500/15">
@@ -99,134 +78,40 @@ export function GerarImagemNode({ id, data, selected }: Props) {
             Gerar
           </span>
         </div>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setOpen((o) => !o)}
-            className="flex size-5 items-center justify-center rounded border border-white/8 bg-white/4 text-muted-foreground/50 hover:text-foreground/70"
-          >
-            <Settings2 className="size-3" />
-          </button>
-          {/* Individual execute button */}
-          <button
-            onClick={handleExecute}
-            disabled={executing}
-            title="Executar somente este nó"
-            className={`flex size-5 items-center justify-center rounded border transition-colors ${
-              done
-                ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400"
-                : "border-cyan-500/30 bg-cyan-500/10 text-cyan-400 hover:border-cyan-500/60 hover:bg-cyan-500/20"
-            } disabled:pointer-events-none disabled:opacity-50`}
-          >
-            {executing ? (
-              <Loader2 className="size-3 animate-spin" />
-            ) : done ? (
-              <Check className="size-3" />
-            ) : (
-              <Play className="size-2.5 fill-current" />
-            )}
-          </button>
-        </div>
+        <button
+          onClick={handleExecute}
+          disabled={executing}
+          title="Executar somente este nó"
+          className={`flex size-5 items-center justify-center rounded border transition-colors ${
+            done
+              ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400"
+              : "border-cyan-500/30 bg-cyan-500/10 text-cyan-400 hover:border-cyan-500/60 hover:bg-cyan-500/20"
+          } disabled:pointer-events-none disabled:opacity-50`}
+        >
+          {executing ? (
+            <Loader2 className="size-3 animate-spin" />
+          ) : done ? (
+            <Check className="size-3" />
+          ) : (
+            <Play className="size-2.5 fill-current" />
+          )}
+        </button>
       </div>
 
-      {/* Settings panel */}
-      {open ? (
-        <div className="space-y-2">
-          <div className="space-y-1">
-            <label className="text-[0.5625rem] uppercase tracking-wider text-cyan-400/60">
-              Modelo
-            </label>
-            <div className="flex flex-wrap gap-1">
-              {MODELS.map((m) => (
-                <button
-                  key={m.value}
-                  onClick={() => update({ model: m.value })}
-                  className={`rounded px-1.5 py-0.5 text-[0.5625rem] font-medium transition-colors ${
-                    (data.model ?? "gpt-2") === m.value
-                      ? "bg-cyan-500/25 text-cyan-300"
-                      : "bg-white/4 text-muted-foreground/50 hover:bg-white/8"
-                  }`}
-                >
-                  {m.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          {(data.model ?? "gpt-2") !== "gemini" && (
-            <div className="space-y-1">
-              <label className="text-[0.5625rem] uppercase tracking-wider text-cyan-400/60">
-                Qualidade
-              </label>
-              <div className="flex gap-1">
-                {QUALITIES.map((q) => (
-                  <button
-                    key={q}
-                    onClick={() => update({ quality: q })}
-                    className={`rounded px-1.5 py-0.5 text-[0.5625rem] font-medium transition-colors ${
-                      (data.quality ?? "low") === q
-                        ? "bg-cyan-500/25 text-cyan-300"
-                        : "bg-white/4 text-muted-foreground/50 hover:bg-white/8"
-                    }`}
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          <div className="space-y-1">
-            <label className="text-[0.5625rem] uppercase tracking-wider text-cyan-400/60">
-              Aspect ratio
-            </label>
-            <div className="flex flex-wrap gap-1">
-              {ASPECT_RATIOS.map((r) => (
-                <button
-                  key={r}
-                  onClick={() => update({ aspectRatio: r })}
-                  className={`rounded px-1.5 py-0.5 text-[0.5625rem] font-medium transition-colors ${
-                    (data.aspectRatio ?? "3:4") === r
-                      ? "bg-cyan-500/25 text-cyan-300"
-                      : "bg-white/4 text-muted-foreground/50 hover:bg-white/8"
-                  }`}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="space-y-1">
-            <label className="text-[0.5625rem] uppercase tracking-wider text-cyan-400/60">
-              Resolução
-            </label>
-            <div className="flex gap-1">
-              {IMAGE_SIZES.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => update({ imageSize: s })}
-                  className={`rounded px-1.5 py-0.5 text-[0.5625rem] font-medium transition-colors ${
-                    (data.imageSize ?? "2K") === s
-                      ? "bg-cyan-500/25 text-cyan-300"
-                      : "bg-white/4 text-muted-foreground/50 hover:bg-white/8"
-                  }`}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[0.5625rem] text-muted-foreground/60">
-            {MODELS.find((m) => m.value === (data.model ?? "gpt-2"))?.label ?? data.model}
-          </span>
-          <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[0.5625rem] text-muted-foreground/60">
-            {data.aspectRatio ?? "3:4"}
-          </span>
-          <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[0.5625rem] text-muted-foreground/60">
-            {data.imageSize ?? "2K"}
-          </span>
-        </div>
-      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[0.5625rem] text-muted-foreground/60">
+          Magnific
+        </span>
+        <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[0.5625rem] text-muted-foreground/60">
+          {IMAGE_GEN_DEFAULTS.aspectRatio}
+        </span>
+        <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[0.5625rem] text-muted-foreground/60">
+          {IMAGE_GEN_DEFAULTS.imageSize}
+        </span>
+        <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[0.5625rem] text-muted-foreground/60">
+          {IMAGE_GEN_DEFAULTS.quality}
+        </span>
+      </div>
 
       <Handle
         type="source"

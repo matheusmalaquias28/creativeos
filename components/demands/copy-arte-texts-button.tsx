@@ -12,9 +12,15 @@ type Props = {
   arte: DemandArte;
   arteIndex?: number;
   className?: string;
+  iconOnly?: boolean;
 };
 
-export function CopyArteTextsButton({ arte, arteIndex, className }: Props) {
+export function CopyArteTextsButton({
+  arte,
+  arteIndex,
+  className,
+  iconOnly = false,
+}: Props) {
   const [copied, setCopied] = useState(false);
 
   async function handleCopy() {
@@ -43,17 +49,18 @@ export function CopyArteTextsButton({ arte, arteIndex, className }: Props) {
       type="button"
       onClick={handleCopy}
       className={cn(
-        buttonVariants({ variant: "outline", size: "sm" }),
-        "gap-1.5",
+        buttonVariants({ variant: "outline", size: iconOnly ? "icon-xs" : "sm" }),
+        !iconOnly && "gap-1.5",
         className
       )}
+      title="Copiar textos"
     >
       {copied ? (
         <Check className="size-3.5" />
       ) : (
         <Copy className="size-3.5" />
       )}
-      Copiar textos
+      {iconOnly ? <span className="sr-only">Copiar textos</span> : "Copiar textos"}
     </button>
   );
 }

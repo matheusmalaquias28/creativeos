@@ -14,6 +14,7 @@ import { urlsToInlineDataParts, urlToInlineDataPart } from "./storage-refs";
 import { compositeLogoFromBase64 } from "./logo-composite";
 import { compilePrompt, buildOrderedRefs } from "./prompt-compiler";
 import { generateMagnificArt } from "@/lib/magnific/generate-art";
+import { IMAGE_GEN_DEFAULTS } from "./defaults";
 import type { LogoPlacement } from "./logo-composite";
 import type { CreativeProfile, ArtSpec, BriefingCopy, DemandReference } from "./prompt-compiler";
 
@@ -211,8 +212,8 @@ async function runJob(
     subheadline: job.params.subheadline,
     cta: job.params.cta,
     informacoesExtras: job.params.informacoesExtras,
-    aspect_ratio: job.params.aspect_ratio ?? profile?.aspect_ratio ?? "1:1",
-    image_size: job.params.image_size ?? profile?.image_size ?? "2K",
+    aspect_ratio: job.params.aspect_ratio ?? profile?.aspect_ratio ?? IMAGE_GEN_DEFAULTS.aspectRatio,
+    image_size: job.params.image_size ?? profile?.image_size ?? IMAGE_GEN_DEFAULTS.imageSize,
   };
 
   const briefing: BriefingCopy = {
@@ -230,7 +231,7 @@ async function runJob(
   };
 
   const effectiveLogoUrl = flowLogoUrl ?? profile?.logo_url ?? null;
-  const model = job.params.model ?? "gemini";
+  const model = job.params.model ?? IMAGE_GEN_DEFAULTS.model;
 
   let base64: string;
   let mimeType: string;
@@ -242,9 +243,9 @@ async function runJob(
     // prompt do agente (ver lib/magnific/generate-art.ts).
     const result = await generateMagnificArt({
       model,
-      quality: job.params.quality ?? "low",
-      aspectRatio: artSpec.aspect_ratio ?? "3:4",
-      resolution: (artSpec.image_size ?? "2K").toLowerCase(),
+      quality: job.params.quality ?? IMAGE_GEN_DEFAULTS.quality,
+      aspectRatio: artSpec.aspect_ratio ?? IMAGE_GEN_DEFAULTS.aspectRatio,
+      resolution: (artSpec.image_size ?? IMAGE_GEN_DEFAULTS.imageSize).toLowerCase(),
       headline: artSpec.headline,
       subheadline: artSpec.subheadline,
       cta: artSpec.cta,
@@ -252,6 +253,7 @@ async function runJob(
       briefingTitulo: briefing.titulo,
       briefingTipo: briefing.tipo,
       logoUrl: effectiveLogoUrl,
+      visualIdentityPrompt: creativeProfile.base_prompt || null,
       references: allDemandRefs,
     });
 
@@ -282,7 +284,7 @@ async function runJob(
       prompt: promptFinal,
       references,
       imageSize: (artSpec.image_size as ImageSize) ?? "2K",
-      aspectRatio: (artSpec.aspect_ratio as AspectRatio) ?? "1:1",
+      aspectRatio: (artSpec.aspect_ratio as AspectRatio) ?? IMAGE_GEN_DEFAULTS.aspectRatio,
     });
     base64 = generated.base64;
     mimeType = generated.mimeType;
