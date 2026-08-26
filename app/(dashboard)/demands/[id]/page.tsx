@@ -4,7 +4,6 @@ import { ArrowLeft, ExternalLink } from "lucide-react";
 import { DashboardPage } from "@/components/layout/dashboard-page";
 import { DemandDetailStatusBar } from "@/components/demands/demand-detail-status-bar";
 import { MagnificSpaceButton } from "@/components/demands/magnific-space-button";
-import { MagnificSpaceEmbed } from "@/components/demands/magnific-space-embed";
 import { MarkDemandReadOnMount } from "@/components/demands/mark-demand-read-on-mount";
 import {
   DemandClientAssets,
@@ -208,22 +207,6 @@ export default async function DemandDetailPage({ params }: PageProps) {
           </SurfaceContent>
         </Surface>
 
-        {demand.magnific_space_status === "ready" && demand.magnific_space_url && (
-          <Surface variant="elevated">
-            <SurfaceHeader>
-              <SurfaceTitle>Magnific Space</SurfaceTitle>
-              <SurfaceDescription>
-                Board gerado para esta demanda — ajuste as artes sem sair do CreativeOS
-              </SurfaceDescription>
-            </SurfaceHeader>
-            <SurfaceContent>
-              <MagnificSpaceEmbed
-                spaceUrl={demand.magnific_space_url}
-                nodes={demand.magnific_space_nodes}
-              />
-            </SurfaceContent>
-          </Surface>
-        )}
 
         <section className="space-y-4">
           <div>
