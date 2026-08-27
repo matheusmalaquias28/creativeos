@@ -84,9 +84,25 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
+export type GeradorImageRow = {
+  id: string;
+  user_id: string;
+  url: string;
+  aspect_ratio: string;
+  resolution: string;
+  prompt: string;
+  created_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
+      gerador_image: {
+        Row: GeradorImageRow;
+        Insert: Omit<GeradorImageRow, "id" | "created_at"> & { id?: string; created_at?: string };
+        Update: Partial<Omit<GeradorImageRow, "id">>;
+        Relationships: [];
+      };
       users: {
         Row: User;
         Insert: Omit<User, "created_at" | "updated_at"> & {

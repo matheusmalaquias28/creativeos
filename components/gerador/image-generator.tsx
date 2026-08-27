@@ -8,12 +8,20 @@ import {
   ImageIcon,
   Loader2,
   Sparkles,
+  Trash2,
   Upload,
   Wand2,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import {
+  loadGeradorImagesAction,
+  saveGeradorImageAction,
+  deleteGeradorImageAction,
+  type GeradorImage,
+} from "@/actions/gerador";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -113,8 +121,11 @@ type TaskCard = {
 };
 
 type GeneratedResult = {
+  id: string | null; // null until saved to DB
   url: string;
-  aspectRatio: AspectRatioValue;
+  aspectRatio: string;
+  resolution: string;
+  prompt: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -353,10 +364,14 @@ function GeneratingCard({ aspectRatio }: { aspectRatio: string }) {
 function ResultCard({
   result,
   onFullscreen,
+  onDelete,
 }: {
   result: GeneratedResult;
   onFullscreen: () => void;
+  onDelete: () => void;
 }) {
+  const [deleting, setDeleting] = useState(false);
+
   async function handleDownload() {
     const res = await fetch(result.url);
     const blob = await res.blob();
@@ -366,11 +381,24 @@ function ResultCard({
     a.click();
   }
 
+  async function handleDelete() {
+    if (!result.id) return;
+    setDeleting(true);
+    const res = await deleteGeradorImageAction(result.id);
+    if ("error" in res) {
+      toast.error(res.error);
+      setDeleting(false);
+    } else {
+      onDelete();
+    }
+  }
+
   return (
     <div
       className={cn(
         "group relative overflow-hidden rounded-xl border border-border/50 bg-muted/10 dark:border-white/8",
-        getAspectClass(result.aspectRatio)
+        getAspectClass(result.aspectRatio),
+        deleting && "opacity-50 pointer-events-none"
       )}
       style={{ maxHeight: result.aspectRatio === "9:16" ? 400 : undefined }}
     >
@@ -378,7 +406,7 @@ function ResultCard({
       <img src={result.url} alt="Imagem gerada" className="h-full w-full object-cover" />
 
       {/* Overlay */}
-      <div className="absolute inset-0 flex flex-col items-end justify-start gap-2 bg-gradient-to-b from-black/40 to-transparent p-2.5 opacity-0 transition-opacity group-hover:opacity-100">
+      <div className="absolute inset-0 flex flex-col items-end justify-start gap-1.5 bg-gradient-to-b from-black/50 to-transparent p-2.5 opacity-0 transition-opacity group-hover:opacity-100">
         <div className="flex gap-1.5">
           <button
             onClick={onFullscreen}
@@ -392,6 +420,15 @@ function ResultCard({
           >
             <Download className="size-3.5" />
           </button>
+          {result.id && (
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="flex size-7 items-center justify-center rounded-lg bg-red-600/70 text-white backdrop-blur-sm hover:bg-red-600/90"
+            >
+              {deleting ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -473,10 +510,27 @@ export function ImageGenerator() {
   // Tasks & results
   const [tasks, setTasks] = useState<TaskCard[]>([]);
   const [results, setResults] = useState<GeneratedResult[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
   const [fullscreenUrl, setFullscreenUrl] = useState<string | null>(null);
   const [globalError, setGlobalError] = useState<string | null>(null);
 
   const pollTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  // Load saved images on mount
+  useEffect(() => {
+    loadGeradorImagesAction().then((images: GeradorImage[]) => {
+      setResults(
+        images.map((img) => ({
+          id: img.id,
+          url: img.url,
+          aspectRatio: img.aspect_ratio,
+          resolution: img.resolution,
+          prompt: img.prompt,
+        }))
+      );
+      setLoadingHistory(false);
+    }).catch(() => setLoadingHistory(false));
+  }, []);
 
   const isGenerating = tasks.some((t) => t.status === "pending" || t.status === "in_progress");
 
@@ -505,11 +559,26 @@ export function ImageGenerator() {
         }
 
         if (data.status === "COMPLETED" && data.generated[0]) {
-          updateTask(localId, { status: "completed", imageUrl: data.generated[0] });
-          setResults((prev) => [
-            { url: data.generated[0], aspectRatio },
-            ...prev,
-          ]);
+          const imageUrl = data.generated[0];
+          updateTask(localId, { status: "completed", imageUrl });
+
+          // Save to DB and prepend with id
+          const newResult: GeneratedResult = {
+            id: null,
+            url: imageUrl,
+            aspectRatio,
+            resolution,
+            prompt,
+          };
+          setResults((prev) => [newResult, ...prev]);
+
+          saveGeradorImageAction(imageUrl, aspectRatio, resolution, prompt).then((res) => {
+            if ("id" in res) {
+              setResults((prev) =>
+                prev.map((r) => (r.url === imageUrl && r.id === null ? { ...r, id: res.id } : r))
+              );
+            }
+          });
           return;
         }
 
@@ -909,11 +978,13 @@ export function ImageGenerator() {
           >
             {tasks.map((task) => {
               if (task.status === "completed" && task.imageUrl) {
+                const matchedResult = results.find((r) => r.url === task.imageUrl);
                 return (
                   <ResultCard
                     key={task.localId}
-                    result={{ url: task.imageUrl, aspectRatio }}
+                    result={matchedResult ?? { id: null, url: task.imageUrl, aspectRatio, resolution, prompt }}
                     onFullscreen={() => setFullscreenUrl(task.imageUrl)}
+                    onDelete={() => setResults((prev) => prev.filter((r) => r.url !== task.imageUrl))}
                   />
                 );
               }
@@ -936,25 +1007,35 @@ export function ImageGenerator() {
           </div>
         )}
 
-        {/* Previous results */}
-        {results.length > 0 && tasks.every((t) => t.status === "completed" || t.status === "failed") && (
+        {/* History */}
+        {(results.length > 0 || loadingHistory) && (
           <div>
             <p className="mb-3 text-xs text-muted-foreground/60">
-              {results.length} imagem{results.length !== 1 ? "ns" : ""} gerada{results.length !== 1 ? "s" : ""}
+              {loadingHistory
+                ? "Carregando histórico..."
+                : `${results.length} imagem${results.length !== 1 ? "ns" : ""} salva${results.length !== 1 ? "s" : ""}`}
             </p>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {results.map((r, i) => (
-                <ResultCard
-                  key={i}
-                  result={r}
-                  onFullscreen={() => setFullscreenUrl(r.url)}
-                />
-              ))}
-            </div>
+            {loadingHistory ? (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground/50">
+                <Loader2 className="size-3 animate-spin" />
+                Carregando...
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {results.map((r) => (
+                  <ResultCard
+                    key={r.url}
+                    result={r}
+                    onFullscreen={() => setFullscreenUrl(r.url)}
+                    onDelete={() => setResults((prev) => prev.filter((img) => img.url !== r.url))}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
 
-        {tasks.length === 0 && (
+        {tasks.length === 0 && results.length === 0 && !loadingHistory && (
           <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border/40 py-20 text-center dark:border-white/8">
             <ImageIcon className="size-8 text-muted-foreground/20" strokeWidth={1.25} />
             <div>
