@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   Layers,
   LogOut,
+  Wand2,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,7 @@ const navItems = [
   { href: "/demands", label: "Demandas", icon: ClipboardList },
   { href: "/web-demands", label: "Demandas Web", icon: Globe },
   { href: "/carousel", label: "Carrosséis", icon: Layers },
+  { href: "/gerador", label: "Gerador", icon: Wand2 },
 ];
 
 type AppSidebarProps = {

@@ -11,6 +11,7 @@ import {
 } from "@/components/demands/demand-client-assets";
 import { DemandArteFeed } from "@/components/demands/demand-arte-feed";
 import { DemandReferenceManager } from "@/components/demands/demand-reference-manager";
+import { CreativeBriefPanel } from "@/components/demands/creative-brief-panel";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Surface,
@@ -207,6 +208,11 @@ export default async function DemandDetailPage({ params }: PageProps) {
           </SurfaceContent>
         </Surface>
 
+
+        <CreativeBriefPanel
+          demandId={id}
+          hasClient={Boolean(demand.client_id)}
+        />
 
         <section className="space-y-4">
           <div>

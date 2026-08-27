@@ -17,10 +17,7 @@ import type { ClientVisualIdentityState } from "@/lib/schemas/visual-identity";
 import { isVisualIdentityReady } from "@/lib/schemas/visual-identity";
 import { LogoUploadField } from "@/components/clients/logo-upload-field";
 import { ClientPhotosField } from "@/components/clients/client-photos-field";
-import {
-  VisualIdentityDnaPreview,
-  VisualIdentityField,
-} from "@/components/clients/visual-identity-field";
+import { VisualIdentityField } from "@/components/clients/visual-identity-field";
 import { Button } from "@/components/ui/button";
 
 type OnboardingFormProps = {
@@ -113,12 +110,6 @@ export function OnboardingForm({
     };
   }, [form, persistDraft]);
 
-  useEffect(() => {
-    if (identityState.identityExtractionStatus !== "extracting") return;
-    const timer = setInterval(() => router.refresh(), 4000);
-    return () => clearInterval(timer);
-  }, [identityState.identityExtractionStatus, router]);
-
   const onComplete = (formData: FormData) => {
     if (!identityReady) {
       toast.error("Aguarde a extração do DNA visual antes de concluir");
@@ -195,15 +186,12 @@ export function OnboardingForm({
         >
           <VisualIdentityField
             compact
-            showDnaDetails={false}
             clientId={clientId}
             state={identityState}
             onStateChange={setIdentityState}
           />
         </BriefingColumn>
       </div>
-
-      <VisualIdentityDnaPreview state={identityState} />
 
       <input type="hidden" name="logoUrl" value={logoUrl ?? ""} readOnly />
       <input type="hidden" name="logoStoragePath" value={logoStoragePath ?? ""} readOnly />
