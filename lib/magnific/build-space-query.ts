@@ -21,10 +21,14 @@ const QUERY_CHAR_BUDGET = 3600;
  * inventar 1:1 ou modelos diferentes por arte.
  *
  * O DNA visual do cliente (`profile.basePrompt`) entra só como um resumo curto
- * de apoio — a arte de referência de onde ele foi extraído já foi enviada como
- * imagem anexa ao Space (ver `styleUrls` em generate-space.ts) e é a fonte
- * visual principal. O resumo é cortado no fim da função para nunca estourar o
- * orçamento de caracteres do spaces_edit, mesmo que o DNA extraído seja longo.
+ * de apoio — cores, tipografia e mood, NUNCA para ser copiado como layout. A
+ * arte de referência de onde ele foi extraído também é enviada como imagem
+ * anexa ao Space (ver `styleUrls` em generate-space.ts), então o prompt deixa
+ * explícito que essa imagem é só inspiração de cor/acabamento — sem isso o
+ * spaces_edit tende a replicar a composição literal da referência (ex: uma
+ * arte de style guide vira grade de swatches com códigos hex na arte final,
+ * em vez de conteúdo da demanda). O resumo é cortado no fim da função para
+ * nunca estourar o orçamento de caracteres do spaces_edit.
  *
  * `logoIdentifier` é o creation identifier retornado pelo upload da logo —
  * a menção `@[id:Logo:output]` é como o spaces_edit referencia um node
@@ -62,6 +66,12 @@ export function buildMagnificSpaceQuery(
 
   parts.push("Adicione uma imagem em destaque condizente com o tema da arte.");
 
+  if (profile?.basePrompt.trim()) {
+    parts.push(
+      "Entre as imagens anexadas a este Space está a amostra de identidade visual do cliente — use-a SOMENTE como inspiração de paleta de cores, tratamento tipográfico e acabamento. NÃO replique a composição, a grade, os textos ou os códigos de cor dessa imagem de referência na arte final — a arte final deve seguir o tema e os textos desta demanda."
+    );
+  }
+
   // Posição reservada para o resumo do DNA do cliente — preenchida por último,
   // depois de medir quanto orçamento de caracteres sobrou (ver fim da função).
   const identityIndex = parts.length;
@@ -96,7 +106,7 @@ export function buildMagnificSpaceQuery(
   if (profile?.basePrompt.trim()) {
     const withoutIdentity = parts.filter((_, i) => i !== identityIndex).join(" ");
     const prefix =
-      "Identidade visual do cliente (resumo de apoio — a arte de referência anexada a este Space é a fonte visual principal, siga-a fielmente): ";
+      "Direcionamento de estilo do cliente — use apenas para orientar cor, tipografia e mood, NUNCA como layout a copiar: ";
     const room = QUERY_CHAR_BUDGET - withoutIdentity.length - prefix.length;
     if (room > 20) {
       parts[identityIndex] = `${prefix}${profile.basePrompt.trim().slice(0, room)}`;
