@@ -6,12 +6,25 @@ export type CreativeProfileBrief = {
   palette: string[];
 };
 
+// O spaces_edit rejeita queries acima de ~4000 caracteres; orçamento com folga
+// para o sufixo "NÃO renomeie este Space" adicionado na hora do envio (ver
+// mesmo padrão em lib/mvp/build-mvp-query.ts). O basePrompt do DNA do cliente é
+// a parte de tamanho variável — é ela que é cortada quando o texto fixo já
+// preenche boa parte do orçamento.
+const QUERY_CHAR_BUDGET = 3600;
+
 /**
  * Instrução em linguagem natural para `spaces_edit`, seguindo o modelo de
  * prompt validado manualmente no Magnific. Deliberadamente enxuto: NÃO envia
- * tipo da demanda, base_prompt do perfil — o formato/modelo/qualidade dos nodes
- * de imagem são fixos (ver IMAGE_GEN_DEFAULTS) e vão explícitos no prompt para o
- * spaces_edit não inventar 1:1 ou modelos diferentes por arte.
+ * tipo da demanda — o formato/modelo/qualidade dos nodes de imagem são fixos
+ * (ver IMAGE_GEN_DEFAULTS) e vão explícitos no prompt para o spaces_edit não
+ * inventar 1:1 ou modelos diferentes por arte.
+ *
+ * O DNA visual do cliente (`profile.basePrompt`) entra só como um resumo curto
+ * de apoio — a arte de referência de onde ele foi extraído já foi enviada como
+ * imagem anexa ao Space (ver `styleUrls` em generate-space.ts) e é a fonte
+ * visual principal. O resumo é cortado no fim da função para nunca estourar o
+ * orçamento de caracteres do spaces_edit, mesmo que o DNA extraído seja longo.
  *
  * `logoIdentifier` é o creation identifier retornado pelo upload da logo —
  * a menção `@[id:Logo:output]` é como o spaces_edit referencia um node
@@ -49,9 +62,10 @@ export function buildMagnificSpaceQuery(
 
   parts.push("Adicione uma imagem em destaque condizente com o tema da arte.");
 
-  if (profile?.basePrompt.trim()) {
-    parts.push(`Identidade visual do cliente: ${profile.basePrompt.trim()}`);
-  }
+  // Posição reservada para o resumo do DNA do cliente — preenchida por último,
+  // depois de medir quanto orçamento de caracteres sobrou (ver fim da função).
+  const identityIndex = parts.length;
+  if (profile?.basePrompt.trim()) parts.push("");
 
   if (profile?.palette.length) {
     parts.push(`Use as cores ${profile.palette.slice(0, 6).join(" e ")}.`);
@@ -77,6 +91,18 @@ export function buildMagnificSpaceQuery(
     parts.push(
       ["Utilize somente esses textos na criação da arte:", ...textLines].join("\n")
     );
+  }
+
+  if (profile?.basePrompt.trim()) {
+    const withoutIdentity = parts.filter((_, i) => i !== identityIndex).join(" ");
+    const prefix =
+      "Identidade visual do cliente (resumo de apoio — a arte de referência anexada a este Space é a fonte visual principal, siga-a fielmente): ";
+    const room = QUERY_CHAR_BUDGET - withoutIdentity.length - prefix.length;
+    if (room > 20) {
+      parts[identityIndex] = `${prefix}${profile.basePrompt.trim().slice(0, room)}`;
+    } else {
+      parts.splice(identityIndex, 1);
+    }
   }
 
   return parts.join(" ");
