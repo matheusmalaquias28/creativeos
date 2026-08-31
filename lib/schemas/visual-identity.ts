@@ -1,10 +1,17 @@
 import { z } from "zod";
 import { isValidHexColor, normalizeHexColor } from "@/lib/utils/color";
 
-const hexColorSchema = z
-  .string()
-  .refine((v) => isValidHexColor(v), "Cor inválida")
-  .transform((v) => normalizeHexColor(v)!);
+// Filtra e normaliza em vez de rejeitar: o Claude às vezes devolve mais de 8
+// cores ou alguma entrada fora do formato hex (ex: "gradiente azul-roxo") — em
+// vez de derrubar a extração inteira por causa de UM item ruim, descarta só o
+// item inválido e corta no limite.
+function preprocessPalette(value: unknown): unknown {
+  if (!Array.isArray(value)) return value;
+  return value
+    .filter((v): v is string => typeof v === "string" && isValidHexColor(v))
+    .map((v) => normalizeHexColor(v)!)
+    .slice(0, 8);
+}
 
 // O texto do DNA é só uma legenda de apoio — a arte de referência enviada junto
 // é a fonte visual principal. Os clamps abaixo garantem um prompt enxuto mesmo
@@ -13,7 +20,7 @@ const hexColorSchema = z
 // spaces_edit quando o DNA entra no prompt do Space (build-space-query.ts).
 export const visualIdentityDnaSchema = z.object({
   summary: z.string().min(20).transform((v) => v.trim().slice(0, 160)),
-  palette: z.array(hexColorSchema).min(1).max(8),
+  palette: z.preprocess(preprocessPalette, z.array(z.string()).min(1, "Nenhuma cor válida extraída")),
   typography: z.object({
     headlineStyle: z.string().transform((v) => v.trim().slice(0, 60)),
     bodyStyle: z.string().transform((v) => v.trim().slice(0, 60)),
