@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { withPtBrImagePrompt } from "@/lib/carousel/image-prompt";
 import type { CarouselFormat } from "@/types/carousel";
 
 const ASPECT_BY_FORMAT: Record<CarouselFormat, string> = {
@@ -66,7 +67,7 @@ export function BackgroundGenerator({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: prompt.trim(),
+          prompt: withPtBrImagePrompt(prompt.trim()),
           aspect_ratio: ASPECT_BY_FORMAT[format],
           resolution: "2K",
         }),

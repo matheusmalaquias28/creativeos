@@ -74,12 +74,13 @@ export const BUILD_CAROUSEL_TOOL = {
             bgPrompt: {
               type: "string",
               description:
-                "Prompt em inglês para a imagem de fundo (layout background) ou 1ª imagem do grid.",
+                "Prompt para a imagem de fundo (layout background) ou 1ª imagem do grid. Cenário brasileiro quando fizer sentido; qualquer texto na imagem em português do Brasil.",
             },
             gridPrompts: {
               type: "array",
               items: { type: "string" },
-              description: "Prompts em inglês para as imagens do grid (grid2=2, grid3=3).",
+              description:
+                "Prompts para as imagens do grid (grid2=2, grid3=3). Cenário brasileiro quando fizer sentido; texto em português do Brasil.",
             },
             cta: {
               type: "object",
@@ -151,7 +152,8 @@ REGRAS DE CONTEÚDO:
 - Varie a posição do texto (textPos) entre os cards para ficar dinâmico.
 - Use SOMENTE cores da paleta acima em corFundo/corTitulo/corSubtitulo, garantindo contraste legível.
 - Varie os layouts: alguns cards com "background" (imagem de fundo) e alguns com grid ("grid1", "grid2", "grid3") quando ajudar a contar a história.
-- Sempre forneça bgPrompt (em inglês, descritivo, coerente com a marca). Para grids, forneça gridPrompts com a quantidade certa de imagens.
+- Sempre forneça bgPrompt (descritivo, coerente com a marca). Para grids, forneça gridPrompts com a quantidade certa de imagens.
+- Nos prompts de imagem, prefira cenários, ambientes e pessoas brasileiras quando fizer sentido. Se a imagem tiver qualquer texto, ele deve estar em português do Brasil (nunca em inglês).
 - Use CTA apenas no último card (ex.: "Salve este post", "Comente EU QUERO").
 - Para legibilidade sobre imagens de fundo, conte com o overlay escuro do fundo — NÃO use retângulo glassmorphism (textGlass deve ser false).
 

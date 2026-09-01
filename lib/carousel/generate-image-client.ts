@@ -1,4 +1,5 @@
 import type { CarouselFormat, ImageGridLayout } from "@/types/carousel";
+import { withPtBrImagePrompt } from "@/lib/carousel/image-prompt";
 
 /** Aspect ratio per carousel format (backgrounds). Client-safe. */
 export const FORMAT_ASPECT: Record<CarouselFormat, string> = {
@@ -29,7 +30,7 @@ export async function generateImageViaGerador(
   const res = await fetch("/api/gerador/generate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt, aspect_ratio: aspect, resolution: "2K" }),
+    body: JSON.stringify({ prompt: withPtBrImagePrompt(prompt), aspect_ratio: aspect, resolution: "2K" }),
   });
   const data = await res.json();
   if (!res.ok || data.error) throw new Error(data.error ?? "Erro ao iniciar a geração");

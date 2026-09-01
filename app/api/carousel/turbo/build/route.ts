@@ -9,6 +9,7 @@ import {
   type TurboSpec,
 } from "@/lib/carousel/turbo/schema";
 import { generateMagnificImage, ASPECT_BY_FORMAT } from "@/lib/carousel/turbo/magnific";
+import { withPtBrImagePrompt } from "@/lib/carousel/image-prompt";
 import { makeDefaultDesign } from "@/types/carousel";
 import type { CarouselProfile } from "@/types/carousel-profile";
 
@@ -124,10 +125,11 @@ export async function POST(req: NextRequest) {
               if (Date.now() >= DEADLINE) {
                 reason = "tempo do processo esgotado";
               } else {
-                let r = await generateMagnificImage(job.prompt, job.aspect);
+                const finalPrompt = withPtBrImagePrompt(job.prompt);
+                let r = await generateMagnificImage(finalPrompt, job.aspect);
                 // One retry on a real failure while there is still time budget.
                 if (!r.url && Date.now() < DEADLINE - 85_000) {
-                  r = await generateMagnificImage(job.prompt, job.aspect);
+                  r = await generateMagnificImage(finalPrompt, job.aspect);
                 }
                 url = r.url;
                 reason = r.reason;
