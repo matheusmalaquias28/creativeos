@@ -42,13 +42,18 @@ export function buildSpacesPrompt(
     parts.push(`Evitar: ${brandDna.negativeStyles.slice(0, 4).join(", ")}.`);
   }
 
-  const hasCopy = copy.headline || copy.subheadline || copy.cta;
-  if (hasCopy) {
-    const copyParts: string[] = [];
-    if (copy.headline) copyParts.push(`Headline: ${copy.headline}`);
-    if (copy.subheadline) copyParts.push(`Subheadline: ${copy.subheadline}`);
-    if (copy.cta) copyParts.push(`CTA: ${copy.cta}`);
-    parts.push(`Utilize a copy — ${copyParts.join("  ")}.`);
+  const copyParts: string[] = [];
+  if (copy.headline) copyParts.push(`Headline: ${copy.headline}`);
+  if (copy.subheadline) copyParts.push(`Subheadline: ${copy.subheadline}`);
+  if (copy.cta) copyParts.push(`CTA: ${copy.cta}`);
+
+  if (copyParts.length) {
+    parts.push(["Utilize somente estes textos, exatamente como estão:", ...copyParts].join("\n"));
+    parts.push(
+      "NÃO adicione nenhum outro texto na arte além dos listados acima — nada de frases, informações, preços, datas, ícones ou elementos que denunciem que a arte foi gerada por IA."
+    );
+  } else {
+    parts.push("NÃO adicione nenhum texto na arte.");
   }
 
   if (copy.logoReference) {
