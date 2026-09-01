@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import Link from "next/link";
-import { signIn, signUp, type AuthActionState } from "@/actions/auth";
+import { signIn, type AuthActionState } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,10 +23,6 @@ type LoginFormProps = {
 export function LoginForm({ redirectTo }: LoginFormProps) {
   const [signInState, signInAction, signInPending] = useActionState(
     signIn,
-    initialState
-  );
-  const [signUpState, signUpAction, signUpPending] = useActionState(
-    signUp,
     initialState
   );
 
@@ -78,55 +74,6 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
             )}
             <Button type="submit" className="w-full" disabled={signInPending}>
               {signInPending ? "Entrando..." : "Entrar"}
-            </Button>
-          </form>
-        </SurfaceContent>
-      </Surface>
-
-      <Surface>
-        <SurfaceHeader>
-          <SurfaceTitle>Criar conta</SurfaceTitle>
-          <SurfaceDescription>Primeiro acesso ao Creative OS</SurfaceDescription>
-        </SurfaceHeader>
-        <SurfaceContent>
-          <form action={signUpAction} className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="fullName">Nome completo</Label>
-              <Input id="fullName" name="fullName" required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="signup-email">E-mail</Label>
-              <Input
-                id="signup-email"
-                name="email"
-                type="email"
-                required
-                autoComplete="email"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="signup-password">Senha</Label>
-              <Input
-                id="signup-password"
-                name="password"
-                type="password"
-                required
-                autoComplete="new-password"
-              />
-            </div>
-            {signUpState.error && (
-              <p className="text-sm text-destructive">{signUpState.error}</p>
-            )}
-            {signUpState.success && (
-              <p className="text-sm text-muted-foreground">{signUpState.success}</p>
-            )}
-            <Button
-              type="submit"
-              variant="outline"
-              className="w-full"
-              disabled={signUpPending}
-            >
-              {signUpPending ? "Criando..." : "Criar conta"}
             </Button>
           </form>
         </SurfaceContent>

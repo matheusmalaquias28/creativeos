@@ -666,6 +666,7 @@ export type Database = {
           format: "carousel" | "square" | "stories";
           post_style: "minimal" | "profile" | "creator" | "techviral" | "viralsaas";
           slides: Json;
+          design: Json;
           created_at: string;
           updated_at: string;
         };
@@ -676,6 +677,7 @@ export type Database = {
           format?: "carousel" | "square" | "stories";
           post_style?: "minimal" | "profile" | "creator" | "techviral" | "viralsaas";
           slides?: Json;
+          design?: Json;
           created_at?: string;
           updated_at?: string;
         };
@@ -684,9 +686,78 @@ export type Database = {
           format: "carousel" | "square" | "stories";
           post_style: "minimal" | "profile" | "creator" | "techviral" | "viralsaas";
           slides: Json;
+          design: Json;
           updated_at: string;
         }>;
         Relationships: [];
+      };
+      carousel_profiles: {
+        Row: {
+          id: string;
+          user_id: string;
+          client_id: string | null;
+          name: string;
+          logo_url: string | null;
+          logo_storage_path: string | null;
+          font_title: string | null;
+          font_body: string | null;
+          color_background: string;
+          color_title: string;
+          color_subtitle: string;
+          color_accent: string;
+          palette: Json;
+          instagram_handle: string | null;
+          business_context: string | null;
+          context_md: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          client_id?: string | null;
+          name?: string;
+          logo_url?: string | null;
+          logo_storage_path?: string | null;
+          font_title?: string | null;
+          font_body?: string | null;
+          color_background?: string;
+          color_title?: string;
+          color_subtitle?: string;
+          color_accent?: string;
+          palette?: Json;
+          instagram_handle?: string | null;
+          business_context?: string | null;
+          context_md?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<{
+          client_id: string | null;
+          name: string;
+          logo_url: string | null;
+          logo_storage_path: string | null;
+          font_title: string | null;
+          font_body: string | null;
+          color_background: string;
+          color_title: string;
+          color_subtitle: string;
+          color_accent: string;
+          palette: Json;
+          instagram_handle: string | null;
+          business_context: string | null;
+          context_md: string | null;
+          updated_at: string;
+        }>;
+        Relationships: [
+          {
+            foreignKeyName: "carousel_profiles_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+        ];
       };
     };
     Views: Record<string, never>;

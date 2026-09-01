@@ -4,7 +4,11 @@ import {
   getAnthropicClient,
   DEFAULT_CLAUDE_MODEL,
 } from "@/lib/ai/client";
+import { stripTravessao } from "@/lib/text/strip-dash";
 import type { CarouselSlide } from "@/types/carousel";
+
+const NO_DASH_RULE =
+  "IMPORTANTE: nunca use travessão (— ou –). Use vírgula, ponto ou frases curtas.";
 
 type GenerateRequest =
   | { type: "slides"; prompt: string; slideCount?: number }
@@ -57,6 +61,7 @@ Responda APENAS com um JSON array, sem markdown:
 Regras:
 - Títulos curtos, diretos e impactantes (máx 8 palavras)
 - Subtítulos complementam o título (máx 20 palavras)
+- ${NO_DASH_RULE}
 - Nenhum texto além do JSON`,
         },
       ],
@@ -71,7 +76,10 @@ Regras:
       const slides = extractJson<{ titulo: string; subtitulo: string }[]>(
         text.text,
         true
-      );
+      ).map((s) => ({
+        titulo: stripTravessao(s.titulo),
+        subtitulo: stripTravessao(s.subtitulo),
+      }));
       return NextResponse.json({ slides });
     } catch {
       return NextResponse.json({ error: "Falha no parse" }, { status: 500 });
@@ -93,6 +101,7 @@ Slide:
 
 Instrução: "${body.instruction}"
 
+${NO_DASH_RULE}
 Responda APENAS com JSON, sem markdown:
 { "titulo": "...", "subtitulo": "..." }`,
         },
@@ -109,7 +118,10 @@ Responda APENAS com JSON, sem markdown:
         text.text,
         false
       );
-      return NextResponse.json(refined);
+      return NextResponse.json({
+        titulo: stripTravessao(refined.titulo),
+        subtitulo: stripTravessao(refined.subtitulo),
+      });
     } catch {
       return NextResponse.json({ error: "Falha no parse" }, { status: 500 });
     }
@@ -133,6 +145,7 @@ ${slidesText}
 
 Instrução: "${body.instruction}"
 
+${NO_DASH_RULE}
 Responda APENAS com JSON array com TODOS os slides melhorados, sem markdown:
 [{ "titulo": "...", "subtitulo": "..." }]`,
         },
@@ -148,7 +161,10 @@ Responda APENAS com JSON array com TODOS os slides melhorados, sem markdown:
       const slides = extractJson<{ titulo: string; subtitulo: string }[]>(
         text.text,
         true
-      );
+      ).map((s) => ({
+        titulo: stripTravessao(s.titulo),
+        subtitulo: stripTravessao(s.subtitulo),
+      }));
       return NextResponse.json({ slides });
     } catch {
       return NextResponse.json({ error: "Falha no parse" }, { status: 500 });
@@ -171,6 +187,7 @@ Responda APENAS com JSON array com TODOS os slides melhorados, sem markdown:
 ${slidesText}
 
 Inclua: gancho inicial, desenvolvimento do tema, chamada para ação e hashtags relevantes.
+${NO_DASH_RULE}
 Responda apenas com o texto da legenda, sem JSON.`,
         },
       ],
@@ -181,7 +198,7 @@ Responda apenas com o texto da legenda, sem JSON.`,
       return NextResponse.json({ error: "Sem resposta" }, { status: 500 });
     }
 
-    return NextResponse.json({ caption: text.text.trim() });
+    return NextResponse.json({ caption: stripTravessao(text.text.trim()) });
   }
 
   return NextResponse.json({ error: "Tipo inválido" }, { status: 400 });

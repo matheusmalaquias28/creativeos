@@ -58,6 +58,7 @@ export async function saveCarouselAction(
       format: carousel.format,
       post_style: carousel.post_style,
       slides: carousel.slides,
+      design: carousel.design ?? {},
       updated_at: new Date().toISOString(),
     })
     .eq("id", carousel.id)

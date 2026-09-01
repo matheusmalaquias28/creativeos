@@ -1,19 +1,40 @@
-import { Inbox, Layers } from "lucide-react";
+import { Layers } from "lucide-react";
 import { DashboardPage } from "@/components/layout/dashboard-page";
 import { CarouselCard } from "@/components/carousel/carousel-card";
 import { CreateCarouselDialog } from "@/components/carousel/create-carousel-dialog";
+import { TurboButton, type TurboProfile } from "@/components/carousel/turbo/turbo-button";
 import { Surface, SurfaceContent } from "@/components/ui/surface";
 import { layout } from "@/lib/design/tokens";
 import { getCarouselsForUser } from "@/services/carousels";
+import { getCarouselProfilesForUser } from "@/services/carousel-profiles";
+import { getClientOptionsForCurrentUser } from "@/services/clients";
 
 export default async function CarouselPage() {
-  const carousels = await getCarouselsForUser();
+  const [carousels, profiles, clients] = await Promise.all([
+    getCarouselsForUser(),
+    getCarouselProfilesForUser(),
+    getClientOptionsForCurrentUser(),
+  ]);
+
+  const clientMap = new Map(clients.map((c) => [c.id, c.name]));
+  const turboProfiles: TurboProfile[] = profiles.map((p) => ({
+    id: p.id,
+    name: p.name,
+    clientName: p.client_id ? clientMap.get(p.client_id) ?? null : null,
+    colors: [p.color_background, p.color_title, p.color_subtitle, p.color_accent],
+    hasContext: !!p.context_md?.trim(),
+  }));
 
   return (
     <DashboardPage
       title="Carrosséis"
       description="Crie e gerencie carrosséis para o Instagram com IA"
-      headerAction={<CreateCarouselDialog />}
+      headerAction={
+        <div className="flex items-center gap-2">
+          <TurboButton profiles={turboProfiles} />
+          <CreateCarouselDialog />
+        </div>
+      }
     >
       <div className={layout.sectionGap}>
         {carousels.length === 0 ? (

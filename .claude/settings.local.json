@@ -27,7 +27,8 @@
       "Skill(claude-api)",
       "Bash(npx tsx *)",
       "PowerShell(node \"C:\\\\Users\\\\mathe\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-mathe-Desktop-Outside-CreativeOS\\\\c921cb75-7585-4ff8-ac17-e02ada680c84\\\\scratchpad\\\\create-cookie-lab.mjs\")",
-      "PowerShell(npm i *)"
+      "PowerShell(npm i *)",
+      "Bash(npx tsc *)"
     ]
   },
   "enableAllProjectMcpServers": true,

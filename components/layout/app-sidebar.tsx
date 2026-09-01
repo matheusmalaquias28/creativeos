@@ -19,12 +19,28 @@ import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { useNewDemandsCount } from "@/components/demands/new-demands-count-provider";
 import { layout } from "@/lib/design/tokens";
 
-const navItems = [
+type NavChild = { href: string; label: string };
+type NavItem = {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  children?: NavChild[];
+};
+
+const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/clients", label: "Clientes", icon: Users },
   { href: "/demands", label: "Demandas", icon: ClipboardList },
   { href: "/web-demands", label: "Demandas Web", icon: Globe },
-  { href: "/carousel", label: "Carrosséis", icon: Layers },
+  {
+    href: "/carousel",
+    label: "Carrosséis",
+    icon: Layers,
+    children: [
+      { href: "/carousel", label: "Todos os carrosséis" },
+      { href: "/carousel/perfis", label: "Perfis" },
+    ],
+  },
   { href: "/gerador", label: "Gerador", icon: Wand2 },
 ];
 
@@ -69,34 +85,70 @@ export function AppSidebar({ userName, userEmail }: AppSidebarProps) {
           const isActive =
             pathname === item.href || pathname.startsWith(`${item.href}/`);
           const Icon = item.icon;
+          const showChildren = !!item.children && isActive;
 
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[0.8125rem] font-medium transition-premium",
-                isActive
-                  ? "nav-active-indicator bg-sidebar-accent pl-4 text-sidebar-accent-foreground dark:bg-white/7"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-foreground dark:hover:bg-white/5"
-              )}
-            >
-              <Icon
+            <div key={item.href}>
+              <Link
+                href={item.href}
                 className={cn(
-                  "size-4 shrink-0",
+                  "relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[0.8125rem] font-medium transition-premium",
                   isActive
-                    ? "text-positive dark:drop-shadow-[0_0_6px_var(--positive)]"
-                    : "text-muted-foreground"
+                    ? "nav-active-indicator bg-sidebar-accent pl-4 text-sidebar-accent-foreground dark:bg-white/7"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-foreground dark:hover:bg-white/5"
                 )}
-                strokeWidth={isActive ? 2 : 1.75}
-              />
-              {item.label}
-              {item.href === "/demands" && newDemandsCount > 0 && (
-                <span className="ml-auto flex size-5 items-center justify-center rounded-full bg-positive text-[0.6rem] font-bold text-positive-foreground dark:shadow-[0_0_8px_var(--positive)]">
-                  {newDemandsCount > 99 ? "99+" : newDemandsCount}
-                </span>
+              >
+                <Icon
+                  className={cn(
+                    "size-4 shrink-0",
+                    isActive
+                      ? "text-positive dark:drop-shadow-[0_0_6px_var(--positive)]"
+                      : "text-muted-foreground"
+                  )}
+                  strokeWidth={isActive ? 2 : 1.75}
+                />
+                {item.label}
+                {item.href === "/demands" && newDemandsCount > 0 && (
+                  <span className="ml-auto flex size-5 items-center justify-center rounded-full bg-positive text-[0.6rem] font-bold text-positive-foreground dark:shadow-[0_0_8px_var(--positive)]">
+                    {newDemandsCount > 99 ? "99+" : newDemandsCount}
+                  </span>
+                )}
+              </Link>
+
+              {showChildren && (
+                <div className="mt-0.5 mb-1 ml-[1.35rem] space-y-0.5 border-l border-sidebar-border/70 pl-3">
+                  {item.children!.map((child) => {
+                    const childActive =
+                      child.href === "/carousel"
+                        ? pathname === "/carousel" ||
+                          (pathname.startsWith("/carousel/") &&
+                            !pathname.startsWith("/carousel/perfis"))
+                        : pathname === child.href ||
+                          pathname.startsWith(`${child.href}/`);
+                    return (
+                      <Link
+                        key={child.href}
+                        href={child.href}
+                        className={cn(
+                          "flex items-center rounded-lg px-3 py-1.5 text-[0.75rem] font-medium transition-premium",
+                          childActive
+                            ? "text-foreground"
+                            : "text-muted-foreground/70 hover:text-foreground"
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "mr-2 size-1.5 rounded-full transition-colors",
+                            childActive ? "bg-positive" : "bg-muted-foreground/30"
+                          )}
+                        />
+                        {child.label}
+                      </Link>
+                    );
+                  })}
+                </div>
               )}
-            </Link>
+            </div>
           );
         })}
       </nav>

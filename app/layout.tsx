@@ -1,15 +1,9 @@
 import type { Metadata } from "next";
-import { Manrope, Geist_Mono } from "next/font/google";
+import { Geist_Mono } from "next/font/google";
 import { AppProviders } from "@/components/providers/app-providers";
 import { AmbientBackground } from "@/components/layout/ambient-background";
+import { fontVariables } from "@/lib/design/fonts";
 import "./globals.css";
-
-const manrope = Manrope({
-  variable: "--font-manrope",
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  display: "swap",
-});
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -33,7 +27,7 @@ export default function RootLayout({
   return (
     <html
       lang="pt-BR"
-      className={`${manrope.variable} ${geistMono.variable} h-full`}
+      className={`${fontVariables} ${geistMono.variable} h-full`}
       suppressHydrationWarning
     >
       <body className="relative min-h-full font-sans">

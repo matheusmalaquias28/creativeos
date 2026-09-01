@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import {
   ArrowLeft,
   Copy,
@@ -13,12 +14,10 @@ import {
   Sparkles,
   Trash2,
   ImagePlus,
-  Pipette,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
@@ -26,25 +25,39 @@ import {
   FORMAT_LABELS,
   FORMAT_DIMENSIONS,
 } from "@/components/carousel/slide-preview";
+import {
+  SidebarSection,
+  RangeControl,
+  ModernColorPicker,
+  FontPicker,
+} from "@/components/carousel/controls/pickers";
+import { RichTextField } from "@/components/carousel/rich-text-field";
+import { CtaControls } from "@/components/carousel/controls/cta-controls";
+import { DesignControls } from "@/components/carousel/controls/design-controls";
+import { ImageGridControls } from "@/components/carousel/controls/image-grid-controls";
+import { BackgroundGenerator } from "@/components/carousel/controls/bg-generator";
+import { RegenerateImageButton } from "@/components/carousel/controls/regenerate-image-button";
+import { FORMAT_ASPECT } from "@/lib/carousel/generate-image-client";
+import { DEFAULT_FONT_FAMILY } from "@/lib/design/fonts";
 import { saveCarouselAction } from "@/actions/carousels";
-import { makeDefaultSlide } from "@/types/carousel";
+import {
+  makeDefaultSlide,
+  makeDefaultCta,
+  makeDefaultDesign,
+  makeDefaultImageGrid,
+} from "@/types/carousel";
 import type {
   Carousel,
+  CarouselCta,
+  CarouselDesign,
+  CarouselImageGrid,
   CarouselFormat,
   CarouselSlide,
   PostStyle,
+  TextPosition,
 } from "@/types/carousel";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-
-const PRESET_COLORS = [
-  "#000000", "#0a0a0a", "#111111", "#1a1a2e", "#0d1117", "#1c1c1e",
-  "#1e293b", "#334155", "#475569", "#64748b", "#94a3b8", "#cbd5e1",
-  "#e2e8f0", "#f1f5f9", "#f8fafc", "#ffffff", "#fef9c3", "#fef3c7",
-  "#3b82f6", "#2563eb", "#8b5cf6", "#7c3aed", "#ec4899", "#db2777",
-  "#10b981", "#059669", "#f59e0b", "#d97706", "#ef4444", "#dc2626",
-  "#06b6d4", "#0891b2", "#84cc16", "#65a30d", "#f97316", "#ea580c",
-];
 
 type PostStyleDef = {
   id: PostStyle;
@@ -59,6 +72,24 @@ const POST_STYLES: PostStyleDef[] = [
   { id: "techviral", label: "TechViral", desc: "Tech agressivo e viral" },
   { id: "viralsaas", label: "Viral SaaS", desc: "Clean com acento moderno" },
 ];
+
+const TEXT_POSITIONS: TextPosition[] = [
+  "top-left", "top-center", "top-right",
+  "middle-left", "middle-center", "middle-right",
+  "bottom-left", "bottom-center", "bottom-right",
+];
+
+const POSITION_DOT: Record<TextPosition, string> = {
+  "top-left": "items-start justify-start",
+  "top-center": "items-start justify-center",
+  "top-right": "items-start justify-end",
+  "middle-left": "items-center justify-start",
+  "middle-center": "items-center justify-center",
+  "middle-right": "items-center justify-end",
+  "bottom-left": "items-end justify-start",
+  "bottom-center": "items-end justify-center",
+  "bottom-right": "items-end justify-end",
+};
 
 // ─── Color extraction ─────────────────────────────────────────────────────────
 
@@ -116,174 +147,6 @@ function luminance(hex: string): number {
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
-
-function SidebarSection({
-  title,
-  open,
-  onToggle,
-  children,
-}: {
-  title: string;
-  open: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="border-b border-white/6 last:border-0">
-      <button
-        onClick={onToggle}
-        className="flex w-full items-center justify-between px-5 py-3.5 text-left text-[0.625rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
-      >
-        {title}
-        <span className={cn("text-muted-foreground/40 transition-transform duration-200", open && "rotate-90")}>
-          ›
-        </span>
-      </button>
-      {open && <div className="px-5 pb-5 space-y-4">{children}</div>}
-    </div>
-  );
-}
-
-function RangeControl({
-  label,
-  value,
-  min,
-  max,
-  step = 1,
-  unit = "px",
-  onChange,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step?: number;
-  unit?: string;
-  onChange: (v: number) => void;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between">
-        <label className="text-[0.625rem] text-muted-foreground/70">{label}</label>
-        <span className="text-[0.625rem] font-mono text-muted-foreground">{value}{unit}</span>
-      </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full h-1.5 cursor-pointer accent-primary"
-      />
-    </div>
-  );
-}
-
-// Modern color picker with presets + hex input
-function ModernColorPicker({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [hex, setHex] = useState(value);
-  const nativeRef = useRef<HTMLInputElement>(null);
-  const wrapRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => { setHex(value); }, [value]);
-
-  useEffect(() => {
-    if (!open) return;
-    function onClickOutside(e: MouseEvent) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
-  }, [open]);
-
-  function commitHex(raw: string) {
-    const v = raw.startsWith("#") ? raw : `#${raw}`;
-    if (/^#[0-9a-f]{6}$/i.test(v)) { onChange(v); setHex(v); }
-  }
-
-  return (
-    <div ref={wrapRef} className="relative">
-      <div className="flex items-center gap-2.5">
-        <button
-          onClick={() => setOpen((o) => !o)}
-          className="size-9 shrink-0 rounded-lg border-2 border-border shadow-sm transition-transform hover:scale-110"
-          style={{ backgroundColor: value }}
-          title={label}
-        />
-        <div className="flex-1 min-w-0">
-          <p className="text-[0.625rem] text-muted-foreground/70 mb-1">{label}</p>
-          <Input
-            value={hex}
-            onChange={(e) => setHex(e.target.value)}
-            onBlur={(e) => commitHex(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && commitHex(hex)}
-            className="h-7 font-mono text-xs uppercase"
-            maxLength={7}
-          />
-        </div>
-      </div>
-
-      {open && (
-        <div className="absolute left-0 top-12 z-30 w-64 rounded-xl border border-border bg-card p-3 shadow-2xl dark:border-white/10 dark:bg-surface-elevated">
-          {/* Preset grid */}
-          <div className="grid grid-cols-9 gap-1 mb-3">
-            {PRESET_COLORS.map((c) => (
-              <button
-                key={c}
-                onClick={() => { onChange(c); setHex(c); setOpen(false); }}
-                className={cn(
-                  "size-6 rounded-md border transition-transform hover:scale-110",
-                  value === c ? "border-primary ring-1 ring-primary" : "border-white/10"
-                )}
-                style={{ backgroundColor: c }}
-                title={c}
-              />
-            ))}
-          </div>
-
-          {/* Hex + native picker */}
-          <div className="flex items-center gap-2">
-            <Input
-              value={hex}
-              onChange={(e) => setHex(e.target.value)}
-              onBlur={(e) => commitHex(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") { commitHex(hex); setOpen(false); } }}
-              placeholder="#000000"
-              className="h-7 flex-1 font-mono text-xs uppercase"
-              maxLength={7}
-            />
-            <button
-              onClick={() => nativeRef.current?.click()}
-              className="flex items-center gap-1 rounded-lg border border-border px-2 py-1.5 text-[0.625rem] text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
-            >
-              <Pipette className="size-3" />
-              Custom
-            </button>
-            <input
-              ref={nativeRef}
-              type="color"
-              value={value}
-              onChange={(e) => { onChange(e.target.value); setHex(e.target.value); }}
-              className="sr-only"
-            />
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 // Color extraction from image
 function ViaImagemExtractor({
@@ -362,20 +225,38 @@ const INITIAL_SECTIONS: OpenSections = {
   texto: true,
   cores: false,
   tipografia: false,
+  cta: false,
+  grade: false,
+  marca: false,
   imagem: false,
 };
 
-const STRIP_WIDTHS: Record<CarouselFormat, number> = {
-  carousel: 270,
-  square: 275,
-  stories: 190,
-};
+/** Merge a (possibly partial/legacy) design object from the DB with defaults. */
+function normalizeDesign(design?: CarouselDesign | null): CarouselDesign {
+  const base = makeDefaultDesign();
+  if (!design || typeof design !== "object") return base;
+  return {
+    badge: { ...base.badge, ...design.badge },
+    numbering: { ...base.numbering, ...design.numbering },
+    pagination: { ...base.pagination, ...design.pagination },
+  };
+}
 
-export function CarouselEditor({ initial }: { initial: Carousel }) {
+export function CarouselEditor({
+  initial,
+  turboGenerating = false,
+  turboExpectedImages,
+}: {
+  initial: Carousel;
+  turboGenerating?: boolean;
+  turboExpectedImages?: number;
+}) {
   const [carousel, setCarousel] = useState<Carousel>({
     ...initial,
     post_style: initial.post_style ?? "minimal",
+    design: normalizeDesign(initial.design),
   });
+  const [bgGenerating, setBgGenerating] = useState(turboGenerating);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [sections, setSections] = useState(INITIAL_SECTIONS);
   const [colorTab, setColorTab] = useState<"manual" | "imagem">("manual");
@@ -394,9 +275,98 @@ export function CarouselEditor({ initial }: { initial: Carousel }) {
 
   const slideRef = useRef<HTMLDivElement>(null);
   const stripRef = useRef<HTMLDivElement>(null);
+  const exportRef = useRef<HTMLDivElement>(null);
+  const [viewportW, setViewportW] = useState(1200);
 
   const currentSlide = carousel.slides[currentIdx] ?? carousel.slides[0];
-  const slideWidth = STRIP_WIDTHS[carousel.format];
+  // Show ~2.5 cards at once, as large as the canvas allows.
+  const slideWidth = Math.max(240, Math.floor((viewportW - 48) / 2.5) - 16);
+
+  // Track the canvas width so cards resize to keep ~2.5 visible.
+  useEffect(() => {
+    const el = stripRef.current;
+    if (!el) return;
+    const update = () => setViewportW(el.clientWidth);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // ─── Turbo background image generation watcher ───────────────────────────────
+  // When we arrive from the Gerador Turbo mid-generation, the server keeps
+  // producing images and persisting them. Poll and merge only into empty image
+  // slots so live edits are preserved, until all expected images arrive or a
+  // safety timeout elapses.
+  useEffect(() => {
+    if (!turboGenerating) return;
+    const supabase = createBrowserClient();
+    let active = true;
+
+    const countImages = (slides: CarouselSlide[]) =>
+      slides.reduce((n, s) => {
+        let c = s.imagemFundo ? 1 : 0;
+        if (s.imageGrid?.enabled) c += s.imageGrid.images.filter(Boolean).length;
+        return n + c;
+      }, 0);
+
+    const merge = (dbSlides: CarouselSlide[]) => {
+      setCarousel((c) => {
+        const byId = new Map(dbSlides.map((s) => [s.id, s]));
+        let changed = false;
+        const slides = c.slides.map((s) => {
+          const db = byId.get(s.id);
+          if (!db) return s;
+          let ns = s;
+          if (!s.imagemFundo && db.imagemFundo) {
+            ns = { ...ns, imagemFundo: db.imagemFundo, overlayOpacidade: db.overlayOpacidade ?? ns.overlayOpacidade };
+            changed = true;
+          }
+          if (s.imageGrid?.enabled && db.imageGrid?.images?.length) {
+            const merged = s.imageGrid.images.map((img, i) => img ?? db.imageGrid!.images[i] ?? null);
+            if (merged.some((v, i) => v !== s.imageGrid!.images[i])) {
+              ns = { ...ns, imageGrid: { ...s.imageGrid, images: merged } };
+              changed = true;
+            }
+          }
+          return ns;
+        });
+        return changed ? { ...c, slides } : c;
+      });
+    };
+
+    const finish = () => {
+      if (!active) return;
+      active = false;
+      clearInterval(iv);
+      clearTimeout(to);
+      setBgGenerating(false);
+    };
+
+    const poll = async () => {
+      const { data } = await supabase
+        .from("carousels")
+        .select("slides")
+        .eq("id", initial.id)
+        .single();
+      if (!active || !data) return;
+      const dbSlides = ((data.slides as CarouselSlide[]) ?? []);
+      merge(dbSlides);
+      if (turboExpectedImages && countImages(dbSlides) >= turboExpectedImages) {
+        finish();
+      }
+    };
+
+    const iv = setInterval(poll, 4000);
+    const to = setTimeout(finish, 210_000);
+    poll();
+
+    return () => {
+      active = false;
+      clearInterval(iv);
+      clearTimeout(to);
+    };
+  }, [turboGenerating, initial.id, turboExpectedImages]);
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -413,6 +383,25 @@ export function CarouselEditor({ initial }: { initial: Carousel }) {
 
   function updateCarousel(patch: Partial<Carousel>) {
     setCarousel((c) => ({ ...c, ...patch }));
+  }
+
+  const design = carousel.design ?? makeDefaultDesign();
+
+  function updateDesign(patch: Partial<CarouselDesign>) {
+    setCarousel((c) => ({
+      ...c,
+      design: { ...normalizeDesign(c.design), ...patch },
+    }));
+  }
+
+  function updateCta(patch: Partial<CarouselCta>) {
+    const nextCta = { ...(currentSlide?.cta ?? makeDefaultCta()), ...patch };
+    updateSlide({ cta: nextCta });
+  }
+
+  function updateImageGrid(patch: Partial<CarouselImageGrid>) {
+    const next = { ...(currentSlide?.imageGrid ?? makeDefaultImageGrid()), ...patch };
+    updateSlide({ imageGrid: next });
   }
 
   function selectSlide(idx: number) {
@@ -456,17 +445,25 @@ export function CarouselEditor({ initial }: { initial: Carousel }) {
   // ─── Export ────────────────────────────────────────────────────────────────
 
   async function handleExport() {
-    if (!slideRef.current) return;
+    // Export from the off-screen full-size (1:1, unscaled) render for a crisp,
+    // card-only image at maximum quality.
+    const node = exportRef.current;
+    if (!node) return;
     const dims = FORMAT_DIMENSIONS[carousel.format];
     try {
       const { toPng } = await import("html-to-image");
-      const dataUrl = await toPng(slideRef.current, { width: dims.width, height: dims.height, pixelRatio: 1 });
+      const dataUrl = await toPng(node, {
+        width: dims.width,
+        height: dims.height,
+        pixelRatio: 2,
+        cacheBust: true,
+      });
       const link = document.createElement("a");
-      link.download = `slide-${currentIdx + 1}.png`;
+      link.download = `${carousel.name || "slide"}-${currentIdx + 1}.png`;
       link.href = dataUrl;
       link.click();
     } catch {
-      toast.error("Instale html-to-image: npm install html-to-image");
+      toast.error("Falha ao exportar a imagem");
     }
   }
 
@@ -746,24 +743,99 @@ export function CarouselEditor({ initial }: { initial: Carousel }) {
 
           {/* Texto */}
           <SidebarSection title={`Texto — Slide ${currentIdx + 1}`} open={!!sections.texto} onToggle={() => toggleSection("texto")}>
+            <FontPicker
+              label="Fonte do slide"
+              value={currentSlide?.fonteFamilia ?? DEFAULT_FONT_FAMILY}
+              onChange={(family) => updateSlide({ fonteFamilia: family })}
+            />
+            <div className="flex justify-end -mt-1">
+              <button
+                onClick={() => {
+                  const family = currentSlide?.fonteFamilia ?? DEFAULT_FONT_FAMILY;
+                  setCarousel((c) => ({
+                    ...c,
+                    slides: c.slides.map((s) => ({ ...s, fonteFamilia: family })),
+                  }));
+                  toast.success("Fonte aplicada em todos os slides");
+                }}
+                className="text-[0.5625rem] text-muted-foreground/60 hover:text-primary transition-colors"
+              >
+                Aplicar fonte em todos
+              </button>
+            </div>
+
+            {/* Posição do bloco de texto */}
+            <div className="space-y-1.5">
+              <label className="text-[0.625rem] text-muted-foreground/70">Posição do texto</label>
+              <div className="grid grid-cols-3 gap-1">
+                {TEXT_POSITIONS.map((p) => {
+                  const active = (currentSlide?.textPos ?? "bottom-left") === p;
+                  return (
+                    <button
+                      key={p}
+                      onClick={() => updateSlide({ textPos: p })}
+                      title={p}
+                      className={cn(
+                        "flex aspect-[4/3] rounded-md border p-1 transition-colors",
+                        POSITION_DOT[p],
+                        active
+                          ? "border-primary bg-primary/10"
+                          : "border-border hover:bg-muted/40"
+                      )}
+                    >
+                      <span className={cn("size-1.5 rounded-full", active ? "bg-primary" : "bg-muted-foreground/40")} />
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex justify-end">
+                <button
+                  onClick={() => {
+                    const textPos = currentSlide?.textPos ?? "bottom-left";
+                    setCarousel((c) => ({
+                      ...c,
+                      slides: c.slides.map((s) => ({ ...s, textPos })),
+                    }));
+                    toast.success("Posição aplicada em todos os slides");
+                  }}
+                  className="text-[0.5625rem] text-muted-foreground/60 hover:text-primary transition-colors"
+                >
+                  Aplicar posição em todos
+                </button>
+              </div>
+            </div>
+
+            {/* Glassmorphism */}
+            <label className="flex items-center justify-between gap-2 cursor-pointer">
+              <span className="text-[0.625rem] text-muted-foreground/70">Retângulo glassmorphism</span>
+              <input
+                type="checkbox"
+                checked={currentSlide?.textGlass ?? false}
+                onChange={(e) => updateSlide({ textGlass: e.target.checked })}
+                className="size-4 accent-primary cursor-pointer"
+              />
+            </label>
+
             <div className="space-y-1.5">
               <label className="text-[0.625rem] text-muted-foreground/70">Título</label>
-              <Textarea
-                value={currentSlide?.titulo ?? ""}
-                onChange={(e) => updateSlide({ titulo: e.target.value })}
+              <RichTextField
+                key={`titulo-${currentSlide?.id}`}
+                html={currentSlide?.tituloHtml}
+                plain={currentSlide?.titulo ?? ""}
                 placeholder="Título do slide"
-                className="text-xs resize-none"
                 rows={2}
+                onChange={({ html, plain }) => updateSlide({ tituloHtml: html, titulo: plain })}
               />
             </div>
             <div className="space-y-1.5">
               <label className="text-[0.625rem] text-muted-foreground/70">Subtítulo</label>
-              <Textarea
-                value={currentSlide?.subtitulo ?? ""}
-                onChange={(e) => updateSlide({ subtitulo: e.target.value })}
+              <RichTextField
+                key={`subtitulo-${currentSlide?.id}`}
+                html={currentSlide?.subtituloHtml}
+                plain={currentSlide?.subtitulo ?? ""}
                 placeholder="Subtítulo ou frase de apoio"
-                className="text-xs resize-none"
                 rows={2}
+                onChange={({ html, plain }) => updateSlide({ subtituloHtml: html, subtitulo: plain })}
               />
             </div>
             <div className="space-y-2 pt-2 border-t border-white/6">
@@ -860,6 +932,42 @@ export function CarouselEditor({ initial }: { initial: Carousel }) {
             />
           </SidebarSection>
 
+          {/* CTA */}
+          <SidebarSection title={`Botão / CTA — Slide ${currentIdx + 1}`} open={!!sections.cta} onToggle={() => toggleSection("cta")}>
+            <CtaControls cta={currentSlide?.cta ?? makeDefaultCta()} onChange={updateCta} />
+            {currentSlide?.cta?.enabled && (
+              <button
+                onClick={() => {
+                  const cta = currentSlide.cta;
+                  setCarousel((c) => ({
+                    ...c,
+                    slides: c.slides.map((s) => ({ ...s, cta: cta ? { ...cta } : s.cta })),
+                  }));
+                  toast.success("CTA aplicado em todos os slides");
+                }}
+                className="w-full text-[0.5625rem] text-muted-foreground/60 hover:text-primary transition-colors"
+              >
+                Aplicar este CTA em todos os slides
+              </button>
+            )}
+          </SidebarSection>
+
+          {/* Grade de imagens */}
+          <SidebarSection title={`Grade de Imagens — Slide ${currentIdx + 1}`} open={!!sections.grade} onToggle={() => toggleSection("grade")}>
+            <ImageGridControls
+              grid={currentSlide?.imageGrid ?? makeDefaultImageGrid()}
+              onChange={updateImageGrid}
+            />
+          </SidebarSection>
+
+          {/* Marca & Layout (carousel-level) */}
+          <SidebarSection title="Marca & Layout" open={!!sections.marca} onToggle={() => toggleSection("marca")}>
+            <p className="text-[0.5625rem] text-muted-foreground/50 leading-relaxed -mt-1">
+              Aplicado a todos os slides do carrossel.
+            </p>
+            <DesignControls design={design} onChange={updateDesign} />
+          </SidebarSection>
+
           {/* Imagem de fundo */}
           <SidebarSection title={`Imagem de Fundo — Slide ${currentIdx + 1}`} open={!!sections.imagem} onToggle={() => toggleSection("imagem")}>
             <label className={cn(
@@ -872,6 +980,21 @@ export function CarouselEditor({ initial }: { initial: Carousel }) {
               <ImagePlus className="size-3.5" />
               {currentSlide?.imagemFundo ? "Trocar imagem" : "Carregar imagem (máx 25 MB)"}
             </label>
+
+            {currentSlide?.bgPrompt && !currentSlide?.imageGrid?.enabled && (
+              <RegenerateImageButton
+                prompt={currentSlide.bgPrompt}
+                aspect={FORMAT_ASPECT[carousel.format]}
+                onDone={(url) =>
+                  updateSlide({ imagemFundo: url, overlayOpacidade: currentSlide.overlayOpacidade || 55 })
+                }
+              />
+            )}
+
+            <BackgroundGenerator
+              format={carousel.format}
+              onApply={(url) => updateSlide({ imagemFundo: url })}
+            />
 
             {currentSlide?.imagemFundo && (
               <>
@@ -961,6 +1084,9 @@ export function CarouselEditor({ initial }: { initial: Carousel }) {
                     <SlidePreview
                       slide={slide}
                       format={carousel.format}
+                      design={design}
+                      index={i}
+                      total={carousel.slides.length}
                       previewWidth={slideWidth}
                       innerRef={isActive ? slideRef : undefined}
                     />
@@ -1009,6 +1135,41 @@ export function CarouselEditor({ initial }: { initial: Carousel }) {
           </div>
         </div>
       </div>
+
+      {/* ── Off-screen full-size render used for high-quality export ── */}
+      <div
+        aria-hidden
+        style={{ position: "fixed", left: -99999, top: 0, pointerEvents: "none" }}
+      >
+        {currentSlide && (
+          <SlidePreview
+            slide={currentSlide}
+            format={carousel.format}
+            design={design}
+            index={currentIdx}
+            total={carousel.slides.length}
+            previewWidth={FORMAT_DIMENSIONS[carousel.format].width}
+            innerRef={exportRef}
+          />
+        )}
+      </div>
+
+      {/* ── Turbo background-generation banner ── */}
+      {bgGenerating && (
+        <div className="fixed bottom-5 right-5 z-50 flex items-center gap-3 rounded-xl border border-positive/30 bg-card/95 px-4 py-3 shadow-2xl backdrop-blur dark:bg-surface-elevated/95">
+          <span className="relative flex size-2.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-positive opacity-75" />
+            <span className="relative inline-flex size-2.5 rounded-full bg-positive" />
+          </span>
+          <div>
+            <p className="text-xs font-medium text-foreground">Gerando imagens em segundo plano…</p>
+            <p className="text-[0.65rem] text-muted-foreground">
+              As artes aparecem nos cards conforme ficam prontas.
+            </p>
+          </div>
+          <Loader2 className="size-4 animate-spin text-positive" />
+        </div>
+      )}
 
       {/* ── Caption modal ── */}
       {caption && (

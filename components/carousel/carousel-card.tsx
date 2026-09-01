@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Layers, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -65,7 +66,17 @@ type CarouselCardProps = {
 
 export function CarouselCard({ carousel }: CarouselCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
+
+  function openMenu() {
+    const rect = menuBtnRef.current?.getBoundingClientRect();
+    if (rect) {
+      setMenuPos({ top: rect.bottom + 6, right: window.innerWidth - rect.right });
+    }
+    setMenuOpen(true);
+  }
 
   async function handleDelete() {
     if (!confirm(`Deletar "${carousel.name}"?`)) return;
@@ -123,44 +134,51 @@ export function CarouselCard({ carousel }: CarouselCardProps) {
             </p>
           </div>
 
-          <div className="relative shrink-0">
+          <div className="shrink-0">
             <Button
+              ref={menuBtnRef}
               variant="ghost"
               size="icon"
               className="size-7 text-muted-foreground"
-              onClick={() => setMenuOpen((o) => !o)}
+              onClick={() => (menuOpen ? setMenuOpen(false) : openMenu())}
             >
               <MoreVertical className="size-3.5" />
             </Button>
 
-            {menuOpen && (
-              <>
-                <div
-                  className="fixed inset-0 z-10"
-                  onClick={() => setMenuOpen(false)}
-                />
-                <div className="absolute right-0 top-8 z-20 min-w-[9rem] rounded-xl border border-border bg-card p-1 shadow-xl dark:border-white/10 dark:bg-surface-elevated">
-                  <Link
-                    href={`/carousel/${carousel.id}`}
-                    className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs text-foreground hover:bg-muted/60"
+            {menuOpen &&
+              menuPos &&
+              createPortal(
+                <>
+                  <div
+                    className="fixed inset-0 z-[998]"
                     onClick={() => setMenuOpen(false)}
+                  />
+                  <div
+                    className="fixed z-[999] min-w-[9rem] rounded-xl border border-border bg-card p-1 shadow-2xl dark:border-white/10 dark:bg-surface-elevated"
+                    style={{ top: menuPos.top, right: menuPos.right }}
                   >
-                    <Pencil className="size-3.5" />
-                    Editar
-                  </Link>
-                  <button
-                    onClick={() => {
-                      setMenuOpen(false);
-                      handleDelete();
-                    }}
-                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-negative hover:bg-negative/10"
-                  >
-                    <Trash2 className="size-3.5" />
-                    Deletar
-                  </button>
-                </div>
-              </>
-            )}
+                    <Link
+                      href={`/carousel/${carousel.id}`}
+                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs text-foreground hover:bg-muted/60"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      <Pencil className="size-3.5" />
+                      Editar
+                    </Link>
+                    <button
+                      onClick={() => {
+                        setMenuOpen(false);
+                        handleDelete();
+                      }}
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-negative hover:bg-negative/10"
+                    >
+                      <Trash2 className="size-3.5" />
+                      Deletar
+                    </button>
+                  </div>
+                </>,
+                document.body
+              )}
           </div>
         </div>
 
