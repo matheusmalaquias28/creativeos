@@ -1,9 +1,11 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { mergeLegacyDemandFlowIntoClient } from "@/services/flow";
 import { linkUnmatchedDemandsByExternalName } from "@/lib/demands/link-unmatched-siblings";
-import type { Database } from "@/types/database";
+import type { Database, Json } from "@/types/database";
+import type { DemandArte } from "@/types/demand";
 
 type DemandUpdate = Database["public"]["Tables"]["creative_demands"]["Update"];
 
@@ -77,6 +79,46 @@ export async function updateDemandStatusAction(
     return { error: "Não foi possível atualizar a demanda." };
   }
 
+  return { success: true };
+}
+
+const MAX_ARTE_FIELD = 4000;
+
+function sanitizeArte(value: unknown): DemandArte {
+  const r = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const str = (v: unknown) => (typeof v === "string" ? v.slice(0, MAX_ARTE_FIELD) : "");
+  return {
+    headline: str(r.headline),
+    subheadline: str(r.subheadline),
+    informacoesExtras: str(r.informacoesExtras),
+    cta: str(r.cta),
+    linkReferencias: str(r.linkReferencias),
+  };
+}
+
+/** Salva os textos do briefing das artes (coluna jsonb `artes`). */
+export async function updateDemandArtesAction(
+  demandId: string,
+  artes: DemandArte[]
+): Promise<DemandStatusState> {
+  if (!Array.isArray(artes)) {
+    return { error: "Formato de artes inválido." };
+  }
+
+  const supabase = await createClient();
+  const sanitized = artes.map(sanitizeArte);
+
+  const { data, error } = await supabase
+    .from("creative_demands")
+    .update({ artes: sanitized as unknown as Json, updated_at: new Date().toISOString() })
+    .eq("id", demandId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) return { error: error.message };
+  if (!data) return { error: "Não foi possível salvar o briefing das artes." };
+
+  revalidatePath(`/demands/${demandId}`);
   return { success: true };
 }
 

@@ -309,6 +309,18 @@ async function runJob(
     base64, mimeType, jobId: job.id, versionNumber: 1,
   });
 
+  // Registra na Galeria (não-fatal)
+  await supabase.from("generated_images").insert({
+    source: "artes",
+    prompt: artSpec.headline ?? briefing.titulo ?? "",
+    aspect_ratio: artSpec.aspect_ratio ?? "1:1",
+    resolution: artSpec.image_size ?? "2K",
+    storage_path: storagePath,
+    url: publicUrl,
+  }).then(({ error }) => {
+    if (error) console.error("[worker] galeria insert falhou:", error.message);
+  });
+
   // Cria art_version v1
   const { error: versionError } = await supabase.from("art_version").insert({
     job_id: job.id,

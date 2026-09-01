@@ -9,6 +9,7 @@ import {
   type TurboSpec,
 } from "@/lib/carousel/turbo/schema";
 import { generateMagnificImage, ASPECT_BY_FORMAT } from "@/lib/carousel/turbo/magnific";
+import { persistImageFromUrl } from "@/lib/images/persist-image";
 import { withPtBrImagePrompt } from "@/lib/carousel/image-prompt";
 import { makeDefaultDesign } from "@/types/carousel";
 import type { CarouselProfile } from "@/types/carousel-profile";
@@ -133,6 +134,19 @@ export async function POST(req: NextRequest) {
                 }
                 url = r.url;
                 reason = r.reason;
+
+                // A URL da Magnific é temporária — persiste no Storage antes de
+                // salvar no slide, senão a imagem some depois de um tempo.
+                if (url) {
+                  const persisted = await persistImageFromUrl({
+                    url,
+                    source: "carousel-turbo",
+                    userId: user.id,
+                    prompt: finalPrompt,
+                    aspectRatio: job.aspect,
+                  });
+                  url = persisted.url;
+                }
               }
 
               if (url) {

@@ -223,7 +223,7 @@ export default async function DemandDetailPage({ params }: PageProps) {
               Headlines e CTAs no formato 3:4
             </p>
           </div>
-          <DemandArteFeed artes={demand.artes} />
+          <DemandArteFeed demandId={id} artes={demand.artes} />
         </section>
 
         <Link

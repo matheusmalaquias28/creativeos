@@ -20,6 +20,29 @@ const POLL_INTERVAL = 2500;
 const MAX_POLLS = 48;
 
 /**
+ * A URL da Magnific é um CDN temporário — troca por uma URL permanente no
+ * Supabase Storage (que também alimenta a Galeria). Se falhar, mantém a original.
+ */
+async function persistGeneratedImage(
+  url: string,
+  prompt: string,
+  aspect: string
+): Promise<string> {
+  try {
+    const res = await fetch("/api/images/persist", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url, source: "carousel-editor", prompt, aspectRatio: aspect }),
+    });
+    const data = await res.json();
+    if (res.ok && data.url) return data.url;
+  } catch {
+    // non-fatal — abaixo devolve a URL original
+  }
+  return url;
+}
+
+/**
  * Generate one image from a prompt via the Gerador (Magnific) endpoints and
  * return its URL. Throws with a readable reason on failure.
  */
@@ -51,7 +74,7 @@ export async function generateImageViaGerador(
           return o?.url ?? o?.image_url ?? o?.image ?? o?.output;
         })
         .filter(Boolean) as string[];
-      if (urls[0]) return urls[0];
+      if (urls[0]) return persistGeneratedImage(urls[0], prompt, aspect);
       throw new Error("Resultado sem imagem");
     }
     if (status === "FAILED" || status === "ERROR") throw new Error("A geração falhou");

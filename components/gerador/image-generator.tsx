@@ -572,11 +572,16 @@ export function ImageGenerator() {
           };
           setResults((prev) => [newResult, ...prev]);
 
+          // O save baixa a imagem pro Storage e devolve a URL permanente —
+          // troca a URL temporária da Magnific na tela também.
           saveGeradorImageAction(imageUrl, aspectRatio, resolution, prompt).then((res) => {
             if ("id" in res) {
               setResults((prev) =>
-                prev.map((r) => (r.url === imageUrl && r.id === null ? { ...r, id: res.id } : r))
+                prev.map((r) =>
+                  r.url === imageUrl && r.id === null ? { ...r, id: res.id, url: res.url } : r
+                )
               );
+              updateTask(localId, { imageUrl: res.url });
             }
           });
           return;

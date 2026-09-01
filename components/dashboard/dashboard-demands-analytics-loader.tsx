@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { DemandMonthStat } from "@/types/demand";
+import type { DashboardAnalytics } from "@/types/demand";
 
 const DashboardDemandsAnalytics = dynamic(
   () =>
@@ -19,6 +19,6 @@ const DashboardDemandsAnalytics = dynamic(
   }
 );
 
-export function DashboardDemandsAnalyticsLoader({ data }: { data: DemandMonthStat[] }) {
+export function DashboardDemandsAnalyticsLoader({ data }: { data: DashboardAnalytics }) {
   return <DashboardDemandsAnalytics data={data} />;
 }

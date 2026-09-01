@@ -94,6 +94,18 @@ export type GeradorImageRow = {
   created_at: string;
 };
 
+export type GeneratedImageRow = {
+  id: string;
+  user_id: string | null;
+  source: string;
+  prompt: string;
+  aspect_ratio: string;
+  resolution: string;
+  storage_path: string | null;
+  url: string;
+  created_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -101,6 +113,16 @@ export type Database = {
         Row: GeradorImageRow;
         Insert: Omit<GeradorImageRow, "id" | "created_at"> & { id?: string; created_at?: string };
         Update: Partial<Omit<GeradorImageRow, "id">>;
+        Relationships: [];
+      };
+      generated_images: {
+        Row: GeneratedImageRow;
+        Insert: Partial<Omit<GeneratedImageRow, "id" | "created_at" | "url">> & {
+          id?: string;
+          url: string;
+          created_at?: string;
+        };
+        Update: Partial<Omit<GeneratedImageRow, "id">>;
         Relationships: [];
       };
       users: {

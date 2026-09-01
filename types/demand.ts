@@ -77,3 +77,31 @@ export type DemandMonthStat = {
   total_artes: number;
   avg_elapsed_minutes: number | null;
 };
+
+/** Comparativo de um período contra o anterior. `pct` é null quando não há base (anterior = 0). */
+export type DashboardDelta = {
+  current: number;
+  previous: number;
+  pct: number | null;
+};
+
+export type DemandStatusCount = {
+  status: string;
+  count: number;
+};
+
+export type DashboardAnalytics = {
+  /** Série mensal recortada para a janela de atividade (sem meses vazios à esquerda). */
+  months: DemandMonthStat[];
+  demandsMonth: DashboardDelta;
+  artesMonth: DashboardDelta;
+  demandsWeek: DashboardDelta;
+  artesWeek: DashboardDelta;
+  statusCounts: DemandStatusCount[];
+  activeDemands: number;
+  completedThisMonth: number;
+  avgTurnaroundMinutes: number | null;
+  totalDemands: number;
+  totalArtes: number;
+  savedMinutesMonth: number;
+};

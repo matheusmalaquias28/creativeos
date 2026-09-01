@@ -17,16 +17,16 @@ import { cn } from "@/lib/utils";
 import { layout } from "@/lib/design/tokens";
 import { getAuthUser } from "@/lib/auth/session";
 import { getClientsForUser, getDashboardStats } from "@/services/clients";
-import { getDemandsMonthlyStats } from "@/services/demands";
+import { getDashboardAnalytics } from "@/services/demands";
 
 export default async function DashboardPageRoute() {
   const user = await getAuthUser();
   if (!user) return null;
 
-  const [stats, clients, monthlyStats] = await Promise.all([
+  const [stats, clients, analytics] = await Promise.all([
     getDashboardStats(user.id),
     getClientsForUser(user.id),
-    getDemandsMonthlyStats(),
+    getDashboardAnalytics(),
   ]);
 
   const recentClients = clients
@@ -39,35 +39,43 @@ export default async function DashboardPageRoute() {
       description="Visão geral dos clientes e Creative Brains da agência"
     >
       <div className={layout.sectionGap}>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard
-            title="Total de clientes"
-            value={stats.totalClients}
-            icon={Users}
-            className="stagger-1 animate-in-soft"
-          />
-          <StatCard
-            title="Em onboarding"
-            value={stats.onboardingClients}
-            icon={Workflow}
-            className="stagger-2 animate-in-soft"
-          />
-          <StatCard
-            title="Creative Brains"
-            value={stats.creativeBrains}
-            icon={Brain}
-            className="stagger-3 animate-in-soft"
-          />
-          <StatCard
-            title="Aprovados"
-            value={stats.approvedBrains}
-            description="Brand DNA revisado"
-            icon={Sparkles}
-            className="stagger-4 animate-in-soft"
-          />
-        </div>
+        <DashboardDemandsAnalyticsLoader data={analytics} />
 
-        <DashboardDemandsAnalyticsLoader data={monthlyStats} />
+        <section className="space-y-5">
+          <div>
+            <h2 className="text-lg font-medium tracking-heading">Visão dos clientes</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Carteira e Creative Brains da agência
+            </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard
+              title="Total de clientes"
+              value={stats.totalClients}
+              icon={Users}
+              className="stagger-1 animate-in-soft"
+            />
+            <StatCard
+              title="Em onboarding"
+              value={stats.onboardingClients}
+              icon={Workflow}
+              className="stagger-2 animate-in-soft"
+            />
+            <StatCard
+              title="Creative Brains"
+              value={stats.creativeBrains}
+              icon={Brain}
+              className="stagger-3 animate-in-soft"
+            />
+            <StatCard
+              title="Aprovados"
+              value={stats.approvedBrains}
+              description="Brand DNA revisado"
+              icon={Sparkles}
+              className="stagger-4 animate-in-soft"
+            />
+          </div>
+        </section>
 
         <Surface variant="elevated">
           <SurfaceHeader>

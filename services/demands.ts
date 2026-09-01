@@ -1,16 +1,21 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { getAuthUser } from "@/lib/auth/session";
 import { isSchemaMissingError, schemaNotReadyError } from "@/lib/errors/database";
 import type {
   CreativeDemand,
   CreativeDemandListItem,
+  DashboardAnalytics,
+  DashboardDelta,
   DemandArte,
   DemandBriefing,
   DemandMonthStat,
 } from "@/types/demand";
 import type { MagnificSpaceStatus } from "@/types/database";
 import { parseStoredSpaceNodes } from "@/lib/magnific/space-state";
+import {
+  TRADITIONAL_DESIGNER_MINUTES as TRADITIONAL_MIN,
+  HYBRID_DESIGNER_MINUTES as HYBRID_MIN,
+} from "@/lib/demands/designer-time";
 
 export const getNewDemandsCount = cache(async (): Promise<number> => {
   const supabase = await createClient();
@@ -293,6 +298,162 @@ export const getDemandsMonthlyStats = cache(async (): Promise<DemandMonthStat[]>
       avg_elapsed_minutes: avgElapsed,
     };
   });
+});
+
+const CLOSED_STATUSES = new Set(["Concluída", "Cancelada"]);
+
+function monthKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function delta(current: number, previous: number): DashboardDelta {
+  const pct = previous > 0 ? Math.round(((current - previous) / previous) * 100) : null;
+  return { current, previous, pct };
+}
+
+/**
+ * Analytics consolidado do dashboard: série mensal (recortada para a janela de
+ * atividade), comparativos mês/semana com o período anterior, distribuição por
+ * status e métricas de produtividade. Usa a data efetiva da demanda
+ * (external_created_at quando disponível) para refletir quando ela realmente
+ * aconteceu, não quando foi importada.
+ */
+export const getDashboardAnalytics = cache(async (): Promise<DashboardAnalytics> => {
+  const supabase = await createClient();
+
+  const now = new Date();
+  const since = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+
+  const { data, error } = await supabase
+    .from("creative_demands")
+    .select("created_at, external_created_at, completed_at, artes, elapsed_seconds, status")
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    return {
+      months: [],
+      demandsMonth: delta(0, 0),
+      artesMonth: delta(0, 0),
+      demandsWeek: delta(0, 0),
+      artesWeek: delta(0, 0),
+      statusCounts: [],
+      activeDemands: 0,
+      completedThisMonth: 0,
+      avgTurnaroundMinutes: null,
+      totalDemands: 0,
+      totalArtes: 0,
+      savedMinutesMonth: 0,
+    };
+  }
+
+  const rows = data ?? [];
+
+  const currentKey = monthKey(now);
+  const weekMs = 7 * 24 * 60 * 60 * 1000;
+  const weekStart = now.getTime() - weekMs;
+  const prevWeekStart = now.getTime() - 2 * weekMs;
+
+  // Comparativo mensal justo: mês-até-agora vs. o MESMO intervalo do mês passado.
+  // Sem isso, no dia 1º um mês parcial (ex.: 4) comparado ao mês cheio anterior
+  // (ex.: 106) mostraria -96%, o que é enganoso.
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const msIntoMonth = now.getTime() - monthStart.getTime();
+  const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
+  const prevMonthCutoff = prevMonthStart + msIntoMonth;
+
+  const byMonth: Record<string, { demands: number; artes: number; elapsed: number[] }> = {};
+  const statusMap: Record<string, number> = {};
+
+  let demandsMonthCur = 0, demandsMonthPrev = 0, artesMonthCur = 0, artesMonthPrev = 0;
+  let demandsWeekCur = 0, demandsWeekPrev = 0, artesWeekCur = 0, artesWeekPrev = 0;
+  let activeDemands = 0, completedThisMonth = 0, totalDemands = 0, totalArtes = 0;
+  const turnaroundList: number[] = [];
+
+  for (const row of rows) {
+    const effective = new Date(row.external_created_at ?? row.created_at);
+    const artes = Array.isArray(row.artes) ? row.artes.length : 0;
+    const status = row.status ? String(row.status) : "Sem status";
+    const t = effective.getTime();
+
+    totalDemands += 1;
+    totalArtes += artes;
+    statusMap[status] = (statusMap[status] ?? 0) + 1;
+    if (!CLOSED_STATUSES.has(status)) activeDemands += 1;
+
+    if (typeof row.elapsed_seconds === "number" && row.elapsed_seconds > 0) {
+      turnaroundList.push(row.elapsed_seconds);
+    }
+
+    // Série mensal (últimos 12 meses)
+    if (effective >= since) {
+      const key = monthKey(effective);
+      (byMonth[key] ??= { demands: 0, artes: 0, elapsed: [] });
+      byMonth[key].demands += 1;
+      byMonth[key].artes += artes;
+      if (typeof row.elapsed_seconds === "number") byMonth[key].elapsed.push(row.elapsed_seconds);
+    }
+
+    // Comparativo mensal (mês-até-agora vs. mesmo intervalo do mês passado)
+    if (t >= monthStart.getTime()) { demandsMonthCur += 1; artesMonthCur += artes; }
+    else if (t >= prevMonthStart && t < prevMonthCutoff) { demandsMonthPrev += 1; artesMonthPrev += artes; }
+
+    // Comparativo semanal
+    if (t >= weekStart) { demandsWeekCur += 1; artesWeekCur += artes; }
+    else if (t >= prevWeekStart) { demandsWeekPrev += 1; artesWeekPrev += artes; }
+
+    // Concluídas neste mês (pela data de conclusão)
+    if (status === "Concluída" && row.completed_at) {
+      if (monthKey(new Date(row.completed_at)) === currentKey) completedThisMonth += 1;
+    }
+  }
+
+  // Constrói série mensal preenchendo buracos, recortada a partir do 1º mês com atividade
+  const filled: DemandMonthStat[] = [];
+  for (let offset = 11; offset >= 0; offset -= 1) {
+    const date = new Date(now.getFullYear(), now.getMonth() - offset, 1);
+    const key = monthKey(date);
+    const stat = byMonth[key];
+    filled.push({
+      month: key,
+      label: date.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }),
+      total_demands: stat?.demands ?? 0,
+      total_artes: stat?.artes ?? 0,
+      avg_elapsed_minutes:
+        stat && stat.elapsed.length > 0
+          ? Math.round(stat.elapsed.reduce((a, b) => a + b, 0) / stat.elapsed.length / 60)
+          : null,
+    });
+  }
+  const firstActive = filled.findIndex((m) => m.total_demands > 0 || m.total_artes > 0);
+  // Mostra da 1ª atividade até agora; se não há dados, mostra os últimos 6 meses.
+  const months = firstActive === -1 ? filled.slice(-6) : filled.slice(firstActive);
+
+  const statusCounts = Object.entries(statusMap)
+    .map(([status, count]) => ({ status, count }))
+    .sort((a, b) => b.count - a.count);
+
+  const avgTurnaroundMinutes =
+    turnaroundList.length > 0
+      ? Math.round(turnaroundList.reduce((a, b) => a + b, 0) / turnaroundList.length / 60)
+      : null;
+
+  const savedMinutesMonth =
+    demandsMonthCur * (TRADITIONAL_MIN - HYBRID_MIN);
+
+  return {
+    months,
+    demandsMonth: delta(demandsMonthCur, demandsMonthPrev),
+    artesMonth: delta(artesMonthCur, artesMonthPrev),
+    demandsWeek: delta(demandsWeekCur, demandsWeekPrev),
+    artesWeek: delta(artesWeekCur, artesWeekPrev),
+    statusCounts,
+    activeDemands,
+    completedThisMonth,
+    avgTurnaroundMinutes,
+    totalDemands,
+    totalArtes,
+    savedMinutesMonth,
+  };
 });
 
 export async function getUnmatchedDemandsCount(): Promise<number> {
