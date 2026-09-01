@@ -22,6 +22,7 @@ import {
   Merriweather,
   Lora,
 } from "next/font/google";
+import localFont from "next/font/local";
 
 const manrope = Manrope({ variable: "--font-manrope", subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], display: "swap" });
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], display: "swap" });
@@ -35,6 +36,16 @@ const bebasNeue = Bebas_Neue({ variable: "--font-bebas-neue", subsets: ["latin"]
 const playfair = Playfair_Display({ variable: "--font-playfair", subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], display: "swap" });
 const merriweather = Merriweather({ variable: "--font-merriweather", subsets: ["latin"], weight: ["400", "700", "900"], display: "swap" });
 const lora = Lora({ variable: "--font-lora", subsets: ["latin"], weight: ["400", "500", "600", "700"], display: "swap" });
+
+// Recoleta — fonte serif proprietária, self-hosted (não é Google Font).
+const recoleta = localFont({
+  variable: "--font-recoleta",
+  display: "swap",
+  src: [
+    { path: "./fonts/recoleta/Recoleta-Medium.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/recoleta/Recoleta-Bold.woff2", weight: "700", style: "normal" },
+  ],
+});
 
 /** Space-joined className with every font variable — attach to <html>. */
 export const fontVariables = [
@@ -50,6 +61,7 @@ export const fontVariables = [
   playfair.variable,
   merriweather.variable,
   lora.variable,
+  recoleta.variable,
 ].join(" ");
 
 export type FontCategory = "sans" | "serif" | "display";
@@ -75,6 +87,7 @@ export const FONT_OPTIONS: FontOption[] = [
   { id: "playfair", label: "Playfair Display", family: "var(--font-playfair), serif", category: "serif" },
   { id: "merriweather", label: "Merriweather", family: "var(--font-merriweather), serif", category: "serif" },
   { id: "lora", label: "Lora", family: "var(--font-lora), serif", category: "serif" },
+  { id: "recoleta", label: "Recoleta", family: "var(--font-recoleta), serif", category: "serif" },
 ];
 
 export const DEFAULT_FONT_FAMILY = FONT_OPTIONS[0].family;
