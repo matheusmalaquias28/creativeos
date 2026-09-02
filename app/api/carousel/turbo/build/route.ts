@@ -8,8 +8,13 @@ import {
   slotAspect,
   type TurboSpec,
 } from "@/lib/carousel/turbo/schema";
-import { generateMagnificImage, ASPECT_BY_FORMAT } from "@/lib/carousel/turbo/magnific";
+import {
+  generateMagnificImage,
+  ASPECT_BY_FORMAT,
+  type MagnificReference,
+} from "@/lib/carousel/turbo/magnific";
 import { persistImageFromUrl } from "@/lib/images/persist-image";
+import type { ProfileReferenceImage } from "@/types/carousel-profile";
 import { withPtBrImagePrompt } from "@/lib/carousel/image-prompt";
 import { makeDefaultDesign } from "@/types/carousel";
 import type { CarouselProfile } from "@/types/carousel-profile";
@@ -56,6 +61,12 @@ export async function POST(req: NextRequest) {
       try {
         const format = "carousel" as const;
         const slides = spec.slides.map((s) => specToSlide(s, [], profile));
+
+        // Referências visuais do perfil guiam as imagens de fundo geradas.
+        const profileRefs = (profile.reference_images as ProfileReferenceImage[] | null) ?? [];
+        const references: MagnificReference[] = profileRefs
+          .filter((r) => r?.url)
+          .map((r) => ({ url: r.url }));
         const design = makeDefaultDesign();
         if (profile.logo_url) {
           design.badge.enabled = true;
@@ -127,10 +138,10 @@ export async function POST(req: NextRequest) {
                 reason = "tempo do processo esgotado";
               } else {
                 const finalPrompt = withPtBrImagePrompt(job.prompt);
-                let r = await generateMagnificImage(finalPrompt, job.aspect);
+                let r = await generateMagnificImage(finalPrompt, job.aspect, references);
                 // One retry on a real failure while there is still time budget.
                 if (!r.url && Date.now() < DEADLINE - 85_000) {
-                  r = await generateMagnificImage(finalPrompt, job.aspect);
+                  r = await generateMagnificImage(finalPrompt, job.aspect, references);
                 }
                 url = r.url;
                 reason = r.reason;

@@ -44,6 +44,15 @@ const CTA_RADIUS: Record<CarouselCta["shape"], number> = {
   square: 0,
 };
 
+/** Converte hex (#rgb ou #rrggbb) em [r,g,b]; cai para preto se inválido. */
+function hexToRgb(hex: string): [number, number, number] {
+  const clean = (hex ?? "").replace("#", "").trim();
+  const full = clean.length === 3 ? clean.split("").map((c) => c + c).join("") : clean;
+  if (!/^[0-9a-fA-F]{6}$/.test(full)) return [0, 0, 0];
+  const n = parseInt(full, 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
 interface SlidePreviewProps {
   slide: CarouselSlide;
   format: CarouselFormat;
@@ -338,12 +347,17 @@ export function SlidePreview({
   const sep = 48 + gridH + 24;
   const rawOverlay = slide.overlayOpacidade ?? 0;
   const overlayAlpha = (slide.imagemFundo ? (rawOverlay > 0 ? rawOverlay : 45) : rawOverlay) / 100;
+  const [or, og, ob] = hexToRgb(slide.overlayColor ?? "#000000");
+  const oc = (a: number) => `rgba(${or}, ${og}, ${ob}, ${a})`;
+  // Extensão vertical: quanto maior, mais o overlay sobe e cobre o texto.
+  const h = Math.min(100, Math.max(0, slide.overlayHeight ?? 60));
+  const solidStop = Math.round(h * 0.55);
   const overlayBg =
     vAlign === "top"
-      ? `linear-gradient(to bottom, rgba(0,0,0,${overlayAlpha}) 0%, rgba(0,0,0,${overlayAlpha * 0.4}) 55%, rgba(0,0,0,0.04) 100%)`
+      ? `linear-gradient(to bottom, ${oc(overlayAlpha)} 0%, ${oc(overlayAlpha)} ${solidStop}%, ${oc(0)} ${h}%)`
       : vAlign === "middle"
-      ? `linear-gradient(rgba(0,0,0,${overlayAlpha * 0.72}), rgba(0,0,0,${overlayAlpha * 0.72}))`
-      : `linear-gradient(to top, rgba(0,0,0,${overlayAlpha}) 0%, rgba(0,0,0,${overlayAlpha * 0.4}) 55%, rgba(0,0,0,0.04) 100%)`;
+      ? `linear-gradient(${oc(overlayAlpha * 0.85)}, ${oc(overlayAlpha * 0.85)})`
+      : `linear-gradient(to top, ${oc(overlayAlpha)} 0%, ${oc(overlayAlpha)} ${solidStop}%, ${oc(0)} ${h}%)`;
 
   return (
     <div

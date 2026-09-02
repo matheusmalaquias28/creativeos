@@ -1036,18 +1036,31 @@ export function CarouselEditor({
                   onChange={(v) => updateSlide({ imagemPosY: v })}
                 />
                 <RangeControl
-                  label="Overlay escuro"
+                  label="Opacidade do overlay"
                   value={currentSlide.overlayOpacidade ?? 0}
                   min={0}
                   max={100}
                   unit="%"
                   onChange={(v) => updateSlide({ overlayOpacidade: v })}
                 />
+                <RangeControl
+                  label="Altura do overlay"
+                  value={currentSlide.overlayHeight ?? 60}
+                  min={0}
+                  max={100}
+                  unit="%"
+                  onChange={(v) => updateSlide({ overlayHeight: v })}
+                />
+                <ModernColorPicker
+                  label="Cor do overlay"
+                  value={currentSlide.overlayColor ?? "#000000"}
+                  onChange={(v) => updateSlide({ overlayColor: v })}
+                />
                 <Button
                   variant="ghost"
                   size="sm"
                   className="w-full text-xs text-negative hover:bg-negative/10"
-                  onClick={() => updateSlide({ imagemFundo: null, overlayOpacidade: 0, imagemPosX: 50, imagemPosY: 50, imagemZoom: 150 })}
+                  onClick={() => updateSlide({ imagemFundo: null, overlayOpacidade: 0, overlayHeight: 60, overlayColor: "#000000", imagemPosX: 50, imagemPosY: 50, imagemZoom: 150 })}
                 >
                   Remover imagem
                 </Button>
@@ -1061,7 +1074,7 @@ export function CarouselEditor({
           {/* Horizontal strip */}
           <div
             ref={stripRef}
-            className="flex flex-1 items-start gap-5 overflow-x-auto overflow-y-auto px-6 pt-7 pb-8"
+            className="flex flex-1 items-start gap-5 overflow-x-auto overflow-y-auto overscroll-contain px-6 pt-7 pb-8"
             style={{ scrollbarWidth: "thin" }}
           >
             {carousel.slides.map((slide, i) => {
@@ -1073,6 +1086,8 @@ export function CarouselEditor({
                   style={{ width: slideWidth }}
                 >
                   <button
+                    // Evita o foco roubar o scroll do strip (a tela "descia" ao clicar).
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => selectSlide(i)}
                     className={cn(
                       "relative overflow-hidden rounded-2xl transition-all duration-200 focus:outline-none",

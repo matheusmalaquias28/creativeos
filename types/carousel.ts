@@ -85,7 +85,12 @@ export type CarouselSlide = {
   imagemPosX: number;
   imagemPosY: number;
   imagemZoom: number;
+  /** Intensidade (0-100) do overlay sobre a imagem de fundo. */
   overlayOpacidade: number;
+  /** Cor do overlay (hex). Default preto. */
+  overlayColor?: string;
+  /** Extensão vertical do overlay (0-100). Maior = cobre mais o texto. */
+  overlayHeight?: number;
   cta?: CarouselCta;
   imageGrid?: CarouselImageGrid;
   /** Original background-image generation prompt (for regenerating). */
@@ -115,6 +120,8 @@ export function makeDefaultSlide(
     imagemPosY: 50,
     imagemZoom: 150,
     overlayOpacidade: 0,
+    overlayColor: "#000000",
+    overlayHeight: 60,
     ...overrides,
   };
 }

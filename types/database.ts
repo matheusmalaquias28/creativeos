@@ -728,6 +728,7 @@ export type Database = {
           color_subtitle: string;
           color_accent: string;
           palette: Json;
+          reference_images: Json;
           instagram_handle: string | null;
           business_context: string | null;
           context_md: string | null;
@@ -748,6 +749,7 @@ export type Database = {
           color_subtitle?: string;
           color_accent?: string;
           palette?: Json;
+          reference_images?: Json;
           instagram_handle?: string | null;
           business_context?: string | null;
           context_md?: string | null;
@@ -766,6 +768,7 @@ export type Database = {
           color_subtitle: string;
           color_accent: string;
           palette: Json;
+          reference_images: Json;
           instagram_handle: string | null;
           business_context: string | null;
           context_md: string | null;

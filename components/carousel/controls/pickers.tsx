@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Pipette } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -14,6 +15,69 @@ export const PRESET_COLORS = [
   "#10b981", "#059669", "#f59e0b", "#d97706", "#ef4444", "#dc2626",
   "#06b6d4", "#0891b2", "#84cc16", "#65a30d", "#f97316", "#ea580c",
 ];
+
+// ─── Anchored popover positioning ──────────────────────────────────────────
+// The picker panels used to be `position: absolute` inside the sidebar, which
+// has `overflow-y-auto` (so overflow-x is clipped). Panels wider than the
+// sidebar got hidden. We render them in a portal with fixed positioning,
+// clamped to the viewport, so they always show in full.
+
+type PopoverPos = {
+  left: number;
+  width: number;
+  top?: number;
+  bottom?: number;
+  maxHeight: number;
+};
+
+function usePopoverPosition(
+  anchorRef: React.RefObject<HTMLElement | null>,
+  open: boolean,
+  fixedWidth: number,
+  matchAnchorWidth = false,
+  gap = 8
+): PopoverPos | null {
+  const [pos, setPos] = useState<PopoverPos | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setPos(null);
+      return;
+    }
+    const update = () => {
+      const el = anchorRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const width = matchAnchorWidth ? r.width : fixedWidth;
+      const left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8));
+      const openUp = r.bottom > window.innerHeight * 0.62;
+      if (openUp) {
+        setPos({
+          left,
+          width,
+          bottom: window.innerHeight - r.top + gap,
+          maxHeight: r.top - gap - 8,
+        });
+      } else {
+        setPos({
+          left,
+          width,
+          top: r.bottom + gap,
+          maxHeight: window.innerHeight - r.bottom - gap - 8,
+        });
+      }
+    };
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [open, anchorRef, fixedWidth, matchAnchorWidth, gap]);
+
+  return pos;
+}
 
 export function SidebarSection({
   title,
@@ -78,6 +142,8 @@ export function RangeControl({
   );
 }
 
+const COLOR_PANEL_WIDTH = 256;
+
 /** Modern color picker with presets + hex input. Optionally allows "none". */
 export function ModernColorPicker({
   label,
@@ -94,15 +160,17 @@ export function ModernColorPicker({
   const [hex, setHex] = useState(value);
   const nativeRef = useRef<HTMLInputElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const pos = usePopoverPosition(wrapRef, open, COLOR_PANEL_WIDTH);
 
   useEffect(() => { setHex(value); }, [value]);
 
   useEffect(() => {
     if (!open) return;
     function onClickOutside(e: MouseEvent) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const t = e.target as Node;
+      if (wrapRef.current?.contains(t) || panelRef.current?.contains(t)) return;
+      setOpen(false);
     }
     document.addEventListener("mousedown", onClickOutside);
     return () => document.removeEventListener("mousedown", onClickOutside);
@@ -141,8 +209,21 @@ export function ModernColorPicker({
         </div>
       </div>
 
-      {open && (
-        <div className="absolute left-0 top-12 z-30 w-64 rounded-xl border border-border bg-card p-3 shadow-2xl dark:border-white/10 dark:bg-surface-elevated">
+      {open && pos && createPortal(
+        <div
+          ref={panelRef}
+          style={{
+            position: "fixed",
+            left: pos.left,
+            top: pos.top,
+            bottom: pos.bottom,
+            width: pos.width,
+            maxHeight: pos.maxHeight,
+            overflowY: "auto",
+            zIndex: 10000,
+          }}
+          className="rounded-xl border border-border bg-card p-3 shadow-2xl dark:border-white/10 dark:bg-surface-elevated"
+        >
           <div className="grid grid-cols-9 gap-1 mb-3">
             {PRESET_COLORS.map((c) => (
               <button
@@ -192,7 +273,8 @@ export function ModernColorPicker({
               Remover cor
             </button>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -219,12 +301,16 @@ export function FontPicker({
 function FontSelect({ value, onChange }: { value: string; onChange: (family: string) => void }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const pos = usePopoverPosition(wrapRef, open, 0, true);
   const current = FONT_OPTIONS.find((f) => f.family === value) ?? FONT_OPTIONS[0];
 
   useEffect(() => {
     if (!open) return;
     function onClickOutside(e: MouseEvent) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (wrapRef.current?.contains(t) || panelRef.current?.contains(t)) return;
+      setOpen(false);
     }
     document.addEventListener("mousedown", onClickOutside);
     return () => document.removeEventListener("mousedown", onClickOutside);
@@ -240,8 +326,20 @@ function FontSelect({ value, onChange }: { value: string; onChange: (family: str
         <span className="truncate">{current.label}</span>
         <span className="text-muted-foreground/50 text-[0.6rem]">▾</span>
       </button>
-      {open && (
-        <div className="absolute left-0 top-11 z-40 max-h-64 w-full overflow-y-auto rounded-xl border border-border bg-card p-1 shadow-2xl dark:border-white/10 dark:bg-surface-elevated">
+      {open && pos && createPortal(
+        <div
+          ref={panelRef}
+          style={{
+            position: "fixed",
+            left: pos.left,
+            top: pos.top,
+            bottom: pos.bottom,
+            width: pos.width,
+            maxHeight: pos.maxHeight,
+            zIndex: 10000,
+          }}
+          className="overflow-y-auto rounded-xl border border-border bg-card p-1 shadow-2xl dark:border-white/10 dark:bg-surface-elevated"
+        >
           {FONT_OPTIONS.map((f) => (
             <button
               key={f.id}
@@ -256,7 +354,8 @@ function FontSelect({ value, onChange }: { value: string; onChange: (family: str
               <span className="text-[0.55rem] uppercase tracking-wider text-muted-foreground/40">{f.category}</span>
             </button>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

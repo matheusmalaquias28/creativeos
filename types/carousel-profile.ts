@@ -1,5 +1,11 @@
 import { DEFAULT_FONT_FAMILY, FONT_OPTIONS } from "@/lib/design/fonts";
 
+/** Imagem de referência do perfil (guia as imagens de fundo dos carrosséis). */
+export type ProfileReferenceImage = {
+  url: string;
+  storage_path: string;
+};
+
 export type CarouselProfile = {
   id: string;
   user_id: string;
@@ -14,6 +20,8 @@ export type CarouselProfile = {
   color_subtitle: string;
   color_accent: string;
   palette: string[];
+  /** Referências visuais usadas para gerar as imagens de fundo. */
+  reference_images: ProfileReferenceImage[];
   instagram_handle: string | null;
   /** Raw business/brand context typed by the user. */
   business_context: string | null;
@@ -43,6 +51,7 @@ export function makeEmptyProfileDraft(): CarouselProfileDraft {
     color_subtitle: "#a3a3a3",
     color_accent: "#3b82f6",
     palette: [],
+    reference_images: [],
     instagram_handle: null,
     business_context: null,
     context_md: null,

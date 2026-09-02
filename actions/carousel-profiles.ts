@@ -79,6 +79,7 @@ function draftToRow(draft: CarouselProfileDraft) {
     color_subtitle: draft.color_subtitle,
     color_accent: draft.color_accent,
     palette: draft.palette ?? [],
+    reference_images: draft.reference_images ?? [],
     instagram_handle: draft.instagram_handle,
     business_context: draft.business_context,
     context_md: draft.context_md,

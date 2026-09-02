@@ -80,12 +80,50 @@ function ProfileEditor({
 }) {
   const [draft, setDraft] = useState<CarouselProfileDraft>(initialDraft);
   const [uploading, setUploading] = useState(false);
+  const [uploadingRefs, setUploadingRefs] = useState(false);
   const [saving, startSaving] = useTransition();
   const [newSwatch, setNewSwatch] = useState("#3b82f6");
   const [genCtx, setGenCtx] = useState(false);
 
   function patch(p: Partial<CarouselProfileDraft>) {
     setDraft((d) => ({ ...d, ...p }));
+  }
+
+  async function handleReferenceUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    if (files.length === 0) return;
+    setUploadingRefs(true);
+    try {
+      const uploaded = await Promise.all(
+        files.map(async (file) => {
+          const fd = new FormData();
+          fd.append("file", file);
+          const res = await fetch("/api/carousel/profiles/upload-image", {
+            method: "POST",
+            body: fd,
+          });
+          const data = await res.json();
+          if (!res.ok || data.error) throw new Error(data.error ?? "Falha no upload");
+          return { url: data.url as string, storage_path: data.storagePath as string };
+        })
+      );
+      setDraft((d) => ({ ...d, reference_images: [...d.reference_images, ...uploaded] }));
+      toast.success(
+        uploaded.length > 1 ? `${uploaded.length} referências enviadas` : "Referência enviada"
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro no upload");
+    } finally {
+      setUploadingRefs(false);
+    }
+  }
+
+  function removeReference(url: string) {
+    setDraft((d) => ({
+      ...d,
+      reference_images: d.reference_images.filter((r) => r.url !== url),
+    }));
   }
 
   async function handleGenerateContext() {
@@ -310,6 +348,61 @@ function ProfileEditor({
               )}
             </div>
 
+            {/* Reference images (backgrounds) */}
+            <div className="space-y-2 rounded-xl border border-border/40 bg-muted/10 p-3">
+              <div className="flex items-center gap-1.5">
+                <ImagePlus className="size-3.5 text-primary" />
+                <p className="text-[0.625rem] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                  Imagens de referência (fundos)
+                </p>
+              </div>
+              <p className="text-[0.625rem] leading-relaxed text-muted-foreground/60">
+                Envie imagens que representem o estilo visual da marca. Elas guiam a
+                geração das imagens de fundo dos carrosséis no Gerador Turbo.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {draft.reference_images.map((ref) => (
+                  <div key={ref.url} className="group relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={ref.url}
+                      alt="referência"
+                      className="size-16 rounded-lg border border-white/10 object-cover"
+                    />
+                    <button
+                      onClick={() => removeReference(ref.url)}
+                      className="absolute -right-1.5 -top-1.5 hidden size-5 items-center justify-center rounded-full bg-negative text-white group-hover:flex"
+                      title="Remover"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </div>
+                ))}
+                <label
+                  className={cn(
+                    "flex size-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed text-[0.55rem] transition-colors",
+                    "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                  )}
+                >
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    multiple
+                    className="sr-only"
+                    onChange={handleReferenceUpload}
+                  />
+                  {uploadingRefs ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <>
+                      <ImagePlus className="size-4" />
+                      Adicionar
+                    </>
+                  )}
+                </label>
+              </div>
+            </div>
+
             {/* Palette */}
             <div className="space-y-2">
               <p className="text-[0.625rem] font-semibold uppercase tracking-widest text-muted-foreground/60">
@@ -475,7 +568,7 @@ export function ProfilesManager({
               key={profile.id}
               profile={profile}
               clientName={clientName(profile.client_id)}
-              onEdit={() => setEditing({ ...profile })}
+              onEdit={() => setEditing({ ...profile, reference_images: profile.reference_images ?? [] })}
               onDelete={() => handleDelete(profile)}
             />
           ))}

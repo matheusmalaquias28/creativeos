@@ -12,26 +12,45 @@ export const ASPECT_BY_FORMAT: Record<CarouselFormat, string> = {
 
 export type MagnificResult = { url: string | null; reason?: string };
 
+/** Referência visual passada ao Magnific para guiar o estilo da imagem. */
+export type MagnificReference = { url: string; mimeType?: string; text?: string };
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+function mimeFromUrl(url: string): "image/png" | "image/jpeg" | "image/webp" {
+  const clean = url.split("?")[0].toLowerCase();
+  if (clean.endsWith(".png")) return "image/png";
+  if (clean.endsWith(".webp")) return "image/webp";
+  return "image/jpeg";
+}
 
 /** Generate a single image from a prompt via Magnific; returns its URL or a reason. */
 export async function generateMagnificImage(
   prompt: string,
-  aspect: string
+  aspect: string,
+  references?: MagnificReference[]
 ): Promise<MagnificResult> {
   const key = process.env.MAGNIFIC_API_KEY;
   if (!key) return { url: null, reason: "MAGNIFIC_API_KEY não configurada" };
   if (!prompt.trim()) return { url: null, reason: "prompt vazio" };
 
   try {
+    const payload: Record<string, unknown> = {
+      prompt: prompt.trim(),
+      aspect_ratio: aspect,
+      resolution: "2K",
+    };
+    if (references && references.length > 0) {
+      payload.reference_images = references.slice(0, 4).map((r) => ({
+        image: r.url,
+        mime_type: r.mimeType ?? mimeFromUrl(r.url),
+        text: r.text ?? "Use como referência de estilo visual, cores e composição do fundo",
+      }));
+    }
     const res = await fetch(MAGNIFIC_API, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-magnific-api-key": key },
-      body: JSON.stringify({
-        prompt: prompt.trim(),
-        aspect_ratio: aspect,
-        resolution: "2K",
-      }),
+      body: JSON.stringify(payload),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
