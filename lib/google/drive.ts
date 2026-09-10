@@ -1,4 +1,4 @@
-import { createSign } from "crypto";
+import { createPrivateKey, createSign } from "crypto";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const DRIVE_API = "https://www.googleapis.com/drive/v3";
@@ -10,11 +10,108 @@ type DriveFile = {
   name: string;
 };
 
+function unwrapQuotes(value: string): string {
+  const trimmed = value.trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
+}
+
+function decodeMaybeBase64(value: string): string {
+  const compact = value.replace(/\s+/g, "");
+  if (
+    value.includes("BEGIN") ||
+    value.trim().startsWith("{") ||
+    !/^[A-Za-z0-9+/]+=*$/.test(compact) ||
+    compact.length < 80
+  ) {
+    return value;
+  }
+
+  try {
+    const decoded = Buffer.from(compact, "base64").toString("utf8");
+    if (decoded.includes("BEGIN") || decoded.trim().startsWith("{")) {
+      return decoded;
+    }
+  } catch {
+    // keep original
+  }
+  return value;
+}
+
+function parseServiceAccountJson(
+  raw: string
+): { email?: string; privateKey?: string } | null {
+  const text = unwrapQuotes(raw).trim();
+  if (!text.startsWith("{")) return null;
+  try {
+    const parsed = JSON.parse(text) as {
+      client_email?: string;
+      private_key?: string;
+    };
+    return {
+      email: parsed.client_email,
+      privateKey: parsed.private_key,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function normalizePrivateKey(raw: string): string {
+  let key = unwrapQuotes(decodeMaybeBase64(raw))
+    .replace(/\\r\\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\r\n/g, "\n")
+    .trim();
+
+  const match = key.match(/-----BEGIN ([A-Z ]+)-----([\s\S]*?)-----END \1-----/);
+  if (!match) return key;
+
+  const label = match[1];
+  const body = match[2].replace(/\s+/g, "");
+  const lines = body.match(/.{1,64}/g) ?? [body];
+  return `-----BEGIN ${label}-----\n${lines.join("\n")}\n-----END ${label}-----\n`;
+}
+
 function readServiceAccount(): { email: string; privateKey: string } | null {
-  const email = process.env.GOOGLE_SA_EMAIL?.trim();
-  const privateKey = process.env.GOOGLE_SA_PRIVATE_KEY?.replace(/\\n/g, "\n").trim();
-  if (!email || !privateKey) return null;
+  const jsonRaw = process.env.GOOGLE_SA_JSON ?? "";
+  const fromJson =
+    parseServiceAccountJson(decodeMaybeBase64(unwrapQuotes(jsonRaw))) ??
+    parseServiceAccountJson(
+      decodeMaybeBase64(unwrapQuotes(process.env.GOOGLE_SA_PRIVATE_KEY ?? ""))
+    );
+
+  const email =
+    process.env.GOOGLE_SA_EMAIL?.trim() || fromJson?.email?.trim() || "";
+  const privateKey = normalizePrivateKey(
+    fromJson?.privateKey || process.env.GOOGLE_SA_PRIVATE_KEY || ""
+  );
+
+  if (!email || !privateKey.includes("BEGIN")) return null;
   return { email, privateKey };
+}
+
+function signJwt(unsigned: string, privateKeyPem: string): Buffer {
+  try {
+    const keyObject = createPrivateKey({ key: privateKeyPem, format: "pem" });
+    const signer = createSign("RSA-SHA256");
+    signer.update(unsigned);
+    return signer.sign(keyObject);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/DECODER|unsupported|DECODING|PEM|bad decrypt/i.test(message)) {
+      throw new Error(
+        "GOOGLE_SA_PRIVATE_KEY inválida. No Vercel, cole o JSON inteiro da service account em GOOGLE_SA_JSON (uma linha só) ou a chave PEM numa linha com \\n."
+      );
+    }
+    throw error;
+  }
 }
 
 export function isGoogleDriveConfigured(): boolean {
@@ -44,9 +141,7 @@ async function getAccessToken(): Promise<string> {
     })
   );
   const unsigned = `${header}.${payload}`;
-  const signer = createSign("RSA-SHA256");
-  signer.update(unsigned);
-  const jwt = `${unsigned}.${base64Url(signer.sign(sa.privateKey))}`;
+  const jwt = `${unsigned}.${base64Url(signJwt(unsigned, sa.privateKey))}`;
 
   const res = await fetch(TOKEN_URL, {
     method: "POST",
