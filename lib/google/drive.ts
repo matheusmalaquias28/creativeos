@@ -63,7 +63,7 @@ function parseServiceAccountJson(
 }
 
 function normalizePrivateKey(raw: string): string {
-  let key = unwrapQuotes(decodeMaybeBase64(raw))
+  const key = unwrapQuotes(decodeMaybeBase64(raw))
     .replace(/\\r\\n/g, "\n")
     .replace(/\\n/g, "\n")
     .replace(/\\n/g, "\n")
