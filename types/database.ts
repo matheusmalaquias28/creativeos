@@ -543,6 +543,24 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["magnific_oauth_tokens"]["Row"]>;
         Relationships: [];
       };
+      google_drive_oauth_tokens: {
+        Row: {
+          id: number;
+          google_email: string | null;
+          refresh_token: string;
+          access_token: string | null;
+          expires_at: string | null;
+          connected_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["google_drive_oauth_tokens"]["Row"]> & {
+          id?: number;
+          refresh_token: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["google_drive_oauth_tokens"]["Row"]>;
+        Relationships: [];
+      };
       demand_reference_image: {
         Row: {
           id: string;

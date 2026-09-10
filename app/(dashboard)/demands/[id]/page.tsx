@@ -35,7 +35,7 @@ import {
   collectDemandDriveUrls,
   resolveDemandDriveFolder,
 } from "@/lib/export/drive-folder";
-import { isGoogleDriveConfigured } from "@/lib/google/drive";
+import { getGoogleDriveAuth } from "@/lib/google/drive";
 
 export const maxDuration = 300;
 
@@ -102,12 +102,13 @@ export default async function DemandDetailPage({ params }: PageProps) {
   ]);
   if (!demand) notFound();
 
-  const [clientAssets, demandRefs, exportFiles] = await Promise.all([
+  const [clientAssets, demandRefs, exportFiles, driveAuth] = await Promise.all([
     demand.client_id && user
       ? getClientVisualAssets(demand.client_id, user.id)
       : Promise.resolve(null),
     getDemandReferenceImages(id),
     getDemandExportFiles(id),
+    getGoogleDriveAuth(),
   ]);
 
   const title =
@@ -161,7 +162,7 @@ export default async function DemandDetailPage({ params }: PageProps) {
               exportStatus={demand.export_status ?? null}
               exportError={demand.export_error ?? null}
               initialFiles={exportFiles}
-              driveConfigured={isGoogleDriveConfigured()}
+              driveAuth={driveAuth}
             />
             {!demand.client_not_found && (
               <MagnificSpaceButton

@@ -15,7 +15,7 @@ import {
 } from "@/lib/export/drive-folder";
 import {
   findOrCreateFolder,
-  isGoogleDriveConfigured,
+  getGoogleDriveAuth,
   uploadOrReplaceFile,
 } from "@/lib/google/drive";
 import { parseArtes } from "@/services/demands";
@@ -235,7 +235,8 @@ export async function deliverDemandExportAction(
     })
     .eq("id", demandId);
 
-  if (!isGoogleDriveConfigured()) {
+  const driveAuth = await getGoogleDriveAuth();
+  if (!driveAuth.canUpload) {
     await admin
       .from("creative_demands")
       .update({
@@ -254,7 +255,7 @@ export async function deliverDemandExportAction(
         sent: 0,
         failed: [],
         driveSkipped:
-          "Arquivos salvos no CreativeOS. Configure GOOGLE_SA_EMAIL e GOOGLE_SA_PRIVATE_KEY para enviar ao Drive.",
+          "Arquivos salvos no CreativeOS. Conecte sua conta Google no botão Entregar demanda para enviar ao Drive.",
       },
     };
   }

@@ -20,15 +20,16 @@ import {
   deliverDemandExportAction,
   uploadDemandExportFileAction,
 } from "@/actions/demand-export";
+import { disconnectGoogleDriveAction } from "@/actions/google-drive";
 import { slotsFromDemandArtes } from "@/lib/export/art-source";
 import {
   buildExportFilename,
   demandExportTitle,
   type ExportFormat,
 } from "@/lib/export/filename";
-import { cn } from "@/lib/utils";
 import type { DemandArte } from "@/types/demand";
-import type { DemandExportFile } from "@/types/demand-export";
+import type { DemandExportFile, GoogleDriveAuth } from "@/types/demand-export";
+import { cn } from "@/lib/utils";
 
 type Props = {
   demandId: string;
@@ -42,7 +43,7 @@ type Props = {
   exportStatus: string | null;
   exportError: string | null;
   initialFiles: DemandExportFile[];
-  driveConfigured: boolean;
+  driveAuth: GoogleDriveAuth;
 };
 
 const FORMAT_META: Record<
@@ -75,7 +76,7 @@ export function DemandDeliverDialog({
   exportStatus,
   exportError,
   initialFiles,
-  driveConfigured,
+  driveAuth,
 }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -84,9 +85,30 @@ export function DemandDeliverDialog({
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
   const [isDelivering, startDeliver] = useTransition();
 
+  const [isDisconnecting, startDisconnect] = useTransition();
+  const driveConfigured = driveAuth.canUpload;
+
   useEffect(() => {
     setFiles(initialFiles);
   }, [initialFiles]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("drive_connected") === "1") {
+      toast.success("Google Drive conectado");
+      params.delete("drive_connected");
+      const next = `${window.location.pathname}${params.size ? `?${params}` : ""}`;
+      window.history.replaceState({}, "", next);
+      setOpen(true);
+    }
+    const error = params.get("drive_error");
+    if (error) {
+      toast.error("Não foi possível conectar o Google Drive");
+      params.delete("drive_error");
+      const next = `${window.location.pathname}${params.size ? `?${params}` : ""}`;
+      window.history.replaceState({}, "", next);
+    }
+  }, []);
 
   const slots = useMemo(() => slotsFromDemandArtes(artes), [artes]);
   const titleForName = demandExportTitle({
@@ -253,9 +275,43 @@ export function DemandDeliverDialog({
                         Sem pasta do Drive nesta demanda
                       </span>
                     )}
-                    {!driveConfigured && (
+                    {driveAuth.connected && driveAuth.email ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-emerald-300">
+                        Drive: {driveAuth.email}
+                        <button
+                          type="button"
+                          disabled={isDisconnecting}
+                          onClick={() =>
+                            startDisconnect(async () => {
+                              const result = await disconnectGoogleDriveAction();
+                              if (result.error) {
+                                toast.error(result.error);
+                                return;
+                              }
+                              toast.success("Google Drive desconectado");
+                              router.refresh();
+                            })
+                          }
+                          className="text-[10px] underline-offset-2 hover:underline"
+                        >
+                          sair
+                        </button>
+                      </span>
+                    ) : driveAuth.oauthAppConfigured ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          window.location.href = `/api/google/drive/oauth?returnTo=${encodeURIComponent(
+                            window.location.pathname
+                          )}`;
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/35 bg-sky-500/10 px-2.5 py-1 text-sky-300"
+                      >
+                        Conectar Google Drive
+                      </button>
+                    ) : (
                       <span className="text-muted-foreground">
-                        Drive ainda não autenticado — as artes ficam salvas aqui.
+                        Falta GOOGLE_OAUTH_CLIENT_ID no Vercel para conectar sua conta.
                       </span>
                     )}
                     {!driveFolderId ? (

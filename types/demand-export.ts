@@ -23,3 +23,11 @@ export type DemandExportReport = {
   failed: Array<{ filename: string; error: string }>;
   driveSkipped?: string;
 };
+
+export type GoogleDriveAuth = {
+  connected: boolean;
+  email: string | null;
+  oauthAppConfigured: boolean;
+  saConfigured: boolean;
+  canUpload: boolean;
+};

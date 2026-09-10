@@ -1,4 +1,9 @@
 import { createPrivateKey, createSign } from "crypto";
+import {
+  getGoogleDriveConnection,
+  getOAuthAccessToken,
+} from "@/lib/google/oauth";
+import type { GoogleDriveAuth } from "@/types/demand-export";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const DRIVE_API = "https://www.googleapis.com/drive/v3";
@@ -114,6 +119,16 @@ function signJwt(unsigned: string, privateKeyPem: string): Buffer {
   }
 }
 
+export async function getGoogleDriveAuth(): Promise<GoogleDriveAuth> {
+  const connection = await getGoogleDriveConnection();
+  const saConfigured = readServiceAccount() != null;
+  return {
+    ...connection,
+    saConfigured,
+    canUpload: connection.connected || saConfigured,
+  };
+}
+
 export function isGoogleDriveConfigured(): boolean {
   return readServiceAccount() != null;
 }
@@ -123,10 +138,10 @@ function base64Url(input: string | Buffer): string {
   return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
-async function getAccessToken(): Promise<string> {
+async function getServiceAccountAccessToken(): Promise<string> {
   const sa = readServiceAccount();
   if (!sa) {
-    throw new Error("Google Drive não configurado. Defina GOOGLE_SA_EMAIL e GOOGLE_SA_PRIVATE_KEY.");
+    throw new Error("Google Drive não configurado. Conecte sua conta Google ou defina a service account.");
   }
 
   const now = Math.floor(Date.now() / 1000);
@@ -164,6 +179,12 @@ async function getAccessToken(): Promise<string> {
   return json.access_token;
 }
 
+async function getAccessToken(): Promise<string> {
+  const oauthToken = await getOAuthAccessToken();
+  if (oauthToken) return oauthToken;
+  return getServiceAccountAccessToken();
+}
+
 async function driveFetch(
   url: string,
   init: RequestInit & { token: string }
@@ -178,6 +199,35 @@ async function driveFetch(
   });
 }
 
+function formatDriveError(raw: string): string {
+  try {
+    const parsed = JSON.parse(raw) as {
+      error?: {
+        message?: string;
+        status?: string;
+        errors?: Array<{ reason?: string }>;
+        details?: Array<{ reason?: string; metadata?: { activationUrl?: string } }>;
+      };
+    };
+    const reason =
+      parsed.error?.details?.find((item) => item.reason)?.reason ??
+      parsed.error?.errors?.[0]?.reason;
+    if (
+      reason === "SERVICE_DISABLED" ||
+      reason === "accessNotConfigured"
+    ) {
+      return "A Google Drive API está desligada neste projeto. Ative em console.cloud.google.com → APIs e serviços → Google Drive API e aguarde 1–2 minutos.";
+    }
+    if (reason === "storageQuotaExceeded") {
+      return "Service Account não tem cota no Meu Drive. Conecte sua conta Google no botão do modal de entrega.";
+    }
+    if (parsed.error?.message) return parsed.error.message;
+  } catch {
+    // keep raw
+  }
+  return raw.slice(0, 240);
+}
+
 async function withRetry<T>(fn: () => Promise<T>, attempts = 4): Promise<T> {
   let lastError: unknown;
   for (let i = 0; i < attempts; i++) {
@@ -186,7 +236,7 @@ async function withRetry<T>(fn: () => Promise<T>, attempts = 4): Promise<T> {
     } catch (error) {
       lastError = error;
       const message = error instanceof Error ? error.message : String(error);
-      const retryable = /429|403|500|502|503|rateLimitExceeded/i.test(message);
+      const retryable = /429|500|502|503|rateLimitExceeded/i.test(message);
       if (!retryable || i === attempts - 1) throw error;
       await new Promise((resolve) => setTimeout(resolve, 400 * 2 ** i));
     }
@@ -205,7 +255,7 @@ export async function findFileInFolder(
 
   const res = await driveFetch(url, { token });
   if (!res.ok) {
-    throw new Error(`Drive search falhou: ${await res.text()}`);
+    throw new Error(`Drive search falhou: ${formatDriveError(await res.text())}`);
   }
   const json = (await res.json()) as { files?: DriveFile[] };
   return json.files?.[0] ?? null;
@@ -231,7 +281,9 @@ export async function findOrCreateFolder(
   });
 
   if (!res.ok) {
-    throw new Error(`Não foi possível criar a pasta ${name}: ${await res.text()}`);
+    throw new Error(
+      `Não foi possível criar a pasta ${name}: ${formatDriveError(await res.text())}`
+    );
   }
   const json = (await res.json()) as DriveFile;
   return json.id;
@@ -269,7 +321,9 @@ export async function uploadOrReplaceFile(params: {
     });
 
     if (!res.ok) {
-      throw new Error(`Upload Drive falhou (${params.name}): ${await res.text()}`);
+      throw new Error(
+        `Upload Drive falhou (${params.name}): ${formatDriveError(await res.text())}`
+      );
     }
     const json = (await res.json()) as DriveFile;
     return json.id;
