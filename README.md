@@ -106,3 +106,6 @@ Acesse [http://localhost:3000](http://localhost:3000).
 | `lib/schemas/` | Validação Zod compartilhada |
 | `types/` | Contratos TypeScript |
 "# creativeos" 
+
+<!-- redeploy -->
+
