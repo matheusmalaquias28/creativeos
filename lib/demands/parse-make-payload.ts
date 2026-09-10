@@ -18,6 +18,29 @@ function asNumberOrNull(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+/**
+ * Normaliza uma lista de URLs vinda do webhook. Aceita tanto um array
+ * (`imagensReferencias`) quanto a versão em texto com uma URL por linha
+ * (`imagensReferenciasTexto`), sempre devolvendo URLs únicas e não-vazias.
+ */
+function asUrlList(...values: unknown[]): string[] {
+  const urls: string[] = [];
+  for (const value of values) {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const url = asString(item);
+        if (url) urls.push(url);
+      }
+    } else if (typeof value === "string") {
+      for (const line of value.split(/[\n,]+/)) {
+        const url = line.trim();
+        if (url) urls.push(url);
+      }
+    }
+  }
+  return Array.from(new Set(urls));
+}
+
 function parsePortugueseDate(value: string): string | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
@@ -67,15 +90,32 @@ function parseArteItem(item: unknown): DemandArte | null {
   const record = asRecord(item);
   const headline = asString(record.headline);
   const subheadline = asString(record.subheadline);
+  const informacoesExtras = asString(record.informacoesExtras);
+  const cta = asString(record.cta);
+  const linkReferencias = asString(record.linkReferencias);
+  const imagensReferencias = asUrlList(
+    record.imagensReferencias,
+    record.imagensReferenciasTexto
+  );
 
-  if (!headline && !subheadline) return null;
+  if (
+    !headline &&
+    !subheadline &&
+    !informacoesExtras &&
+    !cta &&
+    !linkReferencias &&
+    imagensReferencias.length === 0
+  ) {
+    return null;
+  }
 
   return {
     headline,
     subheadline,
-    informacoesExtras: asString(record.informacoesExtras),
-    cta: asString(record.cta),
-    linkReferencias: asString(record.linkReferencias),
+    informacoesExtras,
+    cta,
+    linkReferencias,
+    imagensReferencias,
   };
 }
 
@@ -127,6 +167,8 @@ function parseBriefing(payload: UnknownRecord): DemandBriefing {
 
 export type ParsedMakeDemand = {
   externalId: string;
+  /** ID fixo do cliente no WAR — âncora estável para vincular a demanda (não muda entre demandas). */
+  externalClientId: string;
   clientName: string;
   tipo: string;
   squad: string;
@@ -138,20 +180,42 @@ export type ParsedMakeDemand = {
   status: string;
   dueDate: string | null;
   externalCreatedAt: string | null;
+  /** Todas as URLs de imagens de referência da demanda (nível topo + por arte), deduplicadas. */
+  referenceImageUrls: string[];
 };
+
+/**
+ * Reúne todas as imagens de referência do payload — a lista achatada de topo
+ * (`imagensReferencias`/`imagensReferenciasTexto`) somada às referências de cada
+ * arte já parseada — para ingestão em `demand_reference_image`.
+ */
+function collectReferenceImageUrls(
+  payload: UnknownRecord,
+  artes: DemandArte[]
+): string[] {
+  return asUrlList(
+    payload.imagensReferencias,
+    payload.imagensReferenciasTexto,
+    ...artes.map((arte) => arte.imagensReferencias)
+  );
+}
 
 export function parseMakeDemandPayload(payload: unknown): ParsedMakeDemand | null {
   const record = asRecord(payload);
   const externalId = asString(record.id);
   const clientName = asString(record.clientName);
+  const cliente = asRecord(record.cliente);
+  const externalClientId = asString(record.clientId ?? cliente.id);
 
   if (!externalId || !clientName) return null;
 
   const createdAtRaw = asString(record.createdAt);
   const dueDateRaw = asString(record.dueDate);
+  const artes = parseArtesArray(record);
 
   return {
     externalId,
+    externalClientId,
     clientName,
     tipo: asString(record.tipo),
     squad: asString(record.squad),
@@ -159,11 +223,12 @@ export function parseMakeDemandPayload(payload: unknown): ParsedMakeDemand | nul
     webdesigner: asString(record.webdesigner),
     solicitante: asString(record.solicitante),
     briefing: parseBriefing(record),
-    artes: parseArtesArray(record),
+    artes,
     status: asString(record.status),
     dueDate: dueDateRaw ? parsePortugueseDate(dueDateRaw) ?? dueDateRaw : null,
     externalCreatedAt: createdAtRaw
       ? parsePortugueseDate(createdAtRaw) ?? createdAtRaw
       : null,
+    referenceImageUrls: collectReferenceImageUrls(record, artes),
   };
 }

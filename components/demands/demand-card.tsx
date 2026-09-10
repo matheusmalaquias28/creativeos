@@ -17,7 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 import { displayExternalClientName } from "@/lib/demands/normalize-client-name";
 import { getDemandCardTitle, getDemandCardTipo } from "@/lib/demands/demand-card-copy";
-import type { CreativeDemandListItem, DemandStatus } from "@/types/demand";
+import type { CreativeDemandListItem } from "@/types/demand";
 
 function formatDate(value: string | null): string {
   if (!value) return "Sem data";
@@ -74,7 +74,7 @@ export function DemandCard({
   clients?: DemandClientOption[];
   onArchived?: () => void;
   onArchiveRevert?: () => void;
-  onStatusUpdated?: (status: DemandStatus) => void;
+  onStatusUpdated?: (status: string) => void;
   onClientLinked?: (demandId: string, clientId: string, clientName: string) => void;
 }) {
   const [clientNotFound, setClientNotFound] = useState(demand.client_not_found);
@@ -172,6 +172,7 @@ export function DemandCard({
           <DemandStatusSelector
             demandId={demand.id}
             currentStatus={demand.status}
+            allowedStatuses={demand.status_permitidos}
             onArchived={onArchived}
             onArchiveRevert={onArchiveRevert}
             onStatusUpdated={onStatusUpdated}

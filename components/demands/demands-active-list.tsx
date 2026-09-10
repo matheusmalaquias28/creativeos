@@ -14,7 +14,7 @@ import {
 } from "@/lib/demands/demand-color";
 import { cn } from "@/lib/utils";
 import type { DemandClientOption } from "@/components/demands/demand-client-linker";
-import type { CreativeDemandListItem, DemandStatus } from "@/types/demand";
+import type { CreativeDemandListItem } from "@/types/demand";
 
 type Props = {
   initialDemands: CreativeDemandListItem[];
@@ -50,7 +50,7 @@ export function DemandsActiveList({ initialDemands, clients }: Props) {
   }, []);
 
   const handleStatusUpdated = useCallback(
-    (demandId: string, status: DemandStatus) => {
+    (demandId: string, status: string) => {
       setDemands((prev) =>
         prev.map((item) =>
           item.id === demandId ? { ...item, status } : item

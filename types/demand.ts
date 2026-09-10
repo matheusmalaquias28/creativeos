@@ -1,4 +1,5 @@
 import type { MagnificSpaceStatus } from "./database";
+import type { DemandExportStatus } from "./demand-export";
 
 /** Nó do board do Magnific Space, sincronizado via spaces_state após a geração. */
 export type MagnificSpaceNode = {
@@ -13,6 +14,8 @@ export type DemandArte = {
   informacoesExtras: string;
   cta: string;
   linkReferencias: string;
+  /** URLs de imagens de referência específicas desta arte (enviadas no webhook). */
+  imagensReferencias: string[];
 };
 
 export type DemandBriefing = {
@@ -24,15 +27,55 @@ export type DemandBriefing = {
   driveMateriais: string;
 };
 
+/**
+ * Vocabulário de status compartilhado com o WAR (a plataforma que origina as
+ * demandas). O CreativeOS adota exatamente esses valores para que o webhook de
+ * entrada e o callback de saída façam o round-trip sem perda. O WAR ainda pode
+ * mandar status "custom" (ex.: "Falta material do cliente") — esses são tratados
+ * como válidos em runtime, apenas não aparecem na lista fixa abaixo.
+ */
 export const DEMAND_STATUSES = [
-  "Nova",
+  "Aguardando Definição de Data",
+  "Em Fila",
   "Fazendo",
-  "Revisão",
-  "Concluída",
-  "Cancelada",
+  "Aprovação de Copy",
+  "Aprovação do Gestor",
+  "Ajuste",
+  "Aprovação do Cliente",
+  "Aprovado",
+  "Atrasado",
+  "Concluído",
 ] as const;
 
 export type DemandStatus = (typeof DEMAND_STATUSES)[number];
+
+/** Status inicial padrão quando o WAR não envia um status na criação. */
+export const DEMAND_INITIAL_STATUS: DemandStatus = "Aguardando Definição de Data";
+/** Status que inicia o cronômetro de execução. */
+export const DEMAND_WORKING_STATUS: DemandStatus = "Fazendo";
+/** Status terminal — conclui, arquiva e para o cronômetro. */
+export const DEMAND_DONE_STATUS: DemandStatus = "Concluído";
+
+/**
+ * Status considerados "fechados" para fins de cor/agrupamento e analytics.
+ * Inclui os valores legados ("Concluída"/"Cancelada") de demandas criadas antes
+ * da adoção do vocabulário do WAR.
+ */
+export const CLOSED_DEMAND_STATUSES = new Set<string>([
+  "Concluído",
+  "Concluída", // legado
+  "Cancelada", // legado
+]);
+
+/** True para o status terminal de conclusão (novo "Concluído" ou legado "Concluída"). */
+export function isDoneStatus(status: string | null | undefined): boolean {
+  return status === "Concluído" || status === "Concluída";
+}
+
+/** True quando a demanda está fechada (concluída ou cancelada). */
+export function isClosedStatus(status: string | null | undefined): boolean {
+  return status != null && CLOSED_DEMAND_STATUSES.has(status);
+}
 
 export type CreativeDemand = {
   id: string;
@@ -60,14 +103,22 @@ export type CreativeDemand = {
   magnific_space_status: MagnificSpaceStatus;
   magnific_space_error: string | null;
   magnific_space_nodes: MagnificSpaceNode[];
+  drive_folder_url?: string | null;
+  drive_folder_id?: string | null;
+  export_status?: DemandExportStatus | null;
+  export_error?: string | null;
+  exported_at?: string | null;
   created_at: string;
   updated_at: string;
 };
 
 export type CreativeDemandListItem = CreativeDemand & {
   client_name?: string | null;
+  client_slug?: string | null;
   /** Contagem leve para listagens (artes completas só no detalhe). */
   artes_count?: number;
+  /** Status aceitos pelo WAR para esta demanda (extraídos do raw_payload). */
+  status_permitidos?: string[];
 };
 
 export type DemandMonthStat = {

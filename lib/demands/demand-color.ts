@@ -1,4 +1,4 @@
-import type { CreativeDemandListItem } from "@/types/demand";
+import { isClosedStatus, type CreativeDemandListItem } from "@/types/demand";
 
 export type DemandColorState =
   | "red"
@@ -8,6 +8,28 @@ export type DemandColorState =
   | "gray"
   | "purple"
   | "cyan";
+
+/**
+ * Mapa status → estado de cor. Cobre o vocabulário do WAR e os valores legados
+ * ("Nova"/"Revisão"/"Concluída"/"Cancelada") de demandas antigas.
+ */
+const STATUS_COLOR: Record<string, DemandColorState> = {
+  "Aguardando Definição de Data": "amber",
+  "Em Fila": "cyan",
+  Fazendo: "blue",
+  "Aprovação de Copy": "purple",
+  "Aprovação do Gestor": "purple",
+  Ajuste: "purple",
+  "Aprovação do Cliente": "purple",
+  Aprovado: "green",
+  Atrasado: "red",
+  Concluído: "green",
+  // Legado
+  Nova: "cyan",
+  Revisão: "purple",
+  Concluída: "green",
+  Cancelada: "gray",
+};
 
 export type DemandGroup = {
   key: DemandColorState;
@@ -26,23 +48,25 @@ export type DemandCardNeonTheme = {
   header: string;
 };
 
+/** Estado de cor de um status isolado (sem considerar prazo). */
+export function getStatusColorState(
+  status: string | null | undefined,
+  hasDueDate = true
+): DemandColorState {
+  if (status && STATUS_COLOR[status]) return STATUS_COLOR[status];
+  // Status custom/desconhecido: cyan quando tem data, âmbar quando não tem.
+  return hasDueDate ? "cyan" : "amber";
+}
+
 export function getDemandColorState(demand: CreativeDemandListItem): DemandColorState {
   const status = demand.status;
-  const isClosed = status === "Concluída" || status === "Cancelada";
 
-  if (!isClosed && demand.due_date) {
+  if (!isClosedStatus(status) && demand.due_date) {
     const isOverdue = new Date(demand.due_date) < new Date();
     if (isOverdue) return "red";
   }
 
-  if (status === "Concluída") return "green";
-  if (status === "Cancelada") return "gray";
-  if (status === "Fazendo") return "blue";
-  if (status === "Revisão") return "purple";
-  if (!demand.due_date) return "amber";
-  if (status === "Nova") return "cyan";
-
-  return "cyan";
+  return getStatusColorState(status, Boolean(demand.due_date));
 }
 
 export const COLOR_GROUP_MAP: Record<

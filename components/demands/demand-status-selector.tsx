@@ -8,59 +8,108 @@ import {
   useTransition,
 } from "react";
 import { createPortal } from "react-dom";
-import { CheckCircle2, Circle, Clock, RotateCcw, XCircle } from "lucide-react";
+import {
+  BadgeCheck,
+  CalendarClock,
+  CheckCircle2,
+  Circle,
+  Clock,
+  FileCheck,
+  ListChecks,
+  RotateCcw,
+  UserCheck,
+  Users,
+} from "lucide-react";
 import { toast } from "sonner";
 import { updateDemandStatusAction } from "@/actions/demands";
-import { DEMAND_STATUSES } from "@/types/demand";
-import type { DemandStatus } from "@/types/demand";
+import { DEMAND_STATUSES, DEMAND_INITIAL_STATUS, isDoneStatus } from "@/types/demand";
 
-const STATUS_CONFIG: Record<
-  DemandStatus,
-  { label: string; icon: React.ElementType; className: string }
-> = {
-  Nova: {
-    label: "Nova",
-    icon: Circle,
-    className: "text-blue-600 border-blue-500/40 bg-blue-500/10",
+type StatusConfig = { label: string; icon: React.ElementType; className: string };
+
+const STATUS_CONFIG: Record<string, StatusConfig> = {
+  "Aguardando Definição de Data": {
+    label: "Aguardando Data",
+    icon: CalendarClock,
+    className: "text-amber-600 border-amber-500/40 bg-amber-500/10",
+  },
+  "Em Fila": {
+    label: "Em Fila",
+    icon: ListChecks,
+    className: "text-cyan-600 border-cyan-500/40 bg-cyan-500/10",
   },
   Fazendo: {
     label: "Fazendo",
     icon: Clock,
-    className: "text-amber-600 border-amber-500/40 bg-amber-500/10",
+    className: "text-blue-600 border-blue-500/40 bg-blue-500/10",
   },
-  Revisão: {
-    label: "Revisão",
+  "Aprovação de Copy": {
+    label: "Aprovação de Copy",
+    icon: FileCheck,
+    className: "text-violet-600 border-violet-500/40 bg-violet-500/10",
+  },
+  "Aprovação do Gestor": {
+    label: "Aprovação do Gestor",
+    icon: UserCheck,
+    className: "text-violet-600 border-violet-500/40 bg-violet-500/10",
+  },
+  Ajuste: {
+    label: "Ajuste",
     icon: RotateCcw,
-    className: "text-purple-600 border-purple-500/40 bg-purple-500/10",
+    className: "text-orange-600 border-orange-500/40 bg-orange-500/10",
   },
-  Concluída: {
-    label: "Concluída",
+  "Aprovação do Cliente": {
+    label: "Aprovação do Cliente",
+    icon: Users,
+    className: "text-violet-600 border-violet-500/40 bg-violet-500/10",
+  },
+  Aprovado: {
+    label: "Aprovado",
+    icon: BadgeCheck,
+    className: "text-emerald-600 border-emerald-500/40 bg-emerald-500/10",
+  },
+  Atrasado: {
+    label: "Atrasado",
+    icon: Clock,
+    className: "text-red-600 border-red-500/40 bg-red-500/10",
+  },
+  Concluído: {
+    label: "Concluído",
     icon: CheckCircle2,
     className: "text-emerald-600 border-emerald-500/40 bg-emerald-500/10",
   },
-  Cancelada: {
-    label: "Cancelada",
-    icon: XCircle,
-    className: "text-zinc-500 border-zinc-400/40 bg-zinc-500/10",
-  },
 };
+
+const DEFAULT_STATUS_CONFIG: StatusConfig = {
+  label: "Status",
+  icon: Circle,
+  className: "text-zinc-500 border-zinc-400/40 bg-zinc-500/10",
+};
+
+function statusConfig(status: string): StatusConfig {
+  return STATUS_CONFIG[status] ?? { ...DEFAULT_STATUS_CONFIG, label: status };
+}
 
 type Props = {
   demandId: string;
   currentStatus: string | null;
+  /** Status aceitos pelo WAR para esta demanda; cai na lista padrão se vazio. */
+  allowedStatuses?: string[];
   onArchived?: () => void;
   onArchiveRevert?: () => void;
-  onStatusUpdated?: (status: DemandStatus) => void;
+  onStatusUpdated?: (status: string) => void;
 };
 
 export function DemandStatusSelector({
   demandId,
   currentStatus,
+  allowedStatuses,
   onArchived,
   onArchiveRevert,
   onStatusUpdated,
 }: Props) {
-  const [selected, setSelected] = useState<string>(currentStatus ?? "Nova");
+  const [selected, setSelected] = useState<string>(
+    currentStatus ?? DEMAND_INITIAL_STATUS
+  );
   const [open, setOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(
     null
@@ -89,18 +138,27 @@ export function DemandStatusSelector({
     };
   }, [open]);
 
-  const config =
-    STATUS_CONFIG[selected as DemandStatus] ?? STATUS_CONFIG["Nova"];
+  const config = statusConfig(selected);
   const Icon = config.icon;
 
-  function handleSelect(status: DemandStatus) {
+  // Lista do menu: status aceitos pela demanda (do WAR) ou o vocabulário padrão.
+  // Garante que o status atual apareça mesmo se for custom/fora da lista.
+  const menuStatuses = (() => {
+    const base =
+      allowedStatuses && allowedStatuses.length > 0
+        ? allowedStatuses
+        : [...DEMAND_STATUSES];
+    return base.includes(selected) ? base : [selected, ...base];
+  })();
+
+  function handleSelect(status: string) {
     if (status === selected || isPending) return;
 
     setOpen(false);
     const prev = selected;
     setSelected(status);
 
-    const isCompleting = status === "Concluída";
+    const isCompleting = isDoneStatus(status);
     if (isCompleting) {
       onArchived?.();
     } else {
@@ -114,7 +172,7 @@ export function DemandStatusSelector({
         if (isCompleting) {
           onArchiveRevert?.();
         } else {
-          onStatusUpdated?.(prev as DemandStatus);
+          onStatusUpdated?.(prev);
         }
         toast.error("Erro ao atualizar status", { description: result.error });
         return;
@@ -123,7 +181,7 @@ export function DemandStatusSelector({
       toast.success(
         isCompleting
           ? "Demanda concluída e arquivada"
-          : `Status atualizado: ${status}`
+          : `Status atualizado: ${statusConfig(status).label}`
       );
     });
   }
@@ -142,8 +200,8 @@ export function DemandStatusSelector({
               className="fixed z-50 min-w-[168px] overflow-hidden rounded-xl border border-border/60 bg-popover p-1 shadow-xl"
               style={{ top: menuPos.top, left: menuPos.left }}
             >
-              {DEMAND_STATUSES.map((status) => {
-                const c = STATUS_CONFIG[status];
+              {menuStatuses.map((status) => {
+                const c = statusConfig(status);
                 const SIcon = c.icon;
                 return (
                   <button

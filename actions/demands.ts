@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { mergeLegacyDemandFlowIntoClient } from "@/services/flow";
 import { linkUnmatchedDemandsByExternalName } from "@/lib/demands/link-unmatched-siblings";
+import { notifyWarStatusChange } from "@/lib/demands/war-status-callback";
 import type { Database, Json } from "@/types/database";
-import type { DemandArte } from "@/types/demand";
+import { DEMAND_WORKING_STATUS, isDoneStatus, type DemandArte } from "@/types/demand";
 
 type DemandUpdate = Database["public"]["Tables"]["creative_demands"]["Update"];
 
@@ -32,13 +33,13 @@ export async function updateDemandStatusAction(
 
   const { data: current } = await supabase
     .from("creative_demands")
-    .select("started_at")
+    .select("started_at, external_id, raw_payload")
     .eq("id", demandId)
     .single();
 
   const now = new Date();
-  const isStarting = status === "Fazendo";
-  const isCompleted = status === "Concluída";
+  const isStarting = status === DEMAND_WORKING_STATUS;
+  const isCompleted = isDoneStatus(status);
 
   const update: DemandUpdate = {
     status,
@@ -79,6 +80,13 @@ export async function updateDemandStatusAction(
     return { error: "Não foi possível atualizar a demanda." };
   }
 
+  // Notifica o WAR sobre a mudança (best-effort — não bloqueia o sucesso da ação).
+  await notifyWarStatusChange({
+    externalId: current?.external_id ?? null,
+    status,
+    rawPayload: current?.raw_payload ?? null,
+  });
+
   return { success: true };
 }
 
@@ -93,6 +101,12 @@ function sanitizeArte(value: unknown): DemandArte {
     informacoesExtras: str(r.informacoesExtras),
     cta: str(r.cta),
     linkReferencias: str(r.linkReferencias),
+    // Preserva as imagens de referência (não editáveis no form; vêm do webhook).
+    imagensReferencias: Array.isArray(r.imagensReferencias)
+      ? r.imagensReferencias
+          .filter((url): url is string => typeof url === "string" && url.trim().length > 0)
+          .slice(0, 20)
+      : [],
   };
 }
 

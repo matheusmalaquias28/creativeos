@@ -11,6 +11,7 @@ import {
 type Props = {
   demandId: string;
   status: string | null;
+  allowedStatuses?: string[];
   startedAt: string | null;
   elapsedSeconds: number | null;
   currentClientId: string | null;
@@ -23,6 +24,7 @@ type Props = {
 export function DemandDetailStatusBar({
   demandId,
   status,
+  allowedStatuses,
   startedAt,
   elapsedSeconds,
   currentClientId,
@@ -38,6 +40,7 @@ export function DemandDetailStatusBar({
       <DemandStatusSelector
         demandId={demandId}
         currentStatus={status}
+        allowedStatuses={allowedStatuses}
         onArchived={() => router.push("/demands")}
       />
       <DemandClientLinker

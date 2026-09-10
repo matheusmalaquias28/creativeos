@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Timer } from "lucide-react";
+import { DEMAND_WORKING_STATUS, isDoneStatus } from "@/types/demand";
 
 const MAX_SECONDS = 3600;
 
@@ -32,7 +33,7 @@ type Props = {
 export function DemandTimer({ status, startedAt, elapsedSeconds }: Props) {
   const [elapsed, setElapsed] = useState(0);
 
-  const isTiming = status === "Fazendo" && startedAt;
+  const isTiming = status === DEMAND_WORKING_STATUS && startedAt;
 
   useEffect(() => {
     if (!isTiming) return;
@@ -48,7 +49,7 @@ export function DemandTimer({ status, startedAt, elapsedSeconds }: Props) {
     return () => clearInterval(interval);
   }, [isTiming, startedAt]);
 
-  if (status === "Concluída" && elapsedSeconds != null) {
+  if (isDoneStatus(status) && elapsedSeconds != null) {
     return (
       <span className="inline-flex items-center gap-1.5 text-xs text-emerald-600">
         <Timer className="size-3.5" />

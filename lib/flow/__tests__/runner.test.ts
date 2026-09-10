@@ -24,6 +24,7 @@ const demanda: Pick<CreativeDemand, 'id' | 'client_id' | 'artes' | 'briefing'> =
       cta: 'Compre agora',
       informacoesExtras: '',
       linkReferencias: '',
+      imagensReferencias: [],
     },
     {
       headline: 'Produto destaque',
@@ -31,6 +32,7 @@ const demanda: Pick<CreativeDemand, 'id' | 'client_id' | 'artes' | 'briefing'> =
       cta: 'Saiba mais',
       informacoesExtras: '@img1',
       linkReferencias: '',
+      imagensReferencias: [],
     },
   ],
   briefing: {

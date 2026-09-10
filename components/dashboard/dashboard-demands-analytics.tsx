@@ -44,12 +44,22 @@ type Props = {
 type Accent = "cyan" | "violet" | "emerald" | "amber";
 
 const STATUS_COLORS: Record<string, string> = {
+  // Vocabulário do WAR
+  "Aguardando Definição de Data": "#fbbf24",
+  "Em Fila": "#22d3ee",
+  Fazendo: "#3b82f6",
+  "Aprovação de Copy": "#a78bfa",
+  "Aprovação do Gestor": "#a78bfa",
+  Ajuste: "#fb923c",
+  "Aprovação do Cliente": "#a78bfa",
+  Aprovado: "#34d399",
+  Atrasado: "#f87171",
+  Concluído: "#34d399",
+  // Legado
   Nova: "#22d3ee",
-  Fazendo: "#a78bfa",
   Revisão: "#fbbf24",
   Concluída: "#34d399",
   Cancelada: "#f87171",
-  "Aguardando Definição de Data": "#94a3b8",
   "Sem status": "#64748b",
 };
 

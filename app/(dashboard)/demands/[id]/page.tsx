@@ -4,6 +4,7 @@ import { ArrowLeft, ExternalLink } from "lucide-react";
 import { DashboardPage } from "@/components/layout/dashboard-page";
 import { DemandDetailStatusBar } from "@/components/demands/demand-detail-status-bar";
 import { MagnificSpaceButton } from "@/components/demands/magnific-space-button";
+import { DemandDeliverDialog } from "@/components/demands/demand-deliver-dialog";
 import { MarkDemandReadOnMount } from "@/components/demands/mark-demand-read-on-mount";
 import {
   DemandClientAssets,
@@ -27,8 +28,14 @@ import {
   getClientVisualAssets,
 } from "@/services/clients";
 import { getDemandReferenceImages } from "@/services/art-gen";
+import { getDemandExportFiles } from "@/services/demand-export";
 import { getAuthUser } from "@/lib/auth/session";
 import { displayExternalClientName } from "@/lib/demands/normalize-client-name";
+import {
+  collectDemandDriveUrls,
+  resolveDemandDriveFolder,
+} from "@/lib/export/drive-folder";
+import { isGoogleDriveConfigured } from "@/lib/google/drive";
 
 export const maxDuration = 300;
 
@@ -95,11 +102,12 @@ export default async function DemandDetailPage({ params }: PageProps) {
   ]);
   if (!demand) notFound();
 
-  const [clientAssets, demandRefs] = await Promise.all([
+  const [clientAssets, demandRefs, exportFiles] = await Promise.all([
     demand.client_id && user
       ? getClientVisualAssets(demand.client_id, user.id)
       : Promise.resolve(null),
     getDemandReferenceImages(id),
+    getDemandExportFiles(id),
   ]);
 
   const title =
@@ -107,6 +115,15 @@ export default async function DemandDetailPage({ params }: PageProps) {
     displayExternalClientName(demand.client_name_external) ||
     "Demanda";
   const instagram = demand.briefing.instagramCliente.trim();
+  const driveFolder = resolveDemandDriveFolder(
+    collectDemandDriveUrls({
+      storedUrl: demand.drive_folder_url,
+      briefing: demand.briefing,
+      artes: demand.artes,
+    })
+  );
+  const driveFolderUrl = demand.drive_folder_url || driveFolder.url;
+  const driveFolderId = demand.drive_folder_id || driveFolder.id;
 
   return (
     <DashboardPage title={title}>
@@ -117,6 +134,7 @@ export default async function DemandDetailPage({ params }: PageProps) {
             <DemandDetailStatusBar
               demandId={demand.id}
               status={demand.status}
+              allowedStatuses={demand.status_permitidos}
               startedAt={demand.started_at}
               elapsedSeconds={demand.elapsed_seconds}
               currentClientId={demand.client_id}
@@ -126,14 +144,34 @@ export default async function DemandDetailPage({ params }: PageProps) {
               clients={clients}
             />
           </div>
-          {!demand.client_not_found && (
-            <MagnificSpaceButton
+          <div className="flex flex-wrap items-center gap-2">
+            <DemandDeliverDialog
               demandId={demand.id}
-              status={demand.magnific_space_status}
-              spaceUrl={demand.magnific_space_url}
-              errorMessage={demand.magnific_space_error}
+              artes={demand.artes}
+              demandTitle={demand.briefing.titulo}
+              demandTipo={demand.tipo ?? demand.briefing.tipo}
+              clientName={
+                demand.client_name ||
+                displayExternalClientName(demand.client_name_external) ||
+                demand.client_name_external
+              }
+              clientSlug={demand.client_slug}
+              driveFolderUrl={driveFolderUrl}
+              driveFolderId={driveFolderId}
+              exportStatus={demand.export_status ?? null}
+              exportError={demand.export_error ?? null}
+              initialFiles={exportFiles}
+              driveConfigured={isGoogleDriveConfigured()}
             />
-          )}
+            {!demand.client_not_found && (
+              <MagnificSpaceButton
+                demandId={demand.id}
+                status={demand.magnific_space_status}
+                spaceUrl={demand.magnific_space_url}
+                errorMessage={demand.magnific_space_error}
+              />
+            )}
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
@@ -171,9 +209,14 @@ export default async function DemandDetailPage({ params }: PageProps) {
             label="Materiais"
           />
           <ExternalHref
-            href={demand.briefing.driveMateriais}
+            href={driveFolderUrl || demand.briefing.driveMateriais}
             label="Drive"
           />
+          {driveFolderUrl && !driveFolderId ? (
+            <span className="inline-flex items-center gap-1 text-amber-400">
+              Link do Drive sem pasta válida
+            </span>
+          ) : null}
         </div>
 
         <Surface variant="elevated">

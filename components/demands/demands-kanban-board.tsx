@@ -5,16 +5,29 @@ import Link from "next/link";
 import { AlertTriangle, ArrowUpRight, Calendar, Grip, Inbox, User } from "lucide-react";
 import { toast } from "sonner";
 import { updateDemandStatusAction } from "@/actions/demands";
-import { getDemandColorState, CARD_NEON_THEMES, GROUP_DOT_CLASSES } from "@/lib/demands/demand-color";
+import {
+  getDemandColorState,
+  getStatusColorState,
+  CARD_NEON_THEMES,
+  GROUP_DOT_CLASSES,
+  type DemandColorState,
+} from "@/lib/demands/demand-color";
 import { displayExternalClientName } from "@/lib/demands/normalize-client-name";
 import { getDemandCardTitle, getDemandCardTipo } from "@/lib/demands/demand-card-copy";
 import { cn } from "@/lib/utils";
 import type { DemandClientOption } from "@/components/demands/demand-client-linker";
-import type { CreativeDemandListItem, DemandStatus } from "@/types/demand";
+import {
+  DEMAND_STATUSES,
+  DEMAND_INITIAL_STATUS,
+  DEMAND_DONE_STATUS,
+  isClosedStatus,
+  type CreativeDemandListItem,
+  type DemandStatus,
+} from "@/types/demand";
 
 // ─── Known statuses ──────────────────────────────────────────────────────────
 
-const KNOWN_STATUSES = new Set(["Nova", "Fazendo", "Revisão", "Concluída", "Cancelada"]);
+const KNOWN_STATUSES = new Set<string>(DEMAND_STATUSES);
 
 // ─── Column config ───────────────────────────────────────────────────────────
 
@@ -27,48 +40,36 @@ type KanbanColumn = {
   bg: string;
 };
 
-const COLUMNS: KanbanColumn[] = [
-  {
-    status: "Nova",
-    label: "Nova",
-    dot: GROUP_DOT_CLASSES.cyan,
-    header: "text-cyan-400",
-    border: "border-cyan-500/20 hover:border-cyan-500/40",
-    bg: "dark:bg-cyan-500/3",
-  },
-  {
-    status: "Fazendo",
-    label: "Em andamento",
-    dot: GROUP_DOT_CLASSES.blue,
-    header: "text-blue-400",
-    border: "border-blue-500/20 hover:border-blue-500/40",
-    bg: "dark:bg-blue-500/3",
-  },
-  {
-    status: "Revisão",
-    label: "Em revisão",
-    dot: GROUP_DOT_CLASSES.purple,
-    header: "text-violet-400",
-    border: "border-violet-500/20 hover:border-violet-500/40",
-    bg: "dark:bg-violet-500/3",
-  },
-  {
-    status: "Concluída",
-    label: "Concluída",
-    dot: GROUP_DOT_CLASSES.green,
-    header: "text-emerald-400",
-    border: "border-emerald-500/20 hover:border-emerald-500/40",
-    bg: "dark:bg-emerald-500/3",
-  },
-  {
-    status: "Cancelada",
-    label: "Cancelada",
-    dot: GROUP_DOT_CLASSES.gray,
-    header: "text-zinc-500",
-    border: "border-zinc-500/15 hover:border-zinc-500/30",
-    bg: "dark:bg-zinc-500/2",
-  },
-];
+/** Rótulos curtos para os cabeçalhos das colunas (o status completo é longo). */
+const COLUMN_LABELS: Partial<Record<DemandStatus, string>> = {
+  "Aguardando Definição de Data": "Aguardando Data",
+};
+
+const COLUMN_STYLE: Record<
+  DemandColorState,
+  { header: string; border: string; bg: string }
+> = {
+  red: { header: "text-red-400", border: "border-red-500/20 hover:border-red-500/40", bg: "dark:bg-red-500/3" },
+  amber: { header: "text-amber-400", border: "border-amber-500/20 hover:border-amber-500/40", bg: "dark:bg-amber-500/3" },
+  blue: { header: "text-blue-400", border: "border-blue-500/20 hover:border-blue-500/40", bg: "dark:bg-blue-500/3" },
+  purple: { header: "text-violet-400", border: "border-violet-500/20 hover:border-violet-500/40", bg: "dark:bg-violet-500/3" },
+  cyan: { header: "text-cyan-400", border: "border-cyan-500/20 hover:border-cyan-500/40", bg: "dark:bg-cyan-500/3" },
+  green: { header: "text-emerald-400", border: "border-emerald-500/20 hover:border-emerald-500/40", bg: "dark:bg-emerald-500/3" },
+  gray: { header: "text-zinc-500", border: "border-zinc-500/15 hover:border-zinc-500/30", bg: "dark:bg-zinc-500/2" },
+};
+
+const COLUMNS: KanbanColumn[] = DEMAND_STATUSES.map((status) => {
+  const color = getStatusColorState(status);
+  const style = COLUMN_STYLE[color];
+  return {
+    status,
+    label: COLUMN_LABELS[status] ?? status,
+    dot: GROUP_DOT_CLASSES[color],
+    header: style.header,
+    border: style.border,
+    bg: style.bg,
+  };
+});
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -80,7 +81,7 @@ function formatDate(value: string | null): string {
 }
 
 function isOverdue(dueDate: string | null, status: string | null): boolean {
-  if (!dueDate || status === "Concluída" || status === "Cancelada") return false;
+  if (!dueDate || isClosedStatus(status)) return false;
   return new Date(dueDate) < new Date();
 }
 
@@ -151,7 +152,7 @@ function KanbanCard({
 
         {/* Status externo (quando não é padrão do sistema) */}
         {demand.status && !KNOWN_STATUSES.has(demand.status) && (
-          <span className="inline-block rounded-full border border-amber-500/20 bg-amber-500/8 px-2 py-0.5 text-[0.5625rem] font-medium text-amber-400/90 truncate max-w-full">
+          <span className="inline-flex max-w-full truncate rounded-full border border-amber-500/20 bg-amber-500/8 px-2 py-0.5 text-[0.5625rem] font-medium text-amber-400/90">
             {demand.status}
           </span>
         )}
@@ -303,8 +304,10 @@ export function DemandsKanbanBoard({ initialDemands }: Props) {
   const getDemandsByStatus = useCallback(
     (status: DemandStatus) =>
       demands.filter((d) =>
-        status === "Nova"
-          ? d.status === "Nova" || !d.status || !KNOWN_STATUSES.has(d.status ?? "")
+        // A coluna inicial acumula também demandas sem status ou com status
+        // "custom" do WAR que não têm coluna própria.
+        status === DEMAND_INITIAL_STATUS
+          ? d.status === status || !d.status || !KNOWN_STATUSES.has(d.status)
           : d.status === status
       ),
     [demands]
@@ -368,8 +371,8 @@ export function DemandsKanbanBoard({ initialDemands }: Props) {
         return;
       }
 
-      // Remove from kanban if archived (Concluída)
-      if (targetStatus === "Concluída") {
+      // Remove from kanban if archived (Concluído)
+      if (targetStatus === DEMAND_DONE_STATUS) {
         setTimeout(() => {
           setDemands((prev) => prev.filter((d) => d.id !== demand.id));
         }, 800);

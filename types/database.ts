@@ -274,6 +274,11 @@ export type Database = {
           magnific_space_cancel_requested: boolean;
           magnific_space_nodes: Json | null;
           flow_graph: Json | null;
+          drive_folder_url: string | null;
+          drive_folder_id: string | null;
+          export_status: "pending" | "running" | "done" | "error";
+          export_error: string | null;
+          exported_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -308,6 +313,11 @@ export type Database = {
           magnific_space_cancel_requested?: boolean;
           magnific_space_nodes?: Json | null;
           flow_graph?: Json | null;
+          drive_folder_url?: string | null;
+          drive_folder_id?: string | null;
+          export_status?: "pending" | "running" | "done" | "error";
+          export_error?: string | null;
+          exported_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -340,6 +350,11 @@ export type Database = {
           magnific_space_cancel_requested: boolean;
           magnific_space_nodes: Json | null;
           flow_graph: Json | null;
+          drive_folder_url: string | null;
+          drive_folder_id: string | null;
+          export_status: "pending" | "running" | "done" | "error";
+          export_error: string | null;
+          exported_at: string | null;
           updated_at: string;
         }>;
         Relationships: [
@@ -348,6 +363,56 @@ export type Database = {
             columns: ["client_id"];
             isOneToOne: false;
             referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      demand_export_files: {
+        Row: {
+          id: string;
+          demand_id: string;
+          art_index: number;
+          format: "feed" | "story";
+          filename: string;
+          storage_path: string;
+          public_url: string;
+          mime_type: string | null;
+          file_size: number | null;
+          drive_file_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          demand_id: string;
+          art_index: number;
+          format: "feed" | "story";
+          filename: string;
+          storage_path: string;
+          public_url: string;
+          mime_type?: string | null;
+          file_size?: number | null;
+          drive_file_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<{
+          art_index: number;
+          format: "feed" | "story";
+          filename: string;
+          storage_path: string;
+          public_url: string;
+          mime_type: string | null;
+          file_size: number | null;
+          drive_file_id: string | null;
+          updated_at: string;
+        }>;
+        Relationships: [
+          {
+            foreignKeyName: "demand_export_files_demand_id_fkey";
+            columns: ["demand_id"];
+            isOneToOne: false;
+            referencedRelation: "creative_demands";
             referencedColumns: ["id"];
           },
         ];

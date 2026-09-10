@@ -1,14 +1,16 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { isSchemaMissingError, schemaNotReadyError } from "@/lib/errors/database";
-import type {
-  CreativeDemand,
-  CreativeDemandListItem,
-  DashboardAnalytics,
-  DashboardDelta,
-  DemandArte,
-  DemandBriefing,
-  DemandMonthStat,
+import {
+  isClosedStatus,
+  isDoneStatus,
+  type CreativeDemand,
+  type CreativeDemandListItem,
+  type DashboardAnalytics,
+  type DashboardDelta,
+  type DemandArte,
+  type DemandBriefing,
+  type DemandMonthStat,
 } from "@/types/demand";
 import type { MagnificSpaceStatus } from "@/types/database";
 import { parseStoredSpaceNodes } from "@/lib/magnific/space-state";
@@ -16,6 +18,7 @@ import {
   TRADITIONAL_DESIGNER_MINUTES as TRADITIONAL_MIN,
   HYBRID_DESIGNER_MINUTES as HYBRID_MIN,
 } from "@/lib/demands/designer-time";
+import { extractStatusPermitidos } from "@/lib/demands/war-status-callback";
 
 export const getNewDemandsCount = cache(async (): Promise<number> => {
   const supabase = await createClient();
@@ -65,6 +68,7 @@ function firstArteHeadline(value: unknown): DemandArte[] {
           informacoesExtras: "",
           cta: "",
           linkReferencias: "",
+          imagensReferencias: [],
         },
       ];
     }
@@ -145,6 +149,11 @@ export function parseArtes(value: unknown): DemandArte[] {
         cta: typeof record.cta === "string" ? record.cta : "",
         linkReferencias:
           typeof record.linkReferencias === "string" ? record.linkReferencias : "",
+        imagensReferencias: Array.isArray(record.imagensReferencias)
+          ? record.imagensReferencias.filter(
+              (url): url is string => typeof url === "string" && url.trim().length > 0
+            )
+          : [],
       };
     })
     .filter((arte): arte is DemandArte => arte != null);
@@ -183,9 +192,20 @@ function mapDemandRow(
       (row.magnific_space_status as MagnificSpaceStatus | undefined) ?? "not_generated",
     magnific_space_error: row.magnific_space_error ? String(row.magnific_space_error) : null,
     magnific_space_nodes: parseStoredSpaceNodes(row.magnific_space_nodes),
+    drive_folder_url: row.drive_folder_url ? String(row.drive_folder_url) : null,
+    drive_folder_id: row.drive_folder_id ? String(row.drive_folder_id) : null,
+    export_status:
+      row.export_status === "running" ||
+      row.export_status === "done" ||
+      row.export_status === "error"
+        ? row.export_status
+        : "pending",
+    export_error: row.export_error ? String(row.export_error) : null,
+    exported_at: row.exported_at ? String(row.exported_at) : null,
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
     client_name: clientName ?? null,
+    status_permitidos: extractStatusPermitidos(row.raw_payload),
   };
 }
 
@@ -226,16 +246,22 @@ export const getDemandById = cache(async (demandId: string): Promise<CreativeDem
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("creative_demands")
-    .select("*, clients(name)")
+    .select("*, clients(name, slug)")
     .eq("id", demandId)
     .maybeSingle();
 
   if (error) throwIfDbError(error);
   if (!data) return null;
 
-  const clients = data.clients as { name?: string } | { name?: string }[] | null;
-  const clientName = Array.isArray(clients) ? clients[0]?.name : clients?.name;
-  return mapDemandRow(data as Record<string, unknown>, clientName);
+  const clients = data.clients as
+    | { name?: string; slug?: string }
+    | { name?: string; slug?: string }[]
+    | null;
+  const client = Array.isArray(clients) ? clients[0] : clients;
+  return {
+    ...mapDemandRow(data as Record<string, unknown>, client?.name),
+    client_slug: client?.slug ?? null,
+  };
 });
 
 export const getDemandsMonthlyStats = cache(async (): Promise<DemandMonthStat[]> => {
@@ -299,8 +325,6 @@ export const getDemandsMonthlyStats = cache(async (): Promise<DemandMonthStat[]>
     };
   });
 });
-
-const CLOSED_STATUSES = new Set(["Concluída", "Cancelada"]);
 
 function monthKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -378,7 +402,7 @@ export const getDashboardAnalytics = cache(async (): Promise<DashboardAnalytics>
     totalDemands += 1;
     totalArtes += artes;
     statusMap[status] = (statusMap[status] ?? 0) + 1;
-    if (!CLOSED_STATUSES.has(status)) activeDemands += 1;
+    if (!isClosedStatus(status)) activeDemands += 1;
 
     if (typeof row.elapsed_seconds === "number" && row.elapsed_seconds > 0) {
       turnaroundList.push(row.elapsed_seconds);
@@ -402,7 +426,7 @@ export const getDashboardAnalytics = cache(async (): Promise<DashboardAnalytics>
     else if (t >= prevWeekStart) { demandsWeekPrev += 1; artesWeekPrev += artes; }
 
     // Concluídas neste mês (pela data de conclusão)
-    if (status === "Concluída" && row.completed_at) {
+    if (isDoneStatus(status) && row.completed_at) {
       if (monthKey(new Date(row.completed_at)) === currentKey) completedThisMonth += 1;
     }
   }
