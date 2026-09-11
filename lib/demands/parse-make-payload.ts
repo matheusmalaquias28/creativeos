@@ -12,6 +12,15 @@ function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : value != null ? String(value) : "";
 }
 
+/** Primeiro valor que vira uma string não-vazia após trim; senão "". */
+function firstNonEmpty(...values: unknown[]): string {
+  for (const value of values) {
+    const str = asString(value);
+    if (str) return str;
+  }
+  return "";
+}
+
 function asNumberOrNull(value: unknown): number | null {
   if (value == null || value === "") return null;
   const parsed = Number(value);
@@ -146,22 +155,37 @@ function parseArtesArray(payload: UnknownRecord): DemandArte[] {
 
 function parseBriefing(payload: UnknownRecord): DemandBriefing {
   const briefing = asRecord(payload.briefing);
+  const cliente = asRecord(payload.cliente);
+
+  // A pasta do Drive pode chegar em `briefing.driveMateriais`, no topo
+  // (`driveMateriais`) ou, como último recurso, no `cliente.drive` (a pasta
+  // geral do cliente). Pega o primeiro não-vazio.
+  const driveMateriais = firstNonEmpty(
+    briefing.driveMateriais,
+    payload["briefing.driveMateriais"],
+    payload.driveMateriais,
+    cliente.drive
+  );
 
   return {
-    titulo: asString(briefing.titulo ?? payload["briefing.titulo"]),
+    titulo: asString(briefing.titulo ?? payload["briefing.titulo"] ?? payload.titulo),
     instagramCliente: asString(
-      briefing.instagramCliente ?? payload["briefing.instagramCliente"]
+      briefing.instagramCliente ??
+        payload["briefing.instagramCliente"] ??
+        payload.instagramCliente
     ),
     tipo: asString(briefing.tipo ?? payload["briefing.tipo"]),
     quantidadeArtes: asNumberOrNull(
-      briefing.quantidadeArtes ?? payload["briefing.quantidadeArtes"]
+      briefing.quantidadeArtes ??
+        payload["briefing.quantidadeArtes"] ??
+        payload.quantidadeArtes
     ),
     materiaisEditados: asString(
-      briefing.materiaisEditados ?? payload["briefing.materiaisEditados"]
+      briefing.materiaisEditados ??
+        payload["briefing.materiaisEditados"] ??
+        payload.materiaisEditados
     ),
-    driveMateriais: asString(
-      briefing.driveMateriais ?? payload["briefing.driveMateriais"]
-    ),
+    driveMateriais,
   };
 }
 

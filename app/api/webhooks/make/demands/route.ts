@@ -20,17 +20,27 @@ type CreativeDemandInsert =
 // create + edit + polling pode passar de 1 minuto).
 export const maxDuration = 300;
 
+/**
+ * Aceita o secret tanto do Make (`MAKE_WEBHOOK_SECRET`) quanto do WAR direto
+ * (`DEMANDAS_WEBHOOK_SECRET`, o mesmo par usado no callback de status), para
+ * suportar a transição Make → comunicação direta sem downtime. Reconhece os
+ * headers `x-webhook-secret`, `x-api-key` e `Authorization: Bearer <secret>`.
+ * Se nenhum secret estiver configurado no ambiente, libera (dev).
+ */
 function verifyWebhookSecret(request: Request): boolean {
-  const secret = process.env.MAKE_WEBHOOK_SECRET;
-  if (!secret) return true;
+  const secrets = [
+    process.env.MAKE_WEBHOOK_SECRET,
+    process.env.DEMANDAS_WEBHOOK_SECRET,
+  ].filter((s): s is string => Boolean(s));
+  if (secrets.length === 0) return true;
 
-  const headerSecret = request.headers.get("x-webhook-secret");
-  if (headerSecret === secret) return true;
+  const provided = [
+    request.headers.get("x-webhook-secret"),
+    request.headers.get("x-api-key"),
+    request.headers.get("authorization")?.replace(/^Bearer\s+/i, ""),
+  ].filter((v): v is string => Boolean(v));
 
-  const authHeader = request.headers.get("authorization");
-  if (authHeader === `Bearer ${secret}`) return true;
-
-  return false;
+  return provided.some((value) => secrets.includes(value));
 }
 
 /**
