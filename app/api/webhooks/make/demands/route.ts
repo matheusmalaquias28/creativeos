@@ -8,6 +8,7 @@ import { parseMakeDemandPayload } from "@/lib/demands/parse-make-payload";
 import { triggerMagnificGeneration } from "@/lib/magnific/trigger-generation";
 import {
   collectDemandDriveUrls,
+  isMateriaisEditadosMissing,
   resolveDemandDriveFolder,
 } from "@/lib/export/drive-folder";
 import { DEMAND_INITIAL_STATUS } from "@/types/demand";
@@ -152,6 +153,13 @@ export async function POST(request: Request) {
       artes: parsed.artes,
     })
   );
+
+  if (isMateriaisEditadosMissing(parsed.briefing)) {
+    console.warn(
+      `[webhook/make/demands] demanda ${parsed.externalId} (${parsed.clientName}) sem link de Materiais Editados`
+    );
+  }
+
   const row: CreativeDemandInsert = {
     external_id: parsed.externalId,
     client_id: matchedClient?.id ?? null,

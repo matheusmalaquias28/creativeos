@@ -46,7 +46,8 @@ function parseBriefingSummary(value: unknown): DemandBriefing {
     instagramCliente: "",
     tipo: typeof record.tipo === "string" ? record.tipo : "",
     quantidadeArtes: null,
-    materiaisEditados: "",
+    materiaisEditados:
+      typeof record.materiaisEditados === "string" ? record.materiaisEditados : "",
     driveMateriais: "",
   };
 }

@@ -14,11 +14,13 @@ import {
 } from "@/lib/demands/demand-color";
 import { displayExternalClientName } from "@/lib/demands/normalize-client-name";
 import { getDemandCardTitle, getDemandCardTipo } from "@/lib/demands/demand-card-copy";
+import { isMateriaisEditadosMissing } from "@/lib/export/drive-folder";
 import { cn } from "@/lib/utils";
 import type { DemandClientOption } from "@/components/demands/demand-client-linker";
 import {
   DEMAND_STATUSES,
   DEMAND_INITIAL_STATUS,
+  DEMAND_QUEUE_STATUS,
   DEMAND_DONE_STATUS,
   isClosedStatus,
   type CreativeDemandListItem,
@@ -29,10 +31,21 @@ import {
 
 const KNOWN_STATUSES = new Set<string>(DEMAND_STATUSES);
 
+/**
+ * Coluna à parte para status nulos/"custom" que o WAR pode mandar e que não
+ * têm coluna própria no vocabulário fixo. Nunca cai no card inicial — só aqui.
+ */
+const UNKNOWN_STATUS_COLUMN = "__status_desconhecido__" as const;
+type KanbanColumnId = DemandStatus | typeof UNKNOWN_STATUS_COLUMN;
+
+function isUnknownStatus(d: CreativeDemandListItem): boolean {
+  return !d.status || !KNOWN_STATUSES.has(d.status);
+}
+
 // ─── Column config ───────────────────────────────────────────────────────────
 
 type KanbanColumn = {
-  status: DemandStatus;
+  status: KanbanColumnId;
   label: string;
   dot: string;
   header: string;
@@ -58,18 +71,28 @@ const COLUMN_STYLE: Record<
   gray: { header: "text-zinc-500", border: "border-zinc-500/15 hover:border-zinc-500/30", bg: "dark:bg-zinc-500/2" },
 };
 
-const COLUMNS: KanbanColumn[] = DEMAND_STATUSES.map((status) => {
-  const color = getStatusColorState(status);
-  const style = COLUMN_STYLE[color];
-  return {
-    status,
-    label: COLUMN_LABELS[status] ?? status,
-    dot: GROUP_DOT_CLASSES[color],
-    header: style.header,
-    border: style.border,
-    bg: style.bg,
-  };
-});
+const COLUMNS: KanbanColumn[] = [
+  ...DEMAND_STATUSES.map((status) => {
+    const color = getStatusColorState(status);
+    const style = COLUMN_STYLE[color];
+    return {
+      status,
+      label: COLUMN_LABELS[status] ?? status,
+      dot: GROUP_DOT_CLASSES[color],
+      header: style.header,
+      border: style.border,
+      bg: style.bg,
+    };
+  }),
+  {
+    status: UNKNOWN_STATUS_COLUMN,
+    label: "Status Desconhecido",
+    dot: GROUP_DOT_CLASSES.gray,
+    header: COLUMN_STYLE.gray.header,
+    border: COLUMN_STYLE.gray.border,
+    bg: COLUMN_STYLE.gray.bg,
+  },
+];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -107,6 +130,7 @@ function KanbanCard({
     "Pendente de cadastro";
   const title = getDemandCardTitle(demand);
   const tipo = getDemandCardTipo(demand);
+  const missingMateriaisEditados = isMateriaisEditadosMissing(demand.briefing);
 
   return (
     <article
@@ -147,6 +171,16 @@ function KanbanCard({
         {tipo && (
           <span className="inline-flex max-w-full truncate rounded-full border border-white/10 bg-black/20 px-2 py-0.5 text-[0.5625rem] font-medium text-foreground/80">
             {tipo}
+          </span>
+        )}
+
+        {missingMateriaisEditados && (
+          <span
+            title="Demanda sem link de Materiais Editados"
+            className="inline-flex max-w-full items-center gap-1 truncate rounded-full border border-amber-500/20 bg-amber-500/8 px-2 py-0.5 text-[0.5625rem] font-medium text-amber-400/90"
+          >
+            <AlertTriangle className="size-2.5 shrink-0" />
+            Sem Materiais Editados
           </span>
         )}
 
@@ -298,18 +332,34 @@ export function DemandsKanbanBoard({ initialDemands }: Props) {
       setDemands(initialDemands);
     }
   }, [initialDemands]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [overColumn, setOverColumn] = useState<DemandStatus | null>(null);
+  const [overColumn, setOverColumn] = useState<KanbanColumnId | null>(null);
   const dragDemandRef = useRef<CreativeDemandListItem | null>(null);
 
   const getDemandsByStatus = useCallback(
-    (status: DemandStatus) =>
-      demands.filter((d) =>
-        // A coluna inicial acumula também demandas sem status ou com status
-        // "custom" do WAR que não têm coluna própria.
-        status === DEMAND_INITIAL_STATUS
-          ? d.status === status || !d.status || !KNOWN_STATUSES.has(d.status)
-          : d.status === status
-      ),
+    (status: KanbanColumnId) => {
+      // Status nulo/"custom" do WAR: sempre vai para a coluna à parte, nunca
+      // para o card inicial — mesmo sem data de entrega.
+      if (status === UNKNOWN_STATUS_COLUMN) {
+        return demands.filter(isUnknownStatus);
+      }
+
+      if (status === DEMAND_INITIAL_STATUS) {
+        // Só fica no 1º card quem tem o status inicial E ainda não tem data de
+        // entrega — assim que o WAR define a data, a demanda passa para "Em
+        // Fila" mesmo que o status em si ainda não tenha mudado por lá.
+        return demands.filter((d) => d.status === status && !d.due_date);
+      }
+
+      if (status === DEMAND_QUEUE_STATUS) {
+        return demands.filter(
+          (d) =>
+            d.status === status ||
+            (d.status === DEMAND_INITIAL_STATUS && Boolean(d.due_date))
+        );
+      }
+
+      return demands.filter((d) => d.status === status);
+    },
     [demands]
   );
 
@@ -329,7 +379,10 @@ export function DemandsKanbanBoard({ initialDemands }: Props) {
   }, []);
 
   const handleColumnDragOver = useCallback(
-    (status: DemandStatus) => (e: React.DragEvent) => {
+    (status: KanbanColumnId) => (e: React.DragEvent) => {
+      // A coluna de status desconhecido não é um destino válido — não dá para
+      // "escolher" um status custom do WAR pelo Kanban.
+      if (status === UNKNOWN_STATUS_COLUMN) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
       setOverColumn(status);
@@ -342,7 +395,8 @@ export function DemandsKanbanBoard({ initialDemands }: Props) {
   }, []);
 
   const handleColumnDrop = useCallback(
-    (targetStatus: DemandStatus) => async (e: React.DragEvent) => {
+    (targetStatus: KanbanColumnId) => async (e: React.DragEvent) => {
+      if (targetStatus === UNKNOWN_STATUS_COLUMN) return;
       e.preventDefault();
       setOverColumn(null);
 

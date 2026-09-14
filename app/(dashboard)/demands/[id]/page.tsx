@@ -33,6 +33,7 @@ import { getAuthUser } from "@/lib/auth/session";
 import { displayExternalClientName } from "@/lib/demands/normalize-client-name";
 import {
   collectDemandDriveUrls,
+  isMateriaisEditadosMissing,
   resolveDemandDriveFolder,
 } from "@/lib/export/drive-folder";
 import { getGoogleDriveAuth } from "@/lib/google/drive";
@@ -125,6 +126,7 @@ export default async function DemandDetailPage({ params }: PageProps) {
   );
   const driveFolderUrl = demand.drive_folder_url || driveFolder.url;
   const driveFolderId = demand.drive_folder_id || driveFolder.id;
+  const missingMateriaisEditados = isMateriaisEditadosMissing(demand.briefing);
 
   return (
     <DashboardPage title={title}>
@@ -205,10 +207,19 @@ export default async function DemandDetailPage({ params }: PageProps) {
               <ExternalLink className="size-3" />
             </a>
           ) : null}
-          <ExternalHref
-            href={demand.briefing.materiaisEditados}
-            label="Materiais"
-          />
+          {missingMateriaisEditados ? (
+            <span
+              title="A demanda não trouxe o link de Materiais Editados — confira no WAR"
+              className="inline-flex items-center gap-1 text-amber-400"
+            >
+              Sem link de Materiais Editados
+            </span>
+          ) : (
+            <ExternalHref
+              href={demand.briefing.materiaisEditados}
+              label="Materiais"
+            />
+          )}
           <ExternalHref
             href={driveFolderUrl || demand.briefing.driveMateriais}
             label="Drive"

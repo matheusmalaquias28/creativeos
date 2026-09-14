@@ -3,6 +3,7 @@ import {
   collectDemandDriveUrls,
   extractDriveFolderId,
   isGoogleDriveUrl,
+  isMateriaisEditadosMissing,
   resolveDemandDriveFolder,
 } from "@/lib/export/drive-folder";
 
@@ -78,11 +79,40 @@ describe("resolveDemandDriveFolder", () => {
     expect(resolveDemandDriveFolder(urls)).toEqual({ url: null, id: null });
   });
 
-  it("prioriza o driveMateriais do briefing quando presente", () => {
+  it("cai no driveMateriais do briefing quando materiaisEditados vem vazio", () => {
     const urls = collectDemandDriveUrls({
       briefing: { driveMateriais: drive, materiaisEditados: "" },
       artes: [{ linkReferencias: "https://pin.it/x" }],
     });
     expect(resolveDemandDriveFolder(urls).id).toBe("1hb3C8iFlIj_9HTBSedDYcPdYWH2Su7r0");
+  });
+
+  it("prioriza materiaisEditados sobre driveMateriais quando ambos estão presentes", () => {
+    const materiaisEditados =
+      "https://drive.google.com/drive/folders/2editadosFolderId000000000";
+    const urls = collectDemandDriveUrls({
+      briefing: { driveMateriais: drive, materiaisEditados },
+    });
+    expect(resolveDemandDriveFolder(urls)).toEqual({
+      url: materiaisEditados,
+      id: "2editadosFolderId000000000",
+    });
+  });
+});
+
+describe("isMateriaisEditadosMissing", () => {
+  it("true quando o campo vem vazio, ausente ou só com espaços", () => {
+    expect(isMateriaisEditadosMissing({ materiaisEditados: "" })).toBe(true);
+    expect(isMateriaisEditadosMissing({ materiaisEditados: "   " })).toBe(true);
+    expect(isMateriaisEditadosMissing(null)).toBe(true);
+    expect(isMateriaisEditadosMissing(undefined)).toBe(true);
+  });
+
+  it("false quando há um link", () => {
+    expect(
+      isMateriaisEditadosMissing({
+        materiaisEditados: "https://drive.google.com/drive/folders/1hb3C8iFlIj_9HTBSedDYcPdYWH2Su7r0",
+      })
+    ).toBe(false);
   });
 });

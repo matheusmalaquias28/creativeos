@@ -796,6 +796,125 @@ export type Database = {
         }>;
         Relationships: [];
       };
+      client_subscriptions: {
+        Row: {
+          id: string;
+          source: string;
+          external_id: string;
+          client_id: string | null;
+          client_not_found: boolean;
+          buyer_name: string;
+          buyer_email: string;
+          product_name: string | null;
+          status: "active" | "payment_issue" | "canceled";
+          hubla_status: string | null;
+          auto_renew: boolean;
+          payment_method: string | null;
+          billing_cycle_months: number;
+          amount_cents: number;
+          currency: string;
+          salesperson: "matheus" | "paulo_junior" | null;
+          activated_at: string | null;
+          canceled_at: string | null;
+          last_invoice_status: string | null;
+          last_invoice_due_date: string | null;
+          last_event_at: string | null;
+          raw_payload: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          source?: string;
+          external_id: string;
+          client_id?: string | null;
+          client_not_found?: boolean;
+          buyer_name?: string;
+          buyer_email?: string;
+          product_name?: string | null;
+          status?: "active" | "payment_issue" | "canceled";
+          hubla_status?: string | null;
+          auto_renew?: boolean;
+          payment_method?: string | null;
+          billing_cycle_months?: number;
+          amount_cents?: number;
+          currency?: string;
+          salesperson?: "matheus" | "paulo_junior" | null;
+          activated_at?: string | null;
+          canceled_at?: string | null;
+          last_invoice_status?: string | null;
+          last_invoice_due_date?: string | null;
+          last_event_at?: string | null;
+          raw_payload?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<{
+          client_id: string | null;
+          client_not_found: boolean;
+          buyer_name: string;
+          buyer_email: string;
+          product_name: string | null;
+          status: "active" | "payment_issue" | "canceled";
+          hubla_status: string | null;
+          auto_renew: boolean;
+          payment_method: string | null;
+          billing_cycle_months: number;
+          amount_cents: number;
+          currency: string;
+          salesperson: "matheus" | "paulo_junior" | null;
+          activated_at: string | null;
+          canceled_at: string | null;
+          last_invoice_status: string | null;
+          last_invoice_due_date: string | null;
+          last_event_at: string | null;
+          raw_payload: Json;
+          updated_at: string;
+        }>;
+        Relationships: [
+          {
+            foreignKeyName: "client_subscriptions_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      client_subscription_payments: {
+        Row: {
+          id: string;
+          subscription_id: string;
+          invoice_external_id: string;
+          amount_cents: number;
+          currency: string;
+          paid_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          subscription_id: string;
+          invoice_external_id: string;
+          amount_cents: number;
+          currency?: string;
+          paid_at?: string;
+          created_at?: string;
+        };
+        Update: Partial<{
+          amount_cents: number;
+          currency: string;
+          paid_at: string;
+        }>;
+        Relationships: [
+          {
+            foreignKeyName: "client_subscription_payments_subscription_id_fkey";
+            columns: ["subscription_id"];
+            isOneToOne: false;
+            referencedRelation: "client_subscriptions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       carousel_profiles: {
         Row: {
           id: string;

@@ -17,6 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 import { displayExternalClientName } from "@/lib/demands/normalize-client-name";
 import { getDemandCardTitle, getDemandCardTipo } from "@/lib/demands/demand-card-copy";
+import { isMateriaisEditadosMissing } from "@/lib/export/drive-folder";
 import type { CreativeDemandListItem } from "@/types/demand";
 
 function formatDate(value: string | null): string {
@@ -88,6 +89,7 @@ export function DemandCard({
   const tipo = getDemandCardTipo(demand);
   const colorState = getDemandColorState({ ...demand, client_not_found: clientNotFound });
   const theme = CARD_NEON_THEMES[colorState];
+  const missingMateriaisEditados = isMateriaisEditadosMissing(demand.briefing);
 
   function handleClientLinked(linkedClientId: string, linkedClientName: string) {
     setClientNotFound(false);
@@ -150,6 +152,16 @@ export function DemandCard({
                 className="border-white/10 bg-black/20 text-[0.65rem] text-foreground/80"
               >
                 {tipo}
+              </Badge>
+            )}
+            {missingMateriaisEditados && (
+              <Badge
+                variant="outline"
+                title="Demanda sem link de Materiais Editados"
+                className="gap-1 border-amber-500/40 bg-amber-500/10 text-amber-300"
+              >
+                <AlertTriangle className="size-3" />
+                Sem Materiais Editados
               </Badge>
             )}
           </div>
