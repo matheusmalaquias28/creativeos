@@ -240,6 +240,10 @@ function KanbanCard({
 
 // ─── Kanban Column ────────────────────────────────────────────────────────────
 
+/** Cards empilhados por coluna antes de precisar clicar em "Ver mais" — evita
+ * colunas gigantes que jogam a barra de rolagem horizontal pro fim da página. */
+const VISIBLE_CARDS_LIMIT = 5;
+
 function KanbanColumn({
   column,
   demands,
@@ -261,6 +265,10 @@ function KanbanColumn({
   onCardDragStart: (demand: CreativeDemandListItem) => (e: React.DragEvent) => void;
   onCardDragEnd: () => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const visibleDemands = expanded ? demands : demands.slice(0, VISIBLE_CARDS_LIMIT);
+  const hiddenCount = demands.length - visibleDemands.length;
+
   return (
     <div className="flex w-[272px] shrink-0 flex-col gap-3">
       {/* Column header */}
@@ -294,7 +302,7 @@ function KanbanColumn({
               <p className="text-[0.6875rem] text-muted-foreground/40">Vazio</p>
             </div>
           ) : (
-            demands.map((demand) => (
+            visibleDemands.map((demand) => (
               <KanbanCard
                 key={demand.id}
                 demand={demand}
@@ -303,6 +311,26 @@ function KanbanColumn({
                 onDragEnd={onCardDragEnd}
               />
             ))
+          )}
+
+          {hiddenCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setExpanded(true)}
+              className="rounded-lg border border-dashed border-white/10 py-2 text-[0.6875rem] font-medium text-muted-foreground/70 transition-colors hover:border-white/20 hover:text-foreground"
+            >
+              Ver mais {hiddenCount}
+            </button>
+          )}
+
+          {expanded && demands.length > VISIBLE_CARDS_LIMIT && (
+            <button
+              type="button"
+              onClick={() => setExpanded(false)}
+              className="rounded-lg border border-dashed border-white/10 py-2 text-[0.6875rem] font-medium text-muted-foreground/70 transition-colors hover:border-white/20 hover:text-foreground"
+            >
+              Ver menos
+            </button>
           )}
 
           {/* Drop target indicator */}
