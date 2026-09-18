@@ -5,10 +5,44 @@ import { createClient } from "@/lib/supabase/server";
 import { mergeLegacyDemandFlowIntoClient } from "@/services/flow";
 import { linkUnmatchedDemandsByExternalName } from "@/lib/demands/link-unmatched-siblings";
 import { notifyWarStatusChange } from "@/lib/demands/war-status-callback";
+import { externalClientIdFromPayload } from "@/lib/demands/parse-make-payload";
 import type { Database, Json } from "@/types/database";
 import { DEMAND_WORKING_STATUS, isDoneStatus, type DemandArte } from "@/types/demand";
 
 type DemandUpdate = Database["public"]["Tables"]["creative_demands"]["Update"];
+
+/**
+ * Grava (sobrescrevendo) o ID fixo do WAR em `clients.company_info.external_id`
+ * a partir do `raw_payload` da demanda recém-vinculada. O ID da demanda é a fonte
+ * da verdade após a mudança de termo no WAR, então ele prevalece sobre o que
+ * estiver gravado no cliente. No-op quando o payload não traz ID ou ele já bate.
+ */
+async function adoptClientExternalId(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  clientId: string,
+  rawPayload: unknown
+): Promise<void> {
+  const externalId = externalClientIdFromPayload(rawPayload);
+  if (!externalId) return;
+
+  const { data } = await supabase
+    .from("clients")
+    .select("company_info")
+    .eq("id", clientId)
+    .maybeSingle();
+
+  const info =
+    data?.company_info && typeof data.company_info === "object"
+      ? (data.company_info as Record<string, unknown>)
+      : {};
+
+  if (info.external_id === externalId) return;
+
+  await supabase
+    .from("clients")
+    .update({ company_info: { ...info, external_id: externalId } })
+    .eq("id", clientId);
+}
 
 export type DemandStatusState = {
   error?: string;
@@ -190,7 +224,7 @@ export async function linkDemandToClientAction(
 
   const { data: demand, error: demandError } = await supabase
     .from("creative_demands")
-    .select("id, client_name_external")
+    .select("id, client_name_external, raw_payload")
     .eq("id", demandId)
     .maybeSingle();
 
@@ -220,6 +254,16 @@ export async function linkDemandToClientAction(
   if (!data) {
     return { error: "Não foi possível vincular a demanda." };
   }
+
+  // A demanda carrega o ID fixo do cliente no WAR (o "certo"). Ao vincular
+  // manualmente, gravamos esse ID no cliente do CreativeOS — sobrescrevendo o
+  // antigo — para que as próximas demandas do mesmo cliente casem direto pelo ID
+  // (ver resolveDemandClient) em vez de caírem no fallback por nome.
+  await adoptClientExternalId(supabase, client.id, demand.raw_payload).catch(
+    (err) => {
+      console.error("[linkDemandToClientAction] adoção de external_id falhou:", err);
+    }
+  );
 
   const siblingIds = await linkUnmatchedDemandsByExternalName(supabase, {
     clientId: client.id,

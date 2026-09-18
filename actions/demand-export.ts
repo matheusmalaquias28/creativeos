@@ -32,8 +32,21 @@ export type DemandExportActionState = {
   report?: DemandExportReport;
 };
 
-function parseFormat(value: FormDataEntryValue | null): ExportFormat | null {
-  return value === "feed" || value === "story" ? value : null;
+export type DemandExportUploadTarget = {
+  signedUrl: string;
+  token: string;
+  storagePath: string;
+  filename: string;
+  publicUrl: string;
+};
+
+export type DemandExportUploadTargetState = {
+  error?: string;
+  target?: DemandExportUploadTarget;
+};
+
+function isExportFormat(value: unknown): value is ExportFormat {
+  return value === "feed" || value === "story";
 }
 
 async function requireUser() {
@@ -45,37 +58,27 @@ async function requireUser() {
   return { user, supabase };
 }
 
-export async function uploadDemandExportFileAction(
-  demandId: string,
-  formData: FormData
-): Promise<DemandExportActionState> {
-  const auth = await requireUser();
-  if ("error" in auth && !("user" in auth)) return { error: auth.error };
-
-  const format = parseFormat(formData.get("format"));
-  const artIndex = Number(formData.get("artIndex"));
-  const file = formData.get("file");
-
-  if (!format || !Number.isInteger(artIndex) || artIndex < 1) {
-    return { error: "Slot inválido" };
-  }
-  if (!(file instanceof File)) {
-    return { error: "Selecione um arquivo" };
-  }
-  if (!ALLOWED_TYPES.includes(file.type)) {
-    return { error: `Formato não suportado: ${file.name}` };
-  }
-  if (file.size > MAX_FILE_SIZE) {
-    return { error: `${file.name} passa de 10MB` };
-  }
-
-  const { data: demand, error: demandError } = await auth.supabase
+/**
+ * Resolve o nome de arquivo determinístico de um slot de entrega (título +
+ * cliente + formato + índice) a partir da demanda. Compartilhado entre a criação
+ * da URL assinada e o registro do metadado para que os dois cheguem exatamente ao
+ * mesmo `storage_path` — o cliente nunca escolhe o caminho.
+ */
+async function resolveExportFilename(params: {
+  demandId: string;
+  artIndex: number;
+  format: ExportFormat;
+  fileName?: string;
+  mimeType?: string;
+}): Promise<{ filename: string; storagePath: string } | { error: string }> {
+  const admin = createAdminClient();
+  const { data: demand, error } = await admin
     .from("creative_demands")
     .select("id, tipo, briefing, client_name_external, clients(name, slug)")
-    .eq("id", demandId)
+    .eq("id", params.demandId)
     .maybeSingle();
 
-  if (demandError) return { error: demandError.message };
+  if (error) return { error: error.message };
   if (!demand) return { error: "Demanda não encontrada" };
 
   const briefing = (demand.briefing ?? {}) as { titulo?: string };
@@ -91,45 +94,132 @@ export async function uploadDemandExportFileAction(
     }),
     clientName: client?.name || demand.client_name_external,
     clientSlug: client?.slug,
-    format,
-    index: artIndex,
-    fileName: file.name,
-    mimeType: file.type,
+    format: params.format,
+    index: params.artIndex,
+    fileName: params.fileName,
+    mimeType: params.mimeType,
   });
+
+  return { filename, storagePath: `${params.demandId}/${filename}` };
+}
+
+/**
+ * Emite uma URL assinada para o navegador subir a arte DIRETO no Supabase Storage,
+ * sem passar os bytes pela Server Action. Isso contorna o limite de corpo de
+ * requisição do Vercel (~4.5MB), que silenciosamente descartava as artes maiores —
+ * tipicamente os stories 9:16, que costumam pesar mais que o feed. Depois do upload
+ * o cliente chama `recordDemandExportFileAction` para gravar o metadado.
+ */
+export async function createDemandExportUploadTargetAction(params: {
+  demandId: string;
+  artIndex: number;
+  format: string;
+  fileName: string;
+  mimeType: string;
+}): Promise<DemandExportUploadTargetState> {
+  const auth = await requireUser();
+  if ("error" in auth && !("user" in auth)) return { error: auth.error };
+
+  if (!isExportFormat(params.format)) return { error: "Slot inválido" };
+  if (!Number.isInteger(params.artIndex) || params.artIndex < 1) {
+    return { error: "Slot inválido" };
+  }
+  if (!ALLOWED_TYPES.includes(params.mimeType)) {
+    return { error: `Formato não suportado: ${params.fileName}` };
+  }
+
+  const resolved = await resolveExportFilename({
+    demandId: params.demandId,
+    artIndex: params.artIndex,
+    format: params.format,
+    fileName: params.fileName,
+    mimeType: params.mimeType,
+  });
+  if ("error" in resolved) return { error: resolved.error };
+
+  const admin = createAdminClient();
+  const { data, error } = await admin.storage
+    .from(BUCKET)
+    .createSignedUploadUrl(resolved.storagePath, { upsert: true });
+
+  if (error || !data) {
+    return { error: error?.message ?? "Não foi possível preparar o upload" };
+  }
+
+  const { data: publicUrl } = admin.storage
+    .from(BUCKET)
+    .getPublicUrl(resolved.storagePath);
+
+  return {
+    target: {
+      signedUrl: data.signedUrl,
+      token: data.token,
+      storagePath: resolved.storagePath,
+      filename: resolved.filename,
+      publicUrl: publicUrl.publicUrl,
+    },
+  };
+}
+
+/**
+ * Registra o metadado de uma arte já enviada ao Storage (via URL assinada). O
+ * corpo é pequeno (só metadado), então não esbarra no limite de corpo do Vercel.
+ * Recalcula o `storage_path` no servidor em vez de confiar no que o cliente manda.
+ */
+export async function recordDemandExportFileAction(params: {
+  demandId: string;
+  artIndex: number;
+  format: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+}): Promise<DemandExportActionState> {
+  const auth = await requireUser();
+  if ("error" in auth && !("user" in auth)) return { error: auth.error };
+
+  if (!isExportFormat(params.format)) return { error: "Slot inválido" };
+  if (!Number.isInteger(params.artIndex) || params.artIndex < 1) {
+    return { error: "Slot inválido" };
+  }
+  if (params.fileSize > MAX_FILE_SIZE) {
+    return { error: `${params.fileName} passa de 10MB` };
+  }
+
+  const resolved = await resolveExportFilename({
+    demandId: params.demandId,
+    artIndex: params.artIndex,
+    format: params.format,
+    fileName: params.fileName,
+    mimeType: params.mimeType,
+  });
+  if ("error" in resolved) return { error: resolved.error };
 
   const admin = createAdminClient();
   const { data: existing } = await admin
     .from("demand_export_files")
     .select("id, storage_path")
-    .eq("demand_id", demandId)
-    .eq("art_index", artIndex)
-    .eq("format", format)
+    .eq("demand_id", params.demandId)
+    .eq("art_index", params.artIndex)
+    .eq("format", params.format)
     .maybeSingle();
 
-  const storagePath = `${demandId}/${filename}`;
-  const bytes = Buffer.from(await file.arrayBuffer());
-
-  const { error: uploadError } = await admin.storage
-    .from(BUCKET)
-    .upload(storagePath, bytes, { upsert: true, contentType: file.type });
-
-  if (uploadError) return { error: uploadError.message };
-
-  if (existing?.storage_path && existing.storage_path !== storagePath) {
+  if (existing?.storage_path && existing.storage_path !== resolved.storagePath) {
     await admin.storage.from(BUCKET).remove([existing.storage_path]);
   }
 
-  const { data: publicUrl } = admin.storage.from(BUCKET).getPublicUrl(storagePath);
+  const { data: publicUrl } = admin.storage
+    .from(BUCKET)
+    .getPublicUrl(resolved.storagePath);
 
   const row = {
-    demand_id: demandId,
-    art_index: artIndex,
-    format,
-    filename,
-    storage_path: storagePath,
+    demand_id: params.demandId,
+    art_index: params.artIndex,
+    format: params.format,
+    filename: resolved.filename,
+    storage_path: resolved.storagePath,
     public_url: publicUrl.publicUrl,
-    mime_type: file.type,
-    file_size: file.size,
+    mime_type: params.mimeType,
+    file_size: params.fileSize,
     drive_file_id: null,
     updated_at: new Date().toISOString(),
   };
@@ -149,9 +239,9 @@ export async function uploadDemandExportFileAction(
       export_error: null,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", demandId);
+    .eq("id", params.demandId);
 
-  revalidatePath(`/demands/${demandId}`);
+  revalidatePath(`/demands/${params.demandId}`);
   return { success: true, file: saved as DemandExportFile };
 }
 

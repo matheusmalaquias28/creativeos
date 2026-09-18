@@ -16,10 +16,12 @@ import { toast } from "sonner";
 import { ImageDropzone } from "@/components/ui/image-dropzone";
 import { Button } from "@/components/ui/button";
 import {
+  createDemandExportUploadTargetAction,
   deleteDemandExportFileAction,
   deliverDemandExportAction,
-  uploadDemandExportFileAction,
+  recordDemandExportFileAction,
 } from "@/actions/demand-export";
+import { createClient as createBrowserSupabase } from "@/lib/supabase/client";
 import { disconnectGoogleDriveAction } from "@/actions/google-drive";
 import { slotsFromDemandArtes } from "@/lib/export/art-source";
 import {
@@ -45,6 +47,8 @@ type Props = {
   initialFiles: DemandExportFile[];
   driveAuth: GoogleDriveAuth;
 };
+
+const EXPORT_BUCKET = "demand-exports";
 
 const FORMAT_META: Record<
   ExportFormat,
@@ -145,13 +149,45 @@ export function DemandDeliverDialog({
     const key = `${artIndex}-${format}`;
     setUploadingKey(key);
     try {
-      const formData = new FormData();
-      formData.set("artIndex", String(artIndex));
-      formData.set("format", format);
-      formData.set("file", file);
-      const result = await uploadDemandExportFileAction(demandId, formData);
+      // O arquivo sobe DIRETO no Storage via URL assinada; a Server Action só
+      // troca metadado. Isso evita o limite de corpo de requisição do Vercel
+      // (~4.5MB) que descartava silenciosamente os stories maiores.
+      const targetState = await createDemandExportUploadTargetAction({
+        demandId,
+        artIndex,
+        format,
+        fileName: file.name,
+        mimeType: file.type,
+      });
+      if (targetState.error || !targetState.target) {
+        toast.error(targetState.error ?? "Falha ao preparar o upload");
+        return;
+      }
+
+      const supabase = createBrowserSupabase();
+      const { error: uploadError } = await supabase.storage
+        .from(EXPORT_BUCKET)
+        .uploadToSignedUrl(
+          targetState.target.storagePath,
+          targetState.target.token,
+          file,
+          { contentType: file.type }
+        );
+      if (uploadError) {
+        toast.error(`Falha no upload: ${uploadError.message}`);
+        return;
+      }
+
+      const result = await recordDemandExportFileAction({
+        demandId,
+        artIndex,
+        format,
+        fileName: file.name,
+        mimeType: file.type,
+        fileSize: file.size,
+      });
       if (result.error || !result.file) {
-        toast.error(result.error ?? "Falha no upload");
+        toast.error(result.error ?? "Falha ao salvar a arte");
         return;
       }
       setFiles((prev) => {
@@ -161,6 +197,10 @@ export function DemandDeliverDialog({
         return [...without, result.file!];
       });
       toast.success(`Salvo como ${result.file.filename}`);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Falha inesperada no upload"
+      );
     } finally {
       setUploadingKey(null);
     }

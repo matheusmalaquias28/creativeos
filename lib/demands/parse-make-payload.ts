@@ -224,6 +224,19 @@ function collectReferenceImageUrls(
   );
 }
 
+/**
+ * Extrai o ID fixo do cliente no WAR de um `raw_payload` já armazenado (aceita
+ * tanto `clientId` no topo quanto `cliente.id`). Usado ao vincular manualmente
+ * uma demanda a um cliente existente: a demanda carrega o ID certo do WAR, então
+ * gravamos esse ID no cliente para que as próximas demandas casem direto por ID.
+ */
+export function externalClientIdFromPayload(payload: unknown): string | null {
+  const record = asRecord(payload);
+  const cliente = asRecord(record.cliente);
+  const value = asString(record.clientId ?? cliente.id);
+  return value || null;
+}
+
 export function parseMakeDemandPayload(payload: unknown): ParsedMakeDemand | null {
   const record = asRecord(payload);
   const externalId = asString(record.id);

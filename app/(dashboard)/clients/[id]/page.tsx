@@ -7,6 +7,7 @@ import {
   Sparkles,
   ArrowLeft,
   Layers,
+  CalendarClock,
 } from "lucide-react";
 import { DashboardPage } from "@/components/layout/dashboard-page";
 import { StatCard } from "@/components/dashboard/stat-card";
@@ -69,6 +70,26 @@ export default async function ClientDetailPage({ params }: PageProps) {
     (acc, demand) => acc + demand.artes.length,
     0
   );
+
+  // Data de solicitação: usa quando a demanda foi criada no WAR (external_created_at)
+  // e cai no created_at do CreativeOS como fallback.
+  const requestedAt = (demand: (typeof demands)[number]) =>
+    new Date(demand.external_created_at ?? demand.created_at);
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfLast30 = new Date(now);
+  startOfLast30.setDate(startOfLast30.getDate() - 30);
+  const demandsThisMonth = demands.filter(
+    (demand) => requestedAt(demand) >= startOfMonth
+  ).length;
+  const demandsLast30 = demands.filter(
+    (demand) => requestedAt(demand) >= startOfLast30
+  ).length;
+  const monthLabel = now.toLocaleDateString("pt-BR", {
+    month: "long",
+    year: "numeric",
+  });
+
   const opportunityFlags: string[] = [];
 
   return (
@@ -121,9 +142,22 @@ export default async function ClientDetailPage({ params }: PageProps) {
           </div>
         )}
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
-            title="Demandas"
+            title="Demandas no mês"
+            value={demandsThisMonth}
+            description={`Solicitadas em ${monthLabel}`}
+            icon={CalendarClock}
+            accent={demandsThisMonth > 0 ? "positive" : "neutral"}
+          />
+          <StatCard
+            title="Últimos 30 dias"
+            value={demandsLast30}
+            description="Demandas solicitadas no período"
+            icon={CalendarClock}
+          />
+          <StatCard
+            title="Demandas no total"
             value={totalDemands}
             description="Briefings recebidos via Make"
             icon={ClipboardList}
