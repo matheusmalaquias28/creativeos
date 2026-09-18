@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardList,
+  CreditCard,
   Globe,
   Images,
   LayoutDashboard,
@@ -37,6 +38,7 @@ const navItems: NavItem[] = [
   { href: "/clients", label: "Clientes", icon: Users },
   { href: "/demands", label: "Demandas", icon: ClipboardList },
   { href: "/web-demands", label: "Demandas Web", icon: Globe },
+  { href: "/assinaturas", label: "Assinaturas", icon: CreditCard },
   {
     href: "/carousel",
     label: "Carrosséis",

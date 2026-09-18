@@ -51,6 +51,8 @@ export type DemandStatus = (typeof DEMAND_STATUSES)[number];
 
 /** Status inicial padrão quando o WAR não envia um status na criação. */
 export const DEMAND_INITIAL_STATUS: DemandStatus = "Aguardando Definição de Data";
+/** Próximo status na fila, após a data de entrega ser definida. */
+export const DEMAND_QUEUE_STATUS: DemandStatus = "Em Fila";
 /** Status que inicia o cronômetro de execução. */
 export const DEMAND_WORKING_STATUS: DemandStatus = "Fazendo";
 /** Status terminal — conclui, arquiva e para o cronômetro. */

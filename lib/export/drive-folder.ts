@@ -53,12 +53,25 @@ export function collectDemandDriveUrls(params: {
   briefing?: { driveMateriais?: string; materiaisEditados?: string } | null;
   artes?: Array<{ linkReferencias?: string | null }> | null;
 }): Array<string | null | undefined> {
+  // `materiaisEditados` é a pasta de entrega e sempre vence `driveMateriais` (a
+  // pasta geral/bruta do cliente) quando ambas estão presentes — a demanda quase
+  // sempre traz os dois links, mas só o de Materiais Editados é o destino certo
+  // para as artes finalizadas. Ver `isMateriaisEditadosMissing` para o alerta
+  // quando esse link não vem preenchido.
   return [
     params.storedUrl,
-    params.briefing?.driveMateriais,
     params.briefing?.materiaisEditados,
+    params.briefing?.driveMateriais,
     ...(params.artes ?? []).map((arte) => arte.linkReferencias),
   ];
+}
+
+/** True quando a demanda não trouxe o link de Materiais Editados — a entrega não
+ * deve cair silenciosamente na pasta geral (`driveMateriais`) nesse caso. */
+export function isMateriaisEditadosMissing(
+  briefing?: { materiaisEditados?: string } | null
+): boolean {
+  return !briefing?.materiaisEditados?.trim();
 }
 
 export function resolveDemandDriveFolder(urls: Array<string | null | undefined>): {
