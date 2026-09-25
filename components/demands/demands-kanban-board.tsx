@@ -131,6 +131,8 @@ function KanbanCard({
   const title = getDemandCardTitle(demand);
   const tipo = getDemandCardTipo(demand);
   const missingMateriaisEditados = isMateriaisEditadosMissing(demand.briefing);
+  const missingClientMaterials =
+    Boolean(demand.client_id) && demand.client_materials_ready === false;
 
   return (
     <article
@@ -182,6 +184,18 @@ function KanbanCard({
             <AlertTriangle className="size-2.5 shrink-0" />
             Sem Materiais Editados
           </span>
+        )}
+
+        {missingClientMaterials && (
+          <Link
+            href={`/clients/${demand.client_id}/onboarding`}
+            onClick={(e) => e.stopPropagation()}
+            title="Cliente sem logo/DNA visual/referências cadastrados — geração de artes bloqueada"
+            className="inline-flex max-w-full items-center gap-1 truncate rounded-full border border-amber-500/20 bg-amber-500/8 px-2 py-0.5 text-[0.5625rem] font-medium text-amber-400/90 hover:border-amber-500/40"
+          >
+            <AlertTriangle className="size-2.5 shrink-0" />
+            Materiais do cliente pendentes
+          </Link>
         )}
 
         {/* Status externo (quando não é padrão do sistema) */}

@@ -15,6 +15,7 @@ import { WorkflowModuleCard } from "@/components/clients/workflow-module-card";
 import { GenerateBrainButton } from "@/components/creative-brain/generate-brain-button";
 import { ClientDisplayStatusBadge } from "@/components/clients/client-display-status-badge";
 import { ArchiveClientButton } from "@/components/clients/archive-client-button";
+import { ReadinessChips } from "@/components/art-director/readiness-chips";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,7 @@ import {
 } from "@/services/onboarding";
 import { getClientVisualIdentity, isVisualIdentityReady } from "@/services/visual-identity";
 import { getClientPhotos } from "@/services/client-photos";
+import { getClientArtReadiness } from "@/services/reference-assets";
 import { ClientPhotosPanel } from "@/components/clients/client-photos-panel";
 import { ClientDemandsPanel } from "@/components/demands/client-demands-panel";
 import { getDemandsByClientId } from "@/services/demands";
@@ -49,7 +51,7 @@ export default async function ClientDetailPage({ params }: PageProps) {
   const client = await getClientById(id, user.id);
   if (!client) notFound();
 
-  const [references, creativeBrain, onboarding, clientPhotos, demands, visualIdentity, briefingComplete] =
+  const [references, creativeBrain, onboarding, clientPhotos, demands, visualIdentity, briefingComplete, readiness] =
     await Promise.all([
     getClientReferences(id),
     getLatestCreativeBrain(id),
@@ -58,11 +60,12 @@ export default async function ClientDetailPage({ params }: PageProps) {
     getDemandsByClientId(id),
     getClientVisualIdentity(id),
     isClientBriefingComplete(id),
+    getClientArtReadiness(id),
   ]);
 
   const parsedOnboarding = parseOnboardingAnswers(onboarding);
   const onboardingDone = Boolean(onboarding?.completed_at) || isVisualIdentityReady(visualIdentity);
-  const logoUrl = parsedOnboarding.logoUrl ?? visualIdentity.identitySampleUrl ?? null;
+  const logoUrl = parsedOnboarding.logoUrl ?? visualIdentity.identitySampleUrls[0] ?? null;
   const brandDna = creativeBrain?.brand_dna as BrandDna | undefined;
   const hasBrandDna = Boolean(brandDna);
   const totalDemands = demands.length;
@@ -132,15 +135,37 @@ export default async function ClientDetailPage({ params }: PageProps) {
           </div>
         )}
 
-        {isVisualIdentityReady(visualIdentity) && (
-          <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-4 text-sm">
-            <p className="font-medium text-emerald-300">DNA visual ativo</p>
-            <p className="mt-1 text-muted-foreground">
+        <div
+          className={cn(
+            "rounded-lg border p-4 text-sm",
+            readiness?.is_ready
+              ? "border-emerald-500/25 bg-emerald-500/5"
+              : "border-amber-500/25 bg-amber-500/5"
+          )}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className={cn("font-medium", readiness?.is_ready ? "text-emerald-300" : "text-amber-300")}>
+              {readiness?.is_ready ? "Pronto para gerar artes" : "Cadastro de materiais incompleto"}
+            </p>
+            {!readiness?.is_ready && (
+              <Link
+                href={`/clients/${id}/onboarding`}
+                className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+              >
+                Completar cadastro
+              </Link>
+            )}
+          </div>
+          <div className="mt-2">
+            <ReadinessChips readiness={readiness} />
+          </div>
+          {isVisualIdentityReady(visualIdentity) && (
+            <p className="mt-2 text-muted-foreground">
               {visualIdentity.visualIdentityDna?.summary.slice(0, 180)}
               {(visualIdentity.visualIdentityDna?.summary.length ?? 0) > 180 ? "…" : ""}
             </p>
-          </div>
-        )}
+          )}
+        </div>
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard

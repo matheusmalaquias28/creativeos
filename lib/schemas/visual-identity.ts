@@ -47,7 +47,7 @@ export type VisualIdentityDna = z.infer<typeof visualIdentityDnaSchema>;
 export type IdentityExtractionStatus = "idle" | "extracting" | "ready" | "failed";
 
 export type ClientVisualIdentityState = {
-  identitySampleUrl: string | null;
+  identitySampleUrls: string[];
   visualIdentityDna: VisualIdentityDna | null;
   identityExtractedAt: string | null;
   identityExtractionStatus: IdentityExtractionStatus;

@@ -17,13 +17,15 @@ export const getClientVisualIdentity = cache(
     const { data } = await supabase
       .from("client_creative_profile")
       .select(
-        "identity_sample_url, visual_identity_dna, identity_extracted_at, identity_extraction_status, identity_extraction_error, base_prompt, palette"
+        "identity_sample_urls, visual_identity_dna, identity_extracted_at, identity_extraction_status, identity_extraction_error, base_prompt, palette"
       )
       .eq("client_id", clientId)
       .maybeSingle();
 
     return {
-      identitySampleUrl: data?.identity_sample_url ?? null,
+      identitySampleUrls: Array.isArray(data?.identity_sample_urls)
+        ? (data.identity_sample_urls as string[])
+        : [],
       visualIdentityDna: parseDna(data?.visual_identity_dna),
       identityExtractedAt: data?.identity_extracted_at ?? null,
       identityExtractionStatus:

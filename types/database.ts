@@ -628,6 +628,8 @@ export type Database = {
           aspect_ratio: string;
           identity_sample_url: string | null;
           identity_sample_storage_path: string | null;
+          identity_sample_urls: string[];
+          identity_sample_storage_paths: string[];
           visual_identity_dna: Json | null;
           identity_extracted_at: string | null;
           identity_extraction_status: "idle" | "extracting" | "ready" | "failed";
@@ -647,8 +649,8 @@ export type Database = {
           logo_placement?: Json;
           image_size?: "1K" | "2K" | "4K";
           aspect_ratio?: string;
-          identity_sample_url?: string | null;
-          identity_sample_storage_path?: string | null;
+          identity_sample_urls?: string[];
+          identity_sample_storage_paths?: string[];
           visual_identity_dna?: Json | null;
           identity_extracted_at?: string | null;
           identity_extraction_status?: "idle" | "extracting" | "ready" | "failed";
@@ -666,8 +668,8 @@ export type Database = {
           logo_placement: Json;
           image_size: "1K" | "2K" | "4K";
           aspect_ratio: string;
-          identity_sample_url: string | null;
-          identity_sample_storage_path: string | null;
+          identity_sample_urls: string[];
+          identity_sample_storage_paths: string[];
           visual_identity_dna: Json | null;
           identity_extracted_at: string | null;
           identity_extraction_status: "idle" | "extracting" | "ready" | "failed";

@@ -55,13 +55,18 @@ export function buildBasePromptFromDna(dna: VisualIdentityDna): string {
     .join("\n\n");
 }
 
-export async function extractVisualIdentityFromImage(
-  sampleUrl: string,
+export async function extractVisualIdentityFromImages(
+  sampleUrls: string[],
   clientName?: string
 ): Promise<VisualIdentityDna> {
-  const validated = await fetchValidatedVisionImage(sampleUrl, "identity-sample");
-  if (!validated) {
-    throw new Error("Imagem de referência inválida ou formato não suportado");
+  const validations = await Promise.all(
+    sampleUrls.map((url) => fetchValidatedVisionImage(url, "identity-sample"))
+  );
+  const validated = validations.filter(
+    (v): v is NonNullable<typeof v> => v !== null
+  );
+  if (validated.length === 0) {
+    throw new Error("Nenhuma imagem de referência válida (formato não suportado)");
   }
 
   const anthropic = getAnthropicClient();
@@ -74,17 +79,17 @@ export async function extractVisualIdentityFromImage(
       {
         role: "user",
         content: [
-          {
-            type: "image",
+          ...validated.map((v) => ({
+            type: "image" as const,
             source: {
-              type: "base64",
-              media_type: validated.mimeType,
-              data: validated.base64,
+              type: "base64" as const,
+              media_type: v.mimeType,
+              data: v.base64,
             },
-          },
+          })),
           {
             type: "text",
-            text: buildVisualIdentityUserPrompt(clientName),
+            text: buildVisualIdentityUserPrompt(clientName, validated.length),
           },
         ],
       },

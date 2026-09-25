@@ -20,7 +20,7 @@ export async function loadFlowCreativeProfile(
   const [{ data: profile }, { data: refRows }, { data: onboarding }] = await Promise.all([
     supabase
       .from("client_creative_profile")
-      .select("logo_url, style_reference_urls, identity_sample_url")
+      .select("logo_url, style_reference_urls, identity_sample_urls")
       .eq("client_id", clientId)
       .maybeSingle(),
     supabase
@@ -45,7 +45,7 @@ export async function loadFlowCreativeProfile(
   const referenceUrls = Array.from(
     new Set([
       ...(profile?.style_reference_urls ?? []),
-      ...(profile?.identity_sample_url ? [profile.identity_sample_url] : []),
+      ...(profile?.identity_sample_urls ?? []),
       ...(refRows ?? []).map((r) => r.public_url),
     ])
   );

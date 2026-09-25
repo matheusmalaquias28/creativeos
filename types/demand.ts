@@ -121,6 +121,11 @@ export type CreativeDemandListItem = CreativeDemand & {
   artes_count?: number;
   /** Status aceitos pelo WAR para esta demanda (extraídos do raw_payload). */
   status_permitidos?: string[];
+  /**
+   * `client_art_readiness.is_ready` do cliente vinculado — null quando não há
+   * cliente vinculado ainda. Usado pro badge "materiais pendentes" no Kanban.
+   */
+  client_materials_ready?: boolean | null;
 };
 
 export type DemandMonthStat = {

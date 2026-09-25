@@ -82,7 +82,8 @@ const DEMAND_LIST_SELECT =
 
 function mapDemandListRow(
   row: Record<string, unknown>,
-  clientName?: string | null
+  clientName?: string | null,
+  clientMaterialsReady?: boolean | null
 ): CreativeDemandListItem {
   const artesCount = parseArtesCount(row.artes);
   return {
@@ -118,6 +119,7 @@ function mapDemandListRow(
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
     client_name: clientName ?? null,
+    client_materials_ready: clientMaterialsReady ?? null,
   };
 }
 
@@ -221,10 +223,35 @@ export const getDemandsForUser = cache(
 
     if (error) throwIfDbError(error);
 
-    return (data ?? []).map((row) => {
+    const rows = data ?? [];
+    const clientIds = Array.from(
+      new Set(
+        rows
+          .map((row) => (row as Record<string, unknown>).client_id)
+          .filter((id): id is string => typeof id === "string")
+      )
+    );
+
+    // Lido à parte (não dá pra fazer join direto na view client_art_readiness) —
+    // computado na leitura, igual ao badge "sem Materiais Editados", sem coluna
+    // nova em creative_demands nem gancho no webhook do Make.
+    const readinessByClient = new Map<string, boolean>();
+    if (clientIds.length > 0) {
+      const { data: readinessRows } = await supabase
+        .from("client_art_readiness")
+        .select("client_id, is_ready")
+        .in("client_id", clientIds);
+      for (const r of readinessRows ?? []) {
+        readinessByClient.set(r.client_id as string, Boolean(r.is_ready));
+      }
+    }
+
+    return rows.map((row) => {
       const clients = row.clients as { name?: string } | { name?: string }[] | null;
       const clientName = Array.isArray(clients) ? clients[0]?.name : clients?.name;
-      return mapDemandListRow(row as Record<string, unknown>, clientName);
+      const clientId = (row as Record<string, unknown>).client_id as string | null;
+      const clientMaterialsReady = clientId ? (readinessByClient.get(clientId) ?? null) : null;
+      return mapDemandListRow(row as Record<string, unknown>, clientName, clientMaterialsReady);
     });
   }
 );

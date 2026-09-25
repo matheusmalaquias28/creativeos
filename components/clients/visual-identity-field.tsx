@@ -1,18 +1,34 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Check, Copy, Loader2, Palette, RefreshCw, Sparkles, Trash2, Type, Wand2 } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Loader2,
+  Palette,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Sparkles,
+  Trash2,
+  Type,
+  Wand2,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   removeIdentitySampleAction,
   retryIdentityExtractionAction,
+  updateVisualIdentityDnaAction,
   uploadIdentitySampleAction,
 } from "@/actions/visual-identity";
 import { createClient } from "@/lib/supabase/client";
 import { ImageDropzone } from "@/components/ui/image-dropzone";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { isValidHexColor, normalizeHexColor } from "@/lib/utils/color";
 import {
   visualIdentityDnaSchema,
   type ClientVisualIdentityState,
@@ -21,6 +37,138 @@ import {
 } from "@/lib/schemas/visual-identity";
 
 const ACCEPT = "image/jpeg,image/png,image/webp";
+const MAX_SAMPLES = 5;
+
+/** Editor de lista de chips (palavras-chave, elementos fixos, evitar). */
+function TagListEditor({
+  values,
+  onChange,
+  placeholder,
+}: {
+  values: string[];
+  onChange: (next: string[]) => void;
+  placeholder?: string;
+}) {
+  const [draft, setDraft] = useState("");
+
+  function commit() {
+    const v = draft.trim();
+    if (!v) return;
+    onChange([...values, v]);
+    setDraft("");
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex flex-wrap gap-1">
+        {values.map((v, i) => (
+          <span
+            key={`${v}-${i}`}
+            className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-black/20 px-1.5 py-0.5 text-[0.625rem] text-foreground/80"
+          >
+            {v}
+            <button
+              type="button"
+              onClick={() => onChange(values.filter((_, idx) => idx !== i))}
+              className="text-muted-foreground hover:text-foreground"
+              aria-label={`Remover ${v}`}
+            >
+              <X className="size-2.5" />
+            </button>
+          </span>
+        ))}
+      </div>
+      <div className="flex gap-1">
+        <Input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commit();
+            }
+          }}
+          placeholder={placeholder}
+          className="h-7 text-xs"
+        />
+        <Button type="button" size="icon-xs" variant="outline" onClick={commit} className="shrink-0">
+          <Plus className="size-3" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** Editor da paleta — chip de cor com input hex, mais um seletor pra facilitar. */
+function PaletteEditor({
+  colors,
+  onChange,
+}: {
+  colors: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const [draft, setDraft] = useState("#");
+
+  function addColor() {
+    const normalized = normalizeHexColor(draft);
+    if (!normalized) {
+      toast.error("Cor hex inválida");
+      return;
+    }
+    onChange([...colors, normalized]);
+    setDraft("#");
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex flex-wrap gap-1.5">
+        {colors.map((color, i) => (
+          <span
+            key={`${color}-${i}`}
+            className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-black/20 px-1.5 py-0.5 text-[0.625rem] font-mono"
+          >
+            <input
+              type="color"
+              value={isValidHexColor(color) ? color : "#000000"}
+              onChange={(e) => {
+                const next = [...colors];
+                next[i] = e.target.value.toUpperCase();
+                onChange(next);
+              }}
+              className="size-3 cursor-pointer border-0 bg-transparent p-0"
+            />
+            {color}
+            <button
+              type="button"
+              onClick={() => onChange(colors.filter((_, idx) => idx !== i))}
+              className="text-muted-foreground hover:text-foreground"
+              aria-label={`Remover ${color}`}
+            >
+              <X className="size-2.5" />
+            </button>
+          </span>
+        ))}
+      </div>
+      <div className="flex gap-1">
+        <Input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              addColor();
+            }
+          }}
+          placeholder="#RRGGBB"
+          className="h-7 w-24 text-xs font-mono"
+        />
+        <Button type="button" size="icon-xs" variant="outline" onClick={addColor} className="shrink-0">
+          <Plus className="size-3" />
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 function buildDnaText(dna: VisualIdentityDna): string {
   const lines: string[] = [
@@ -84,6 +232,9 @@ export function VisualIdentityField({
             identityExtractedAt: (row.identity_extracted_at as string | null) ?? null,
             basePrompt: (row.base_prompt as string) ?? "",
             palette: Array.isArray(row.palette) ? (row.palette as string[]) : [],
+            ...(Array.isArray(row.identity_sample_urls)
+              ? { identitySampleUrls: row.identity_sample_urls as string[] }
+              : {}),
           };
           setLocal((prev) => {
             const merged = { ...prev, ...next };
@@ -105,9 +256,9 @@ export function VisualIdentityField({
     onStateChange?.(merged);
   }
 
-  function handleUpload(file: File) {
+  function handleUpload(files: File[]) {
     const formData = new FormData();
-    formData.append("sample", file);
+    for (const file of files) formData.append("sample", file);
 
     startTransition(async () => {
       const result = await uploadIdentitySampleAction(clientId, formData);
@@ -116,31 +267,41 @@ export function VisualIdentityField({
         return;
       }
       patch({
-        identitySampleUrl: result.sampleUrl ?? local.identitySampleUrl,
+        identitySampleUrls: result.sampleUrls ?? local.identitySampleUrls,
         identityExtractionStatus: "extracting",
         identityExtractionError: null,
         visualIdentityDna: null,
       });
-      toast.success("Arte enviada — extraindo identidade visual...");
+      toast.success("Arte(s) enviada(s) — extraindo identidade visual...");
     });
   }
 
-  function handleRemove() {
+  function handleRemove(sampleUrl: string) {
     startTransition(async () => {
-      const result = await removeIdentitySampleAction(clientId);
+      const result = await removeIdentitySampleAction(clientId, sampleUrl);
       if (result.error) {
         toast.error(result.error);
         return;
       }
-      patch({
-        identitySampleUrl: null,
-        visualIdentityDna: null,
-        identityExtractedAt: null,
-        identityExtractionStatus: "idle",
-        identityExtractionError: null,
-        basePrompt: "",
-        palette: [],
-      });
+      const remaining = result.sampleUrls ?? [];
+      patch(
+        remaining.length === 0
+          ? {
+              identitySampleUrls: [],
+              visualIdentityDna: null,
+              identityExtractedAt: null,
+              identityExtractionStatus: "idle",
+              identityExtractionError: null,
+              basePrompt: "",
+              palette: [],
+            }
+          : {
+              identitySampleUrls: remaining,
+              identityExtractionStatus: "extracting",
+              identityExtractionError: null,
+              visualIdentityDna: null,
+            }
+      );
       toast.success("Amostra removida");
     });
   }
@@ -165,6 +326,36 @@ export function VisualIdentityField({
     toast.success("DNA copiado");
   }
 
+  const [editingDna, setEditingDna] = useState(false);
+  const [draftDna, setDraftDna] = useState<VisualIdentityDna | null>(null);
+  const [isSavingDna, startSaveDna] = useTransition();
+
+  function startEditingDna() {
+    if (!local.visualIdentityDna) return;
+    setDraftDna(local.visualIdentityDna);
+    setEditingDna(true);
+  }
+
+  function cancelEditingDna() {
+    setEditingDna(false);
+    setDraftDna(null);
+  }
+
+  function handleSaveDna() {
+    if (!draftDna) return;
+    startSaveDna(async () => {
+      const result = await updateVisualIdentityDnaAction(clientId, draftDna);
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      patch({ visualIdentityDna: draftDna });
+      setEditingDna(false);
+      setDraftDna(null);
+      toast.success("DNA atualizado");
+    });
+  }
+
   const extracting = local.identityExtractionStatus === "extracting" || isPending;
   const failed = local.identityExtractionStatus === "failed";
   const ready = local.identityExtractionStatus === "ready" && local.visualIdentityDna;
@@ -175,24 +366,55 @@ export function VisualIdentityField({
         <div>
           <Label>Extrator de identidade visual</Label>
           <p className="mt-1 text-xs text-muted-foreground">
-            Envie uma arte que represente a identidade visual do cliente.
+            Envie uma ou mais artes que representem a identidade visual do cliente.
           </p>
         </div>
       )}
 
-      {local.identitySampleUrl ? (
+      {local.identitySampleUrls.length > 0 ? (
         <div className="space-y-2">
-          <div className="overflow-hidden rounded-lg border border-white/10 bg-black/25">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={local.identitySampleUrl}
-              alt="Amostra de identidade visual"
-              className={cn(
-                "w-full object-contain bg-black/20",
-                compact ? "max-h-36" : "max-h-64"
-              )}
-            />
+          <div className={cn("grid gap-1.5", compact ? "grid-cols-3" : "grid-cols-4 sm:grid-cols-5")}>
+            {local.identitySampleUrls.map((url) => (
+              <div
+                key={url}
+                className="group relative aspect-square overflow-hidden rounded-lg border border-white/10 bg-black/25"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={url}
+                  alt="Amostra de identidade visual"
+                  className="size-full object-cover"
+                  loading="lazy"
+                  decoding="async"
+                />
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => handleRemove(url)}
+                  aria-label="Remover amostra"
+                  className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-md bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                >
+                  <Trash2 className="size-3" />
+                </button>
+              </div>
+            ))}
           </div>
+
+          {local.identitySampleUrls.length < MAX_SAMPLES && (
+            <ImageDropzone
+              variant="neon"
+              accept={ACCEPT}
+              multiple
+              disabled={isPending}
+              isUploading={isPending}
+              onFiles={handleUpload}
+              icon={<Plus className="size-5 text-white/45" strokeWidth={1.25} />}
+              title={`Adicionar mais artes (${local.identitySampleUrls.length}/${MAX_SAMPLES})`}
+              subtitle="PNG, JPG ou WebP"
+              minHeight="sm"
+              className="flex-1"
+            />
+          )}
 
           <div className="flex flex-wrap gap-1.5">
             {extracting && (
@@ -218,31 +440,40 @@ export function VisualIdentityField({
                 Retry
               </Button>
             )}
-            <Button type="button" size="sm" variant="ghost" disabled={isPending} onClick={handleRemove} className="h-7 text-xs">
-              <Trash2 className="size-3" />
-            </Button>
           </div>
 
           {failed && local.identityExtractionError && (
             <p className="text-[0.625rem] text-red-400/90">{local.identityExtractionError}</p>
           )}
 
-          {showDnaDetails && ready && local.visualIdentityDna && (
+          {showDnaDetails && ready && local.visualIdentityDna && !editingDna && (
             <div className="space-y-2 rounded-lg border border-border/50 bg-muted/30 p-3">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[0.625rem] font-medium uppercase tracking-wide text-muted-foreground">
                   DNA visual
                 </span>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  className="h-6 gap-1 px-2 text-[0.625rem]"
-                  onClick={handleCopyDna}
-                >
-                  {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
-                  {copied ? "Copiado" : "Copiar"}
-                </Button>
+                <div className="flex gap-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 gap-1 px-2 text-[0.625rem]"
+                    onClick={startEditingDna}
+                  >
+                    <Pencil className="size-3" />
+                    Editar
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 gap-1 px-2 text-[0.625rem]"
+                    onClick={handleCopyDna}
+                  >
+                    {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+                    {copied ? "Copiado" : "Copiar"}
+                  </Button>
+                </div>
               </div>
 
               <p className="text-xs leading-relaxed text-foreground/90">
@@ -297,17 +528,141 @@ export function VisualIdentityField({
               )}
             </div>
           )}
+
+          {showDnaDetails && editingDna && draftDna && (
+            <div className="space-y-3 rounded-lg border border-border/50 bg-muted/30 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[0.625rem] font-medium uppercase tracking-wide text-muted-foreground">
+                  Editar DNA visual
+                </span>
+                <div className="flex gap-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={isSavingDna}
+                    onClick={handleSaveDna}
+                    className="h-6 gap-1 px-2 text-[0.625rem]"
+                  >
+                    {isSavingDna ? <Loader2 className="size-3 animate-spin" /> : <Check className="size-3" />}
+                    Salvar
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={isSavingDna}
+                    onClick={cancelEditingDna}
+                    className="h-6 gap-1 px-2 text-[0.625rem]"
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-[0.5625rem]">Resumo</Label>
+                <Input
+                  value={draftDna.summary}
+                  onChange={(e) => setDraftDna({ ...draftDna, summary: e.target.value })}
+                  className="h-7 text-xs"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-[0.5625rem]">Paleta</Label>
+                <PaletteEditor
+                  colors={draftDna.palette}
+                  onChange={(palette) => setDraftDna({ ...draftDna, palette })}
+                />
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label className="text-[0.5625rem]">Tipografia — headline</Label>
+                  <Input
+                    value={draftDna.typography.headlineStyle}
+                    onChange={(e) =>
+                      setDraftDna({
+                        ...draftDna,
+                        typography: { ...draftDna.typography, headlineStyle: e.target.value },
+                      })
+                    }
+                    className="h-7 text-xs"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[0.5625rem]">Tipografia — corpo</Label>
+                  <Input
+                    value={draftDna.typography.bodyStyle}
+                    onChange={(e) =>
+                      setDraftDna({
+                        ...draftDna,
+                        typography: { ...draftDna.typography, bodyStyle: e.target.value },
+                      })
+                    }
+                    className="h-7 text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label className="text-[0.5625rem]">Composição</Label>
+                  <Input
+                    value={draftDna.compositionStyle}
+                    onChange={(e) => setDraftDna({ ...draftDna, compositionStyle: e.target.value })}
+                    className="h-7 text-xs"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[0.5625rem]">Mood</Label>
+                  <Input
+                    value={draftDna.mood}
+                    onChange={(e) => setDraftDna({ ...draftDna, mood: e.target.value })}
+                    className="h-7 text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-[0.5625rem]">Palavras-chave</Label>
+                <TagListEditor
+                  values={draftDna.visualKeywords}
+                  onChange={(visualKeywords) => setDraftDna({ ...draftDna, visualKeywords })}
+                  placeholder="Nova palavra-chave"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-[0.5625rem]">Elementos fixos</Label>
+                <TagListEditor
+                  values={draftDna.elementsToRepeat}
+                  onChange={(elementsToRepeat) => setDraftDna({ ...draftDna, elementsToRepeat })}
+                  placeholder="Novo elemento"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-[0.5625rem]">Evitar</Label>
+                <TagListEditor
+                  values={draftDna.avoid ?? []}
+                  onChange={(avoid) => setDraftDna({ ...draftDna, avoid })}
+                  placeholder="Novo item a evitar"
+                />
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <ImageDropzone
           variant="neon"
           accept={ACCEPT}
-          multiple={false}
+          multiple
           disabled={isPending}
           isUploading={isPending}
-          onFiles={(files) => handleUpload(files[0])}
+          onFiles={handleUpload}
           icon={<Sparkles className="size-6 text-white/45" strokeWidth={1.25} />}
-          title="Clique ou arraste a arte"
+          title="Clique ou arraste uma ou mais artes"
           subtitle="PNG, JPG ou WebP"
           minHeight={compact ? "md" : "sm"}
           className="flex-1"

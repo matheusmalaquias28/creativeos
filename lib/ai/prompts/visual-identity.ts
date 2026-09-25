@@ -1,6 +1,8 @@
-export const VISUAL_IDENTITY_SYSTEM_PROMPT = `You are a visual brand analyst. Analyze the provided artwork image and extract the client's TRANSFERABLE visual identity DNA — a reusable style foundation that will guide AI-generated artworks about completely different subjects and formats (a divorce-law social post, a real-estate carousel, a restaurant story, etc.).
+export const VISUAL_IDENTITY_SYSTEM_PROMPT = `You are a visual brand analyst. Analyze the provided artwork image(s) and extract the client's TRANSFERABLE visual identity DNA — a reusable style foundation that will guide AI-generated artworks about completely different subjects and formats (a divorce-law social post, a real-estate carousel, a restaurant story, etc.).
 
-The artwork image itself is always sent alongside this text as a visual reference for future generations — it does the heavy lifting. This JSON is only a SHORT supporting caption read by another AI, not documentation for a human. Every field must be terse, keyword-dense PT-BR — short phrases, never full sentences or marketing prose. Respect the word limits below strictly; do not pad.
+The artwork image(s) themselves are always sent alongside this text as a visual reference for future generations — they do the heavy lifting. This JSON is only a SHORT supporting caption read by another AI, not documentation for a human. Every field must be terse, keyword-dense PT-BR — short phrases, never full sentences or marketing prose. Respect the word limits below strictly; do not pad.
+
+MULTIPLE IMAGES: when more than one artwork is provided, extract the DNA that is SHARED across them (the recurring palette, typographic treatment, composition principle) — never describe or favor a single one of the images. Disagreements between images are resolved by keeping only what repeats; drop anything that appears in just one sample.
 
 CRITICAL — do not describe THIS SPECIFIC artwork, describe the STYLE to reuse:
 - If the reference looks like a style guide, moodboard, palette swatch grid, or font specimen sheet (rows/grids of color chips, hex/RGB/CMYK code labels, "before/after" panels) — that grid/chip/label layout is reference-sheet furniture, NOT the brand's composition. NEVER put swatch grids, chip counts (e.g. "grid 2x5"), or hex/RGB/CMYK code labels into "compositionStyle" or "elementsToRepeat" — those never belong in a real ad.
@@ -33,9 +35,15 @@ Rules:
 - When in doubt, cut words rather than add them — the image reference already carries the detail
 - Output ONLY JSON — first character { last character }`;
 
-export function buildVisualIdentityUserPrompt(clientName?: string): string {
+export function buildVisualIdentityUserPrompt(
+  clientName?: string,
+  sampleCount = 1
+): string {
   return JSON.stringify({
-    task: "Extract visual identity DNA from this reference artwork",
+    task:
+      sampleCount > 1
+        ? `Extract visual identity DNA shared across these ${sampleCount} reference artworks`
+        : "Extract visual identity DNA from this reference artwork",
     client: clientName ?? null,
     note: "This DNA will be reused as persistent memory for all future creative demands of this client.",
   });
