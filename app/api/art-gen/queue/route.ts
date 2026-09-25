@@ -1,18 +1,26 @@
 /**
  * POST /api/art-gen/queue
- * Cria os jobs e dispara o worker em background (fire-and-forget).
+ * Cria os jobs e dispara o worker em background.
  * A resposta retorna imediatamente após criar os jobs;
  * o progresso é acompanhado via Supabase Realtime no frontend.
  *
- * Funciona em VPS/Node.js tradicional. Em serverless (Vercel), o processo
- * pode ser encerrado antes do worker terminar — use um cron externo nesse caso.
+ * O disparo usa `after()` (não `setImmediate`): numa function serverless
+ * (Vercel), o processo pode ser congelado assim que a resposta HTTP é
+ * enviada, e um `setImmediate` agendado depois disso nunca chega a rodar —
+ * os jobs ficam presos em "queued" pra sempre, sem erro nenhum (foi
+ * exatamente esse bug que gerou este comentário). `after()` é a forma
+ * suportada pelo runtime de continuar trabalho depois da resposta.
  */
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { runWorker } from "@/lib/ai/imagegen/worker";
 import { IMAGE_GEN_DEFAULTS } from "@/lib/ai/imagegen/defaults";
 import type { Database, Json } from "@/types/database";
+
+// Cobre o pior caso: várias artes, cada uma com até IMAGE_JOB_TIMEOUT_MS
+// (2min) de geração, processadas com concorrência limitada.
+export const maxDuration = 300;
 
 type ArtJobInsert = Database["public"]["Tables"]["art_generation_job"]["Insert"];
 
@@ -110,14 +118,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: insertError.message }, { status: 500 });
   }
 
-  // Dispara o worker em background (fire-and-forget).
-  // O cliente acompanha o progresso via Supabase Realtime — não precisa aguardar.
+  // Dispara o worker em background. O cliente acompanha o progresso via
+  // Supabase Realtime — não precisa aguardar a resposta desta rota.
   if (!skipGenerate) {
-    setImmediate(() => {
-      void runWorker(demandId).catch((err) => {
+    after(() =>
+      runWorker(demandId).catch((err) => {
         console.error("[art-gen/worker]", (err as Error)?.message ?? err);
-      });
-    });
+      })
+    );
   }
 
   return NextResponse.json({ ok: true, jobsCreated: inserted?.length ?? 0 });

@@ -8,7 +8,7 @@
  * O /api/art-gen/queue legado continua existindo e não muda.
  */
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { prepareDemandPrompts } from "@/lib/ai/art-director/prepare";
 
@@ -71,11 +71,14 @@ export async function POST(request: Request) {
     );
   }
 
-  setImmediate(() => {
-    void prepareDemandPrompts(demandId).catch((err) => {
+  // `after()`, não `setImmediate` — numa function serverless o processo pode
+  // ser congelado assim que a resposta é enviada, e um setImmediate agendado
+  // depois disso nunca roda (job fica preso sem erro nenhum).
+  after(() =>
+    prepareDemandPrompts(demandId).catch((err) => {
       console.error("[art-gen/prepare]", (err as Error)?.message ?? err);
-    });
-  });
+    })
+  );
 
   return NextResponse.json({ ok: true, started: true });
 }

@@ -4,10 +4,14 @@
  * inteira tem que ser um clique só.
  */
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { approveAllPrompts } from "@/services/art-director";
 import { runWorker } from "@/lib/ai/imagegen/worker";
+
+// Cobre o pior caso: várias artes, cada uma com até IMAGE_JOB_TIMEOUT_MS
+// (2min) de geração, processadas com concorrência limitada.
+export const maxDuration = 300;
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -32,11 +36,12 @@ export async function POST(request: Request) {
 
     if (approved > 0) {
       const demandId = body.demandId;
-      setImmediate(() => {
-        void runWorker(demandId).catch((err) => {
+      // `after()`, não `setImmediate` — ver comentário em queue/route.ts.
+      after(() =>
+        runWorker(demandId).catch((err) => {
           console.error("[art-gen/approve-all]", (err as Error)?.message ?? err);
-        });
-      });
+        })
+      );
     }
 
     return NextResponse.json({ ok: true, approved });

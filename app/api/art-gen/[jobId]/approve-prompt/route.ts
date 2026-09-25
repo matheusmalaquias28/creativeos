@@ -4,10 +4,12 @@
  * referências é incrementado — não no rascunho.
  */
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { approvePrompt } from "@/services/art-director";
 import { runWorker } from "@/lib/ai/imagegen/worker";
+
+export const maxDuration = 300;
 
 export async function POST(
   _request: Request,
@@ -37,11 +39,13 @@ export async function POST(
       .single();
 
     if (job?.demand_id) {
-      setImmediate(() => {
-        void runWorker(job.demand_id as string).catch((err) => {
+      // `after()`, não `setImmediate` — ver comentário em queue/route.ts.
+      const demandId = job.demand_id as string;
+      after(() =>
+        runWorker(demandId).catch((err) => {
           console.error("[art-gen/approve-prompt]", (err as Error)?.message ?? err);
-        });
-      });
+        })
+      );
     }
 
     return NextResponse.json({ ok: true, approved });
