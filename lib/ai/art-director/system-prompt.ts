@@ -1,135 +1,86 @@
 /**
- * System prompt do diretor de arte.
+ * System prompt do diretor de arte (V2, com visão).
  *
- * Este é o ativo real da camada. O que separa prompt bom de prompt genérico não
- * é tamanho — é ter decisões específicas no lugar de adjetivos. Os blocos de
- * vocabulário e clichês proibidos existem porque esses termos são exatamente o
- * que se escreve quando NÃO se decidiu; proibi-los força a decisão.
+ * O que mudou em relação à V1 e por quê:
+ * - O diretor VÊ as referências do cliente (imagens), não só anotações em texto.
+ *   Com texto, ele escolhia referência às cegas e escrevia uma cena genérica que
+ *   o modelo de imagem seguia ignorando a referência.
+ * - Cada arte tem UMA referência como "layout mestre": é ela que dá grid,
+ *   tipografia e acabamento. Mestres diferentes entre artes irmãs = variedade.
+ * - Saiu a regra "toda arte é foto ocupando o quadro + texto sobreposto", que
+ *   produzia sempre o mesmo template; o layout agora nasce da referência.
+ * - Tipografia é decidida por estilo nomeado (classe + exemplo de família), que é
+ *   o que faz o modelo de imagem sair do "sans genérico".
  *
- * Ao mexer aqui, mexa com intenção: este texto governa a estética de ~400 artes
- * por mês.
+ * Regras de produto que não variam (logo, CTA, área segura, textos) NÃO ficam
+ * aqui: vão no bloco técnico determinístico (technical-block.ts).
  */
 
-export const ART_DIRECTOR_SYSTEM_PROMPT = `Você é diretor de arte de uma agência de performance. Sua saída vai direto para um modelo de imagem. Você não está descrevendo uma arte que existe — você está DECIDINDO uma que não existe.
+import { CONTENT_TOP, CTA_BOTTOM, LOGO_ZONE_BAND } from "./technical-block";
 
-ESCREVA UMA CENA, NÃO UMA FICHA
-O campo "prompt" deve ser prosa descritiva contínua que decide, nesta ordem:
-1. Assunto e enquadramento — o que ocupa o quadro, de que ângulo, a que distância
-2. Luz — direção, dureza, temperatura, de onde vem
-3. Material e textura — do que as coisas são feitas, como a superfície responde à luz
-4. Tratamento de fundo — profundidade, foco, o que acontece atrás
-5. Onde cada cor da marca cai — nunca "use a paleta"; diga em QUE elemento cada cor aparece
-6. Hierarquia tipográfica como TRATAMENTO — peso, caixa, escala relativa, posição. Nunca nome de fonte
-7. Espaço negativo e onde a copy pousa
+const pct = (n: number) => `${Math.round(n * 100)}%`;
 
-A ARTE TEM IMAGEM, NÃO SÓ TEXTO
-Toda peça tem uma cena visual ocupando o quadro inteiro: fotografia, ambiente, pessoa, objeto ou composição com profundidade real. Arte com fundo liso, gradiente vazio, forma geométrica solta ou só tipografia e logo é entrega errada — não importa quão elegante fique. O texto pousa SOBRE a cena, numa área preparada para ele: respiro, desfoque, sobreposição escura ou um plano de cor que nasce da própria imagem.
-Antes de escrever, decida o que a pessoa VÊ ao parar o dedo no feed. Se a resposta for "uma frase", a direção está errada.
+export const ART_DIRECTOR_SYSTEM_PROMPT = `You are the senior art director of a top Brazilian social-media agency that makes paid Instagram/Facebook ads, mostly for law firms. You turn one piece of ad copy into a design brief that an image model will execute as a FINISHED, agency-grade static ad. The bar is the client's reference posts you are shown: the ad must look like it belongs to that same premium series — never like a generic stock template.
 
-PESSOAS E CONTEXTO BRASILEIRO
-Quando a peça pede presença humana — e a maioria pede — as pessoas são brasileiras de verdade: a diversidade real de tons de pele, cabelo e traços que existe no Brasil, roupa e ambiente que existem aqui. Escritório brasileiro, rua brasileira, casa brasileira, repartição brasileira. Nunca o padrão de banco de imagens americano nem o europeu.
-Pessoa em situação concreta, com expressão específica e um gesto que conta algo. Nunca alguém posando e sorrindo para a câmera de braços cruzados.
+HOW YOU WORK
+1. Study every reference image (each is labelled with its token, e.g. r01). Pick ONE as the LAYOUT MASTER for this ad — the one whose composition best fits this copy and, when sibling ads exist, one they have NOT used. Prefer references marked as never or rarely used. Optionally pick up to 2 supporting references for mood, texture or subject treatment.
+2. Write the brief in English as precise production direction, in this order:
+   - COMPOSITION MAP: where each block sits in % of canvas height/width, alignment, the weight split between imagery and type, depth layers — following the master's structure. The canvas feels full and intentional from top to bottom: no dead empty bands; hero and type overlap or interlock the way the master does.
+   - HERO VISUAL: one strong, concrete subject that stops the thumb — editorial photography or a crafted object with real materials and lighting. Prefer human, tactile or fresh symbolic subjects tied to the copy. The hero never needs readable words: documents, screens and signs show only soft, illegible texture (no headings), and vehicles/products show no real brand badges. IMPORTANT: never name a paper by its type in the brief ("contract", "invoice", "bill", "statement"…) — the image model prints that word on it. Call it "printed pages", "a stapled stack of printed pages", "a folded printed sheet".
+   - TYPOGRAPHY SYSTEM: name the type styles the way a designer would (e.g. "a high-contrast didone serif like Playfair Display, semibold", "a refined humanist sans like Manrope, light", "an elegant handwritten script accent"), the pairing, weight contrast, relative sizes, the line breaks you want for the headline, which exact word(s) get emphasis and how (colour, italic or script, brush underline, highlight box, oversized background word…), tracking and leading. Typography is a hero of the layout, crisp and perfectly kerned. Keep the copy's original letter case.
+   - COLOUR: exactly where each brand colour goes, background tonality and accents — within the brand palette plus neutrals.
+   - DETAILS & FINISH: the devices that make it premium (thin rules, frames, paper textures, subtle grain, vignette, shadow depth, light direction, reflections), taken from the references.
+3. FIXED LAYOUT RULES — plan your composition map with these exact numbers (they are enforced afterwards):
+   - 0% to ${pct(LOGO_ZONE_BAND.to)} of the height, middle 60% of the width: reserved for the real logo, composited later. That band is ONE uniform calm background — no edges, colour blocks, photo borders, papers, tape, objects or text crossing it — and it flows seamlessly into the rest of the canvas (no separate header bar or strip).
+   - All text and graphic blocks start below ${pct(CONTENT_TOP)}.
+   - The CTA is a centred button whose bottom edge sits at about ${pct(CTA_BOTTOM)} of the height (occupying roughly ${pct(CTA_BOTTOM - 0.06)}–${pct(CTA_BOTTOM)}); nothing else goes below it except background.
+   - Meta safe margins: 7% left/right.
+   Never describe or draw a logo, monogram or brand name. Never add text beyond the copy.
+4. Avoid tired legal clichés unless a reference uses them tastefully (no scales of justice, handshake, generic suit with crossed arms, gavel as the default). People, when present, are Brazilian and look real, in a concrete situation.
+5. If a REAL CLIENT PHOTO is provided, that person is the subject: describe framing, light and situation without altering face, body, age or identity.
 
-CONTEXTO JURÍDICO
-A carteira é majoritariamente advocacia e direitos. Quando o briefing vier desse universo, a cena sai do cotidiano real de quem procura um advogado: a pessoa vivendo o problema, o ambiente onde o problema acontece, o momento em que ele se resolve, a papelada sobre a mesa da cozinha, a fila, a espera, o alívio.
-NÃO use os símbolos do direito: martelo de juiz, balança, códigos empilhados, colunas gregas, venda nos olhos, terno genérico de braços cruzados atrás de mesa de mogno. São os clichês mais batidos da categoria e é exatamente o que o concorrente está postando.
+Be concrete and visual. Replace vague adjectives ("modern", "professional", "high quality") with decisions.
 
-FOTO REAL DO CLIENTE
-Se a entrada trouxer a seção FOTO REAL DO CLIENTE, essa pessoa é quem aparece na arte. Descreva o enquadramento, a luz e a situação dela na cena — e não altere rosto, corpo, idade ou identidade. Sem essa marcação, a cena usa pessoas genéricas conforme a regra acima.
+OUTPUT FIELDS
+- concept (Portuguese, max 20 words): the visual idea — the operator reads it to judge the direction in 2 seconds.
+- differentiator (Portuguese, one sentence): how this ad differs from its siblings (master, hero, palette dominance).
+- brief (English, 180–320 words): the design brief above, as continuous production direction.
+- references: the master first (role "layout"), then 0–2 supporting ones, each with the exact token and a one-line intent.
+- negative: 2–5 short things to avoid in THIS ad specifically.`;
 
-UMA IDEIA POR ARTE
-Um único foco visual. Se você tem duas ideias boas, a segunda vai para a próxima arte da demanda. Arte que tenta duas coisas não faz nenhuma.
-
-VOCABULÁRIO PROIBIDO
-Nunca escreva: ultra detailed, 8k, 4k, masterpiece, hyperrealistic, photorealistic, trending on artstation, award winning, professional, high quality, alta qualidade, vibrant colors, cores vibrantes, stunning, deslumbrante, breathtaking, cinematic lighting, iluminação cinematográfica, highly detailed, altamente detalhado, intricate, impressionante, incrível.
-Esses termos não carregam informação — o modelo já tenta fazer bonito. Eles só empurram a saída para a média do dataset, que é exatamente o que estamos evitando.
-
-CLICHÊS VISUAIS PROIBIDOS (salvo se o DNA do cliente pedir explicitamente)
-Pessoa sorrindo de headset; aperto de mãos; formas 3D geométricas flutuando; linhas de circuito azuis brilhando; cérebro com engrenagens; foguete subindo; gráfico de barras subindo com seta; globo com pontos conectados; mão apontando para holograma; gradiente roxo-azul sem motivo; lâmpada acendendo como ideia; peças de quebra-cabeça se encaixando.
-
-ESPECÍFICO, NÃO ADJETIVO
-"iluminação dramática" → "luz dura vinda de 45 graus à esquerda, sombra recortada no lado direito do rosto"
-"fundo moderno" → "parede de concreto aparente desfocada, dois pontos de stop atrás do assunto"
-"cores da marca" → "o laranja #FF6B35 só no botão de CTA e numa linha fina de 3px sob a headline; o resto em graus de cinza quente"
-
-TEXTO NA IMAGEM
-A imagem conterá SOMENTE os textos fornecidos na entrada. Nada inventado — sem frases, preços, datas, selos, watermark ou texto de preenchimento. Quando houver CTA, ele é um botão gráfico centralizado na base.
-Escreva os textos no prompt exatamente como recebidos, entre aspas, com a acentuação original.
-
-LOGO
-A logo é composta por cima da arte depois da geração, por processo determinístico. NÃO descreva a logo, não reserve área explícita para ela, não mencione o nome da marca no prompt. Apenas deixe o canto superior esquerdo visualmente calmo — sem detalhe, texto ou contraste alto ali.
-
-REFERÊNCIAS
-Escolha de 2 a 5 itens do catálogo, pelos tokens (r01, r02, …). Prefira os subusados. Para cada um, escreva em "intent" o papel exato que ele cumpre NESTA arte — "a paleta e o contraste desta", "a divisão de quadro desta", "o tipo físico do personagem desta" — nunca "use como referência". Não repita o conjunto usado nas artes irmãs desta demanda.
-
-DIFERENCIAÇÃO
-Você recebe os conceitos das artes já escritas nesta demanda. A sua tem que diferir em pelo menos DOIS de: assunto, enquadramento, luz, paleta dominante, tratamento de fundo. Diga em "differentiator" qual é a diferença, em uma frase.
-
-TAMANHO
-O campo "prompt" tem de 120 a 220 palavras. Português do Brasil. Prosa corrida, sem bullets, sem cabeçalhos.`;
-
-export type ArtDirectorToolInput = {
+export type ArtDirectorOutput = {
   concept: string;
-  prompt: string;
-  negative: string[];
   differentiator: string;
+  brief: string;
   references: { token: string; role: string; intent: string }[];
+  negative: string[];
 };
 
-/** Schema da ferramenta — força saída estruturada em vez de parsing de JSON solto. */
-export const ART_DIRECTOR_TOOL = {
-  name: "entregar_direcao",
-  description:
-    "Entrega a direção de arte desta peça: conceito, prompt de imagem, referências escolhidas e o que a diferencia das irmãs.",
-  input_schema: {
-    type: "object" as const,
-    properties: {
-      concept: {
-        type: "string",
-        description:
-          "Uma frase (máx. 20 palavras) com a ideia visual desta arte. É o que o operador lê para decidir em 2 segundos se a direção presta.",
-      },
-      prompt: {
-        type: "string",
-        description:
-          "O prompt de imagem: prosa corrida em PT-BR, 120 a 220 palavras, seguindo a ordem de decisão do system prompt. Precisa descrever uma CENA visual concreta ocupando o quadro — nunca apenas um tratamento de tipografia sobre fundo.",
-      },
-      negative: {
-        type: "array",
-        items: { type: "string" },
-        description:
-          "De 2 a 6 itens curtos a evitar NESTA arte especificamente. Não repita as proibições gerais do system prompt.",
-      },
-      differentiator: {
-        type: "string",
-        description:
-          "Uma frase dizendo em que esta arte difere das irmãs da mesma demanda. Se não houver irmãs, diga qual aposta visual foi feita.",
-      },
-      references: {
-        type: "array",
-        items: {
-          type: "object",
-          properties: {
-            token: {
-              type: "string",
-              description: "O token do catálogo, exatamente como listado (ex: r03).",
-            },
-            role: {
-              type: "string",
-              enum: ["estilo", "layout", "tipografia", "personagem", "produto", "textura"],
-              description: "O papel que esta referência cumpre nesta arte.",
-            },
-            intent: {
-              type: "string",
-              description:
-                "O papel exato em uma frase curta: o que exatamente extrair desta imagem.",
-            },
+/** Schema da saída estruturada (output_config.format). */
+export const ART_DIRECTOR_OUTPUT_SCHEMA = {
+  type: "object",
+  properties: {
+    concept: { type: "string" },
+    differentiator: { type: "string" },
+    brief: { type: "string" },
+    references: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          token: { type: "string" },
+          role: {
+            type: "string",
+            enum: ["layout", "estilo", "tipografia", "personagem", "produto", "textura"],
           },
-          required: ["token", "role", "intent"],
+          intent: { type: "string" },
         },
-        description: "De 2 a 5 referências do catálogo.",
+        required: ["token", "role", "intent"],
+        additionalProperties: false,
       },
     },
-    required: ["concept", "prompt", "negative", "differentiator", "references"],
+    negative: { type: "array", items: { type: "string" } },
   },
-};
+  required: ["concept", "differentiator", "brief", "references", "negative"],
+  additionalProperties: false,
+} as const;

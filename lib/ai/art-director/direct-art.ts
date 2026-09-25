@@ -1,31 +1,36 @@
 /**
- * A chamada de direção de arte.
+ * A chamada de direção de arte (V2, com visão).
  *
- * Uma chamada por arte, saída estruturada via tool use (não parsing de JSON
- * solto). Uma chamada e não duas — quem escolhe a referência precisa ser quem
- * escreve a cena, senão prompt e referências brigam.
+ * Uma chamada por arte. O diretor VÊ as referências do acervo do cliente —
+ * rotuladas com os mesmos tokens do catálogo (r01, r02…) — escolhe uma como
+ * layout mestre e escreve o briefing de design que o modelo de imagem executa.
+ * Quem escolhe a referência é quem escreve o briefing, senão os dois brigam.
  *
- * Modelo: Sonnet por padrão. Haiku está certo para anotar referência e extrair
- * DNA (tarefas de descrição); direção de arte é julgamento composicional e Haiku
- * volta a produzir a média — que é o problema que a camada existe para resolver.
+ * Modelo: Claude Opus 5 por padrão (julgamento visual/composicional é onde a
+ * diferença de modelo mais aparece). Configurável por ART_DIRECTOR_VISION_MODEL.
  */
 
-import type Anthropic from "@anthropic-ai/sdk";
+import Anthropic from "@anthropic-ai/sdk";
 import { getAnthropicClient } from "@/lib/ai/client";
 import {
+  ART_DIRECTOR_OUTPUT_SCHEMA,
   ART_DIRECTOR_SYSTEM_PROMPT,
-  ART_DIRECTOR_TOOL,
-  type ArtDirectorToolInput,
+  type ArtDirectorOutput,
 } from "./system-prompt";
 import { isReferenceKind } from "./types";
+import { urlToVisionBlock } from "./vision";
+import { describeUsage } from "./catalog";
 import type { ArtDirection, ArtDirectionInput, ChosenReference } from "./types";
 
-const MAX_TOKENS = 2000;
-const MAX_RETRIES = 3;
-const RETRY_DELAY_MS = 400;
+const MAX_TOKENS = 16000;
+const MAX_RETRIES = 2;
+const RETRY_DELAY_MS = 800;
+
+/** Teto de referências enviadas como imagem numa chamada. */
+export const MAX_VISION_REFERENCES = 10;
 
 export function getArtDirectorModel(): string {
-  return process.env.ART_DIRECTOR_MODEL?.trim() || "claude-sonnet-4-5-20250929";
+  return process.env.ART_DIRECTOR_VISION_MODEL?.trim() || "claude-opus-5";
 }
 
 export class ArtDirectionError extends Error {
@@ -36,7 +41,7 @@ export class ArtDirectionError extends Error {
 }
 
 // ---------------------------------------------------------------------------
-// Prompt do usuário
+// Prompt do usuário (parte em texto)
 // ---------------------------------------------------------------------------
 
 function section(title: string, body: string | null | undefined): string | null {
@@ -45,17 +50,19 @@ function section(title: string, body: string | null | undefined): string | null 
 }
 
 export function buildUserPrompt(input: ArtDirectionInput): string {
-  const { client, catalog, demand, art, siblings, steer, clientPhotos } = input;
+  const { client, demand, art, siblings, steer, clientPhotos, assignedMaster } = input;
 
+  // Do DNA só entram marca e tipografia: a composição vem das referências
+  // (o DNA extraído achatava tudo em "foto ao fundo, texto à esquerda").
   const dna = client.dna
     ? [
-        `Resumo: ${client.dna.summary}`,
-        `Composição: ${client.dna.compositionStyle}`,
-        `Tipografia: ${client.dna.typography.headlineStyle} / ${client.dna.typography.bodyStyle}`,
+        `Summary: ${client.dna.summary}`,
+        `Typography: headlines ${client.dna.typography.headlineStyle}; body ${client.dna.typography.bodyStyle}${client.dna.typography.notes ? `; ${client.dna.typography.notes}` : ""}`,
         `Mood: ${client.dna.mood}`,
-        `Palavras-chave: ${client.dna.visualKeywords.join(", ")}`,
-        `Elementos recorrentes: ${client.dna.elementsToRepeat.join(", ")}`,
-        client.dna.avoid?.length ? `Evitar: ${client.dna.avoid.join(", ")}` : null,
+        client.dna.elementsToRepeat?.length
+          ? `Recurring brand elements: ${client.dna.elementsToRepeat.join(", ")}`
+          : null,
+        client.dna.avoid?.length ? `Avoid: ${client.dna.avoid.join(", ")}` : null,
       ]
         .filter(Boolean)
         .join("\n")
@@ -63,56 +70,97 @@ export function buildUserPrompt(input: ArtDirectionInput): string {
 
   const copy = [
     art.headline ? `Headline: "${art.headline}"` : null,
-    art.subheadline ? `Subheadline: "${art.subheadline}"` : null,
-    art.cta ? `CTA: "${art.cta}"` : null,
-    art.informacoesExtras ? `Informações extras: ${art.informacoesExtras}` : null,
+    art.subheadline ? `Supporting line: "${art.subheadline}"` : null,
+    art.informacoesExtras ? `Extra line: "${art.informacoesExtras}"` : null,
+    art.cta ? `Button: "${art.cta}"` : null,
   ]
     .filter(Boolean)
     .join("\n");
 
   const blocks = [
-    section("## CLIENTE", client.name),
-    section("## DNA VISUAL DO CLIENTE", dna),
-    section("## PALETA DA MARCA", client.palette.join(", ")),
-    section("## IDENTIDADE (prompt base salvo)", client.basePrompt),
+    section("## CLIENT", client.name),
+    section("## BRAND PALETTE", client.palette.join(", ")),
+    section("## BRAND NOTES (from the visual identity)", dna),
     client.directionNotes.length
       ? section(
-          "## REGRAS APRENDIDAS DESTE CLIENTE (respeite todas)",
+          "## RULES LEARNED FOR THIS CLIENT (respect all)",
           client.directionNotes.map((n) => `- ${n.note}`).join("\n")
         )
       : null,
     section(
-      "## DEMANDA",
-      [
-        demand.titulo ? `Campanha: ${demand.titulo}` : null,
-        demand.tipo ? `Tipo: ${demand.tipo}` : null,
-      ]
+      "## CAMPAIGN",
+      [demand.titulo ? `Title: ${demand.titulo}` : null, demand.tipo ? `Type: ${demand.tipo}` : null]
         .filter(Boolean)
         .join("\n")
     ),
-    section("## COPY DESTA ARTE (arte " + (art.index + 1) + ")", copy || "(sem copy)"),
-    section("## FORMATO", `${art.aspectRatio}, ${art.imageSize}`),
-    section("## CATÁLOGO DE REFERÊNCIAS DO CLIENTE", catalog.text),
+    section(
+      `## AD ${art.index + 1} COPY (Portuguese — keep exactly, including letter case)`,
+      copy || "(no copy — image only)"
+    ),
+    section("## FORMAT", `${art.aspectRatio} portrait, ${art.imageSize}`),
     clientPhotos.length
       ? section(
-          "## FOTO REAL DO CLIENTE",
-          `${clientPhotos.length} foto(s) real(is) do cliente serão enviadas junto com as referências. ` +
-            "Esta é a pessoa que aparece na arte: descreva o enquadramento, a luz e a situação dela na cena, " +
-            "sem alterar rosto, corpo, idade ou identidade."
+          "## REAL CLIENT PHOTO",
+          `${clientPhotos.length} real photo(s) of the client are attached (labelled FOTO). That person is the subject of this ad.`
         )
       : null,
     siblings.length
       ? section(
-          "## CONCEITOS JÁ ESCRITOS NESTA DEMANDA (diferencie-se deles)",
-          siblings.map((s) => `- Arte ${s.index + 1}: ${s.concept}`).join("\n")
+          "## SIBLING ADS ALREADY DIRECTED IN THIS CAMPAIGN (use a different master and hero)",
+          siblings
+            .map((s) => `- Ad ${s.index + 1}${s.master ? ` (master ${s.master})` : ""}: ${s.concept}`)
+            .join("\n")
         )
       : null,
-    steer?.trim()
-      ? section("## DIREÇÃO DO OPERADOR (prioridade máxima)", steer.trim())
+    assignedMaster
+      ? section(
+          "## ASSIGNED LAYOUT MASTER",
+          `Use ${assignedMaster} as the layout master of this ad (other ads of this campaign use other masters).`
+        )
       : null,
+    steer?.trim() ? section("## OPERATOR DIRECTION (highest priority)", steer.trim()) : null,
   ].filter(Boolean);
 
   return blocks.join("\n\n");
+}
+
+// ---------------------------------------------------------------------------
+// Conteúdo multimodal: referências rotuladas + fotos + texto
+// ---------------------------------------------------------------------------
+
+async function buildContent(
+  input: ArtDirectionInput
+): Promise<{ content: Anthropic.Messages.ContentBlockParam[]; sentTokens: string[] }> {
+  const now = new Date();
+  const entries = input.catalog.entries.slice(0, MAX_VISION_REFERENCES);
+  const images = await Promise.all(entries.map((e) => urlToVisionBlock(e.asset.storageUrl)));
+
+  const content: Anthropic.Messages.ContentBlockParam[] = [];
+  const sentTokens: string[] = [];
+
+  entries.forEach((entry, i) => {
+    const image = images[i];
+    if (!image) return;
+    sentTokens.push(entry.token);
+    const winner = entry.asset.isWinner ? ", approved past ad of this client" : "";
+    content.push({
+      type: "text",
+      text: `${entry.token} (${entry.asset.kind}${winner}; ${describeUsage(entry.asset, now)}):`,
+    });
+    content.push(image);
+  });
+
+  if (input.clientPhotos.length) {
+    const photos = await Promise.all(input.clientPhotos.map((p) => urlToVisionBlock(p.url, 800)));
+    photos.forEach((photo, i) => {
+      if (!photo) return;
+      content.push({ type: "text", text: `FOTO ${i + 1} (real client photo):` });
+      content.push(photo);
+    });
+  }
+
+  content.push({ type: "text", text: buildUserPrompt(input) });
+  return { content, sentTokens };
 }
 
 // ---------------------------------------------------------------------------
@@ -120,7 +168,7 @@ export function buildUserPrompt(input: ArtDirectionInput): string {
 // ---------------------------------------------------------------------------
 
 export function resolveReferences(
-  raw: ArtDirectorToolInput["references"],
+  raw: ArtDirectorOutput["references"],
   input: ArtDirectionInput
 ): ChosenReference[] {
   const out: ChosenReference[] = [];
@@ -135,9 +183,11 @@ export function resolveReferences(
     out.push({
       assetId: asset.id,
       storageUrl: asset.storageUrl,
-      role: isReferenceKind(ref.role) ? ref.role : asset.kind,
-      intent: ref.intent.trim().slice(0, 200),
+      // A primeira escolhida é o mestre, sempre com papel de layout.
+      role: out.length === 0 ? "layout" : isReferenceKind(ref.role) ? ref.role : asset.kind,
+      intent: ref.intent.trim().slice(0, 240),
     });
+    if (out.length >= 3) break;
   }
 
   return out;
@@ -147,27 +197,35 @@ export function resolveReferences(
 // Chamada
 // ---------------------------------------------------------------------------
 
-function extractToolInput(
-  content: Anthropic.Messages.Message["content"]
-): ArtDirectorToolInput {
-  const block = content.find(
-    (b): b is Anthropic.Messages.ToolUseBlock =>
-      b.type === "tool_use" && b.name === ART_DIRECTOR_TOOL.name
-  );
-  if (!block) {
-    throw new ArtDirectionError("Claude não devolveu a direção de arte estruturada");
+function parseOutput(message: Anthropic.Messages.Message): ArtDirectorOutput {
+  if (message.stop_reason === "refusal") {
+    throw new ArtDirectionError("O modelo recusou a direção desta arte");
   }
-  return block.input as ArtDirectorToolInput;
+  if (message.stop_reason === "max_tokens") {
+    throw new ArtDirectionError("Direção de arte truncada (max_tokens)");
+  }
+  const text = message.content.find(
+    (b): b is Anthropic.Messages.TextBlock => b.type === "text"
+  )?.text;
+  if (!text) throw new ArtDirectionError("Claude não devolveu a direção de arte");
+  return JSON.parse(text) as ArtDirectorOutput;
 }
 
-function validate(parsed: ArtDirectorToolInput): void {
-  if (!parsed.prompt?.trim()) throw new ArtDirectionError("Prompt vazio");
+function validate(parsed: ArtDirectorOutput): void {
+  if (!parsed.brief?.trim()) throw new ArtDirectionError("Briefing vazio");
   if (!parsed.concept?.trim()) throw new ArtDirectionError("Conceito vazio");
+  const words = parsed.brief.trim().split(/\s+/).length;
+  if (words < 80) throw new ArtDirectionError(`Briefing curto demais (${words} palavras)`);
+}
 
-  const words = parsed.prompt.trim().split(/\s+/).length;
-  if (words < 60) {
-    throw new ArtDirectionError(`Prompt curto demais (${words} palavras)`);
-  }
+function isRetryable(error: unknown): boolean {
+  return (
+    error instanceof Anthropic.RateLimitError ||
+    error instanceof Anthropic.InternalServerError ||
+    error instanceof Anthropic.APIConnectionError ||
+    error instanceof ArtDirectionError ||
+    error instanceof SyntaxError
+  );
 }
 
 function sleep(ms: number): Promise<void> {
@@ -177,7 +235,7 @@ function sleep(ms: number): Promise<void> {
 export async function directArt(input: ArtDirectionInput): Promise<ArtDirection> {
   const anthropic = getAnthropicClient();
   const model = getArtDirectorModel();
-  const userPrompt = buildUserPrompt(input);
+  const { content } = await buildContent(input);
 
   let lastError: Error | null = null;
 
@@ -186,16 +244,16 @@ export async function directArt(input: ArtDirectionInput): Promise<ArtDirection>
       const response = await anthropic.messages.create({
         model,
         max_tokens: MAX_TOKENS,
-        // Alta o bastante para variar entre artes irmãs, baixa o bastante para
-        // não ignorar as regras do cliente.
-        temperature: 0.9,
+        thinking: { type: "adaptive" },
+        output_config: {
+          effort: "high",
+          format: { type: "json_schema", schema: ART_DIRECTOR_OUTPUT_SCHEMA },
+        },
         system: ART_DIRECTOR_SYSTEM_PROMPT,
-        tools: [ART_DIRECTOR_TOOL],
-        tool_choice: { type: "tool", name: ART_DIRECTOR_TOOL.name },
-        messages: [{ role: "user", content: userPrompt }],
+        messages: [{ role: "user", content }],
       });
 
-      const parsed = extractToolInput(response.content);
+      const parsed = parseOutput(response);
       validate(parsed);
 
       const references = resolveReferences(parsed.references ?? [], input);
@@ -205,14 +263,18 @@ export async function directArt(input: ArtDirectionInput): Promise<ArtDirection>
 
       return {
         concept: parsed.concept.trim(),
-        prompt: parsed.prompt.trim(),
-        negative: (parsed.negative ?? []).map((n) => n.trim()).filter(Boolean).slice(0, 8),
+        prompt: parsed.brief.trim(),
+        negative: (parsed.negative ?? []).map((n) => n.trim()).filter(Boolean).slice(0, 6),
         differentiator: parsed.differentiator?.trim() ?? "",
         references,
       };
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
-      if (attempt < MAX_RETRIES) await sleep(RETRY_DELAY_MS * attempt);
+      if (attempt < MAX_RETRIES && isRetryable(error)) {
+        await sleep(RETRY_DELAY_MS * attempt);
+        continue;
+      }
+      break;
     }
   }
 

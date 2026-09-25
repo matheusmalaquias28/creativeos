@@ -101,6 +101,8 @@ export type ArtDirectionArt = {
 export type SiblingConcept = {
   index: number;
   concept: string;
+  /** Token da referência usada como layout mestre (r01…), quando conhecido. */
+  master?: string | null;
 };
 
 /**
@@ -122,6 +124,8 @@ export type ArtDirectionInput = {
   clientPhotos: ClientPhoto[];
   /** Direção livre do operador ao regenerar: "mais minimalista", "sem pessoas". */
   steer?: string | null;
+  /** Mestre pré-atribuído (token do catálogo) — usado na preparação em paralelo. */
+  assignedMaster?: string | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -154,4 +158,8 @@ export type DirectionMeta = {
   model: string;
   catalogSize: number;
   writtenAt: string;
+  /** Token do layout mestre escolhido (r01…). */
+  master?: string | null;
+  /** Resultado da revisão automática da última geração. */
+  review?: { pass: boolean; score: number; attempts: number; fixes: string[] } | null;
 };

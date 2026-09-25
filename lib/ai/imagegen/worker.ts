@@ -1,22 +1,37 @@
 /**
  * Worker de geração em lote com concorrência limitada.
  * Processa jobs com status 'queued' da tabela art_generation_job.
- * Geração é síncrona — sem webhook, sem polling externo.
  *
- * Timeout: cada job tem 2min para completar (configável via IMAGE_JOB_TIMEOUT_MS).
+ * A curadoria gera SEMPRE pelo Gemini, direto — `params.model` é ignorado
+ * (nada de Magnific aqui). Por job:
+ *   1. monta o prompt: referências → briefing do diretor → padrões fixos;
+ *   2. gera no Gemini;
+ *   3. compõe a logo real (sem fundo, contraste garantido, topo central);
+ *   4. revisão automática com visão; se reprovar, UMA nova tentativa com as
+ *      correções anexadas ao prompt (fica a melhor das duas);
+ *   5. salva a arte final (v1.png) e a versão sem logo (v1_raw.png), usada
+ *      pelos ajustes para recompor a logo sem duplicá-la.
+ *
+ * Timeout: IMAGE_JOB_TIMEOUT_MS (padrão 4min — cobre duas gerações + revisões).
  * Cancelamento: ao marcar o job como 'failed' externamente, o worker respeita.
  */
 
 import pLimit from "p-limit";
+import sharp from "sharp";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateArt, type ImageSize, type AspectRatio } from "./client";
 import { urlsToInlineDataParts, urlToInlineDataPart } from "./storage-refs";
-import { compositeLogoFromBase64 } from "./logo-composite";
-import { compilePrompt, buildOrderedRefs } from "./prompt-compiler";
-import { appendTechnicalBlock } from "@/lib/ai/art-director/technical-block";
+import { compositeBrandLogo, prepareLogo } from "./brand-logo";
+import { compilePrompt } from "./prompt-compiler";
+import {
+  appendTechnicalBlock,
+  buildStandardsBlock,
+  LOGO_ZONE_BAND,
+  type TechnicalBlockSpec,
+} from "@/lib/ai/art-director/technical-block";
+import { reviewArt, type ArtReview } from "@/lib/ai/art-director/review-art";
 import { ART_ASPECT_RATIO } from "@/lib/ai/art-director/constants";
-import type { ReferenceRole } from "@/lib/ai/art-director/types";
-import { generateMagnificArt } from "@/lib/magnific/generate-art";
+import type { DirectionMeta, ReferenceRole } from "@/lib/ai/art-director/types";
 import { IMAGE_GEN_DEFAULTS } from "./defaults";
 import type { LogoPlacement } from "./logo-composite";
 import type { CreativeProfile, ArtSpec, BriefingCopy, DemandReference } from "./prompt-compiler";
@@ -25,8 +40,12 @@ import type { CreativeProfile, ArtSpec, BriefingCopy, DemandReference } from "./
 // Config
 // ---------------------------------------------------------------------------
 
-const MAX_CONCURRENCY = Number(process.env.IMAGE_MAX_CONCURRENCY ?? "3");
-const JOB_TIMEOUT_MS = Number(process.env.IMAGE_JOB_TIMEOUT_MS ?? String(2 * 60 * 1000)); // 2min
+const MAX_CONCURRENCY = Number(process.env.IMAGE_MAX_CONCURRENCY ?? "5");
+const JOB_TIMEOUT_MS = Number(process.env.IMAGE_JOB_TIMEOUT_MS ?? String(4 * 60 * 1000)); // 4min
+/** Revisão automática com visão. Desligue com ART_REVIEW_ENABLED=0. */
+const REVIEW_ENABLED = process.env.ART_REVIEW_ENABLED !== "0";
+/** Gerações por job, contando a primeira (1 = sem nova tentativa). */
+const MAX_ATTEMPTS = Math.max(1, Number(process.env.ART_REVIEW_MAX_ATTEMPTS ?? "2"));
 
 // ---------------------------------------------------------------------------
 // Types
@@ -41,6 +60,7 @@ type JobRow = {
   prompt_draft?: string | null;
   /** Edição do operador sobre o rascunho. Vence o rascunho quando existe. */
   prompt_edited?: string | null;
+  direction?: DirectionMeta | null;
   params: {
     headline?: string | null;
     subheadline?: string | null;
@@ -104,17 +124,16 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 // ---------------------------------------------------------------------------
 
 async function uploadArtToStorage(params: {
-  base64: string;
-  mimeType: string;
+  buffer: Buffer;
   jobId: string;
   versionNumber: number;
+  /** Versão sem logo (insumo dos ajustes). */
+  raw?: boolean;
 }): Promise<{ publicUrl: string; storagePath: string }> {
   const supabase = createAdminClient();
-  const { base64, mimeType, jobId, versionNumber } = params;
-
-  const ext = mimeType.includes("png") ? "png" : "jpg";
-  const storagePath = `${jobId}/v${versionNumber}.${ext}`;
-  const buffer = Buffer.from(base64, "base64");
+  const { buffer, jobId, versionNumber, raw } = params;
+  const mimeType = "image/png";
+  const storagePath = `${jobId}/v${versionNumber}${raw ? "_raw" : ""}.png`;
 
   const { error } = await supabase.storage
     .from("art-generations")
@@ -261,110 +280,130 @@ async function runJob(
   };
 
   const effectiveLogoUrl = flowLogoUrl ?? profile?.logo_url ?? null;
-  const model = job.params.model ?? IMAGE_GEN_DEFAULTS.model;
 
-  let base64: string;
-  let mimeType: string;
-  let promptFinal: string;
+  const textSpec: TechnicalBlockSpec = {
+    headline: artSpec.headline,
+    subheadline: artSpec.subheadline,
+    cta: artSpec.cta,
+    informacoesExtras: artSpec.informacoesExtras,
+    aspectRatio: artSpec.aspect_ratio,
+    imageSize: artSpec.image_size,
+  };
 
-  if (model !== "gemini") {
-    // Caminho Magnific (ex: gpt-2) — não precisa de composite pixel-a-pixel nem da
-    // ordenação posicional de referências do Gemini; a logo/copy vão direto no
-    // prompt do agente (ver lib/magnific/generate-art.ts).
-    const result = await generateMagnificArt({
-      model,
-      // Fluxo legado (sem prompt aprovado) mantém o prompt interno do módulo.
-      overridePrompt: approvedPrompt,
-      quality: job.params.quality ?? IMAGE_GEN_DEFAULTS.quality,
-      aspectRatio: artSpec.aspect_ratio ?? IMAGE_GEN_DEFAULTS.aspectRatio,
-      resolution: (artSpec.image_size ?? IMAGE_GEN_DEFAULTS.imageSize).toLowerCase(),
-      headline: artSpec.headline,
-      subheadline: artSpec.subheadline,
-      cta: artSpec.cta,
-      informacoesExtras: artSpec.informacoesExtras,
-      briefingTitulo: briefing.titulo,
-      briefingTipo: briefing.tipo,
-      logoUrl: effectiveLogoUrl,
-      visualIdentityPrompt: creativeProfile.base_prompt || null,
-      references: approvedPrompt && directedRefs.length
-        ? directedRefs
-            .filter((r) => r.role !== "logo")
-            .map((r) => ({ url: r.storage_url, role: r.intent ?? r.role }))
-        : allDemandRefs,
-    });
+  // Referências enviadas ao Gemini. A logo nunca entra: ela é composta depois.
+  const styleRefs = directedRefs.filter((r) => r.role !== "logo");
+  const refUrls = approvedPrompt
+    ? styleRefs.map((r) => r.storage_url)
+    : [...creativeProfile.style_reference_urls, ...allDemandRefs.map((r) => r.url)];
 
-    promptFinal = `[Magnific ${model}] ${JSON.stringify({ artSpec, briefing })}`;
-    const part = await urlToInlineDataPart(result.imageUrl);
-    base64 = part.inlineData.data;
-    mimeType = part.inlineData.mimeType;
-  } else {
-    let refUrls: string[];
-
+  const buildPrompt = (fixNotes?: string[]): string => {
     if (approvedPrompt) {
-      // Caminho da camada de direção de arte: o prompt aprovado carrega a
-      // direção, o bloco técnico impõe as regras de negócio.
-      promptFinal = appendTechnicalBlock(
+      // Camada de direção de arte: o briefing aprovado carrega o design,
+      // o bloco técnico impõe os padrões de produto.
+      return appendTechnicalBlock(
         approvedPrompt,
-        {
-          headline: artSpec.headline,
-          subheadline: artSpec.subheadline,
-          cta: artSpec.cta,
-          informacoesExtras: artSpec.informacoesExtras,
-          aspectRatio: artSpec.aspect_ratio,
-          imageSize: artSpec.image_size,
-        },
-        directedRefs.map((r) => ({ role: r.role, intent: r.intent }))
+        textSpec,
+        styleRefs.map((r) => ({ role: r.role, intent: r.intent })),
+        fixNotes
       );
-      refUrls = directedRefs.map((r) => r.storage_url);
-    } else {
-      // Fluxo legado, intacto.
-      promptFinal = compilePrompt(creativeProfile, briefing, artSpec, allDemandRefs);
-
-      refUrls = [
-        ...creativeProfile.style_reference_urls,
-        ...(creativeProfile.logo_mode === "reference" && effectiveLogoUrl
-          ? [effectiveLogoUrl]
-          : []),
-        ...allDemandRefs.map((r) => r.url),
-      ];
-
-      // Valida que a ordem bate com buildOrderedRefs (assertion em dev)
-      const expectedCount = buildOrderedRefs(creativeProfile, allDemandRefs).length;
-      if (refUrls.length !== expectedCount) {
-        console.warn(`[worker] ref count mismatch: urls=${refUrls.length} vs compiler=${expectedCount}`);
-      }
     }
+    // Sem diretor (canvas de fluxo): prompt compilado + os mesmos padrões.
+    const parts = [
+      compilePrompt(creativeProfile, briefing, artSpec, allDemandRefs),
+      buildStandardsBlock(textSpec),
+    ];
+    if (fixNotes?.length) {
+      parts.push(
+        ["A PREVIOUS ATTEMPT FAILED REVIEW. Fix all of these:", ...fixNotes.map((n) => `- ${n}`)].join("\n")
+      );
+    }
+    return parts.join("\n\n");
+  };
 
-    const references = await urlsToInlineDataParts(refUrls);
+  const references = await urlsToInlineDataParts(refUrls);
+  const cleanLogo = effectiveLogoUrl
+    ? await prepareLogo(
+        Buffer.from((await urlToInlineDataPart(effectiveLogoUrl)).inlineData.data, "base64")
+      )
+    : null;
+
+  type Candidate = { raw: Buffer; final: Buffer; prompt: string; review: ArtReview | null };
+  let best: Candidate | null = null;
+  let fixNotes: string[] | undefined;
+  let attempts = 0;
+
+  while (attempts < MAX_ATTEMPTS) {
+    attempts += 1;
+    const prompt = buildPrompt(fixNotes);
 
     const generated = await generateArt({
-      prompt: promptFinal,
+      prompt,
       references,
       imageSize: (artSpec.image_size as ImageSize) ?? "2K",
       aspectRatio: (artSpec.aspect_ratio as AspectRatio) ?? IMAGE_GEN_DEFAULTS.aspectRatio,
     });
-    base64 = generated.base64;
-    mimeType = generated.mimeType;
+    const raw = await sharp(Buffer.from(generated.base64, "base64")).png().toBuffer();
+    const logoResult = cleanLogo
+      ? await compositeBrandLogo({ art: raw, logo: cleanLogo, palette: creativeProfile.palette })
+      : null;
+    const final = logoResult?.buffer ?? raw;
 
-    // Composição do logo se mode=composite
-    if (creativeProfile.logo_mode === "composite" && effectiveLogoUrl) {
-      const logoPart = await urlToInlineDataPart(effectiveLogoUrl);
-      const composited = await compositeLogoFromBase64({
-        artBase64: base64,
-        artMimeType: mimeType,
-        logoBase64: logoPart.inlineData.data,
-        logoMimeType: logoPart.inlineData.mimeType,
-        placement: profile?.logo_placement ?? {},
-      });
-      base64 = composited.base64;
-      mimeType = composited.mimeType;
+    let review: ArtReview | null = null;
+    if (REVIEW_ENABLED) {
+      try {
+        review = await reviewArt({ image: final, spec: textSpec });
+      } catch (err) {
+        // Revisão é filtro de qualidade: se falhar, a arte segue para a curadoria.
+        console.warn("[worker] revisão falhou:", (err as Error)?.message ?? err);
+      }
     }
+
+    // Checagem objetiva: logo atravessando borda/objeto reprova mesmo que a
+    // revisão visual tenha passado.
+    if (logoResult && !logoResult.backgroundOk) {
+      review = {
+        pass: false,
+        score: Math.min(review?.score ?? 6, 6),
+        fixes: [
+          ...(review?.fixes ?? []),
+          `The top band from 0% to ${Math.round(LOGO_ZONE_BAND.to * 100)}% of the height, across the middle 60% of the width, must be ONE uniform calm background area — move any edge, colour block, photo border, paper, tape, object or text out of it.`,
+        ],
+      };
+    }
+
+    if (!best || (review?.score ?? 0) > (best.review?.score ?? 0)) {
+      best = { raw, final, prompt, review };
+    }
+
+    if (!review || review.pass) break;
+    fixNotes = review.fixes;
   }
 
-  // Upload ao Storage
+  if (!best) throw new Error("Nenhuma arte gerada");
+  const promptFinal = best.prompt;
+
+  // Upload ao Storage — final (com logo) e raw (sem logo, insumo dos ajustes).
   const { publicUrl, storagePath } = await uploadArtToStorage({
-    base64, mimeType, jobId: job.id, versionNumber: 1,
+    buffer: best.final,
+    jobId: job.id,
+    versionNumber: 1,
   });
+  await uploadArtToStorage({ buffer: best.raw, jobId: job.id, versionNumber: 1, raw: true }).catch(
+    (err) => console.warn("[worker] upload da versão sem logo falhou:", (err as Error)?.message ?? err)
+  );
+
+  if (job.direction && best.review) {
+    const direction: DirectionMeta = {
+      ...job.direction,
+      review: {
+        pass: best.review.pass,
+        score: best.review.score,
+        attempts,
+        fixes: best.review.fixes,
+      },
+    };
+    await supabase.from("art_generation_job").update({ direction }).eq("id", job.id);
+  }
 
   // Registra na Galeria (não-fatal)
   await supabase.from("generated_images").insert({
@@ -410,7 +449,7 @@ export async function runWorker(demandId?: string): Promise<{ processed: number 
 
   let query = supabase
     .from("art_generation_job")
-    .select("id, demand_id, client_id, art_index, params, prompt_draft, prompt_edited")
+    .select("id, demand_id, client_id, art_index, params, prompt_draft, prompt_edited, direction")
     .eq("status", "queued")
     .order("created_at", { ascending: true });
 

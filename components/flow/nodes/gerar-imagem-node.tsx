@@ -99,7 +99,7 @@ export function GerarImagemNode({ id, data, selected }: Props) {
         className={cn(flowHandleClass, "!bg-tone-amber")} title="Prompt" />
 
       <div className="flex flex-wrap items-center gap-1.5">
-        {["Magnific", IMAGE_GEN_DEFAULTS.aspectRatio, IMAGE_GEN_DEFAULTS.imageSize, IMAGE_GEN_DEFAULTS.quality].map(
+        {["Gemini", IMAGE_GEN_DEFAULTS.aspectRatio, IMAGE_GEN_DEFAULTS.imageSize].map(
           (chip, i) => (
             <span
               key={i}

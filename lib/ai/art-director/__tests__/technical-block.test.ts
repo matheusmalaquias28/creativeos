@@ -1,122 +1,109 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   appendTechnicalBlock,
   buildReferenceBlock,
+  buildStandardsBlock,
   buildTextBlock,
-  SCENE_REQUIREMENT,
+  CONTENT_TOP,
+  CTA_BOTTOM,
+  LOGO_ZONE_BAND,
+  sanitizeBrief,
 } from "../technical-block";
+import { ART_ASPECT_RATIO } from "../constants";
 
 describe("buildReferenceBlock", () => {
-  it("enumera na ordem recebida", () => {
+  it("marca a primeira referência de estilo como layout mestre e enumera na ordem", () => {
     const out = buildReferenceBlock([
-      { role: "logo", intent: null },
-      { role: "estilo", intent: "a paleta e o contraste desta" },
-      { role: "personagem", intent: "o tipo físico desta" },
+      { role: "layout", intent: "a divisão de quadro" },
+      { role: "textura", intent: "o grão do papel" },
     ]);
-    expect(out).toContain("- Imagem 1: é a logo da marca");
-    expect(out).toContain("- Imagem 2: a paleta e o contraste desta");
-    expect(out).toContain("- Imagem 3: o tipo físico desta");
+    expect(out).toContain("- Image 1 is the LAYOUT & TYPOGRAPHY MASTER");
+    expect(out).toContain("Focus: a divisão de quadro");
+    expect(out).toContain("- Image 2 is a supporting reference (textura) — use it only for: o grão do papel.");
   });
 
-  it("cai para o papel genérico quando a IA não escreveu intent", () => {
-    expect(buildReferenceBlock([{ role: "layout", intent: null }])).toContain(
-      "use como referência de layout"
-    );
+  it("foto real do cliente vem antes e não vira mestre", () => {
+    const out = buildReferenceBlock([
+      { role: "personagem", intent: null },
+      { role: "estilo", intent: null },
+    ]);
+    expect(out).toContain("- Image 1 is a real photo of the client");
+    expect(out).toContain("- Image 2 is the LAYOUT & TYPOGRAPHY MASTER");
   });
 
-  it("some quando não há referências", () => {
+  it("ignora a logo e retorna vazio sem referências", () => {
     expect(buildReferenceBlock([])).toBe("");
-  });
-
-  it("nunca deixa a logo virar referência de estilo", () => {
-    const out = buildReferenceBlock([{ role: "logo", intent: "copie o estilo" }]);
-    expect(out).toContain("não a use como referência de estilo");
+    expect(buildReferenceBlock([{ role: "logo", intent: null }])).toBe("");
   });
 });
 
 describe("buildTextBlock", () => {
-  it("lista somente os textos fornecidos e proíbe outros TEXTOS", () => {
+  it("lista somente os textos permitidos, com o CTA marcado como botão", () => {
     const out = buildTextBlock({ headline: "Divórcio sem briga", cta: "Fale agora" });
-    expect(out).toContain('- Headline principal: "Divórcio sem briga"');
-    expect(out).toContain('- Call-to-action: "Fale agora"');
-    expect(out).toContain("Nenhum outro TEXTO pode aparecer");
-    expect(out).not.toContain("Subheadline");
+    expect(out).toContain('"Divórcio sem briga"');
+    expect(out).toContain('"Fale agora" (button)');
+    expect(out).toContain("same letter case");
+    expect(out).toContain("never any English words");
   });
 
-  // Regressão do bug que fez o modelo entregar só tipografia e logo sobre fundo
-  // liso: a frase antiga ("A IMAGEM DEVE CONTER SOMENTE ESSES TEXTOS, NADA
-  // MAIS") era lida como restrição da arte inteira, não do texto.
-  it("nunca restringe a imagem, só o texto", () => {
-    const out = buildTextBlock({ headline: "oi", cta: "clique" });
-    expect(out).not.toContain("A IMAGEM DEVE CONTER SOMENTE");
-    expect(out).toContain("SOMENTE para texto");
-    expect(out).toContain("os elementos visuais da cena continuam obrigatórios");
+  it("sem copy, proíbe texto mas mantém a composição", () => {
+    expect(buildTextBlock({})).toContain("NO text at all");
+  });
+});
+
+describe("buildStandardsBlock", () => {
+  it("impõe área segura, zona da logo e botão centralizado na base", () => {
+    const out = buildStandardsBlock({ headline: "oi", cta: "Saiba mais", aspectRatio: ART_ASPECT_RATIO });
+    expect(out).toContain("3:4 portrait");
+    expect(out).toContain("Meta");
+    expect(out).toContain(`${Math.round(LOGO_ZONE_BAND.to * 100)}% of the height`);
+    expect(out).toContain(`starts below ${Math.round(CONTENT_TOP * 100)}%`);
+    expect(out).toContain("Do NOT draw any logo");
+    expect(out).toContain("horizontally centred");
+    expect(out).toContain(`${Math.round(CTA_BOTTOM * 100)}% of the canvas height`);
   });
 
-  it("preserva a acentuação da copy", () => {
-    expect(buildTextBlock({ headline: "Atenção: inscrições até março" })).toContain(
-      "Atenção: inscrições até março"
+  it("não fala de botão quando não há CTA", () => {
+    expect(buildStandardsBlock({ headline: "oi" })).not.toContain("BUTTON:");
+  });
+});
+
+describe("sanitizeBrief", () => {
+  it("troca o tipo de documento em inglês, sem tocar a copy em português", () => {
+    expect(sanitizeBrief("a folded paper contract beside Contracts")).toBe(
+      "a folded paper printed pages beside printed pages"
     );
+    expect(sanitizeBrief('headline "consulte o contrato."')).toBe('headline "consulte o contrato."');
   });
 
-  it("só impõe a regra do botão quando há CTA", () => {
-    expect(buildTextBlock({ headline: "oi", cta: "Clique" })).toContain("é um BOTÃO");
-    expect(buildTextBlock({ headline: "oi" })).not.toContain("é um BOTÃO");
-  });
-
-  it("proíbe texto sem dispensar a cena quando não há copy nenhuma", () => {
-    const out = buildTextBlock({});
-    expect(out).toContain("Nenhum TEXTO deve aparecer");
-    expect(out).toContain("cena visual continua obrigatória");
+  it("é aplicado ao briefing no prompt final", () => {
+    expect(appendTechnicalBlock("a signed contract", {}, [])).toContain("a signed printed pages");
   });
 });
 
 describe("appendTechnicalBlock", () => {
-  const prompt = "Plano médio de uma mulher de perfil contra concreto aparente.";
+  const prompt = "Briefing do diretor.";
 
-  it("mantém o prompt aprovado na frente", () => {
-    const out = appendTechnicalBlock(prompt, { headline: "oi" }, []);
-    expect(out.startsWith(prompt)).toBe(true);
+  it("ordena referências, briefing e padrões", () => {
+    const out = appendTechnicalBlock(prompt, { headline: "oi" }, [{ role: "layout", intent: null }]);
+    const iRefs = out.indexOf("REFERENCE IMAGES");
+    const iBrief = out.indexOf(prompt);
+    const iStd = out.indexOf("PRODUCTION STANDARDS");
+    expect(iRefs).toBeGreaterThanOrEqual(0);
+    expect(iRefs).toBeLessThan(iBrief);
+    expect(iBrief).toBeLessThan(iStd);
   });
 
-  it("anexa formato quando informado", () => {
-    const out = appendTechnicalBlock(prompt, { aspectRatio: "3:4", imageSize: "2K" }, []);
-    expect(out).toContain("proporção 3:4, resolução 2K");
-  });
-
-  it("omite o bloco de formato quando não há spec técnica", () => {
-    expect(appendTechnicalBlock(prompt, {}, [])).not.toContain("Produção para redes sociais");
-  });
-
-  it("exige cena com profundidade e proíbe fundo liso", () => {
-    expect(SCENE_REQUIREMENT).toContain("ocupa o quadro inteiro");
-    expect(SCENE_REQUIREMENT).toContain("Fundo liso");
-    const out = appendTechnicalBlock(prompt, { headline: "oi" }, []);
-    expect(out).toContain(SCENE_REQUIREMENT);
+  it("anexa as correções da revisão quando houver", () => {
+    const out = appendTechnicalBlock(prompt, { headline: "oi" }, [], ["Remova a palavra CONTRACT"]);
+    expect(out).toContain("A PREVIOUS ATTEMPT FAILED REVIEW");
+    expect(out).toContain("- Remova a palavra CONTRACT");
+    expect(appendTechnicalBlock(prompt, { headline: "oi" }, [])).not.toContain("FAILED REVIEW");
   });
 
   it("é determinístico", () => {
-    const spec = { headline: "a", cta: "b", aspectRatio: "1:1" };
+    const spec = { headline: "oi", cta: "clique", aspectRatio: "3:4" };
     const refs = [{ role: "estilo" as const, intent: "x" }];
-    expect(appendTechnicalBlock(prompt, spec, refs)).toBe(
-      appendTechnicalBlock(prompt, spec, refs)
-    );
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Formato: 3:4 SEMPRE
-// ---------------------------------------------------------------------------
-
-import { ART_ASPECT_RATIO } from "../constants";
-
-describe("ART_ASPECT_RATIO", () => {
-  it("é 3:4", () => {
-    expect(ART_ASPECT_RATIO).toBe("3:4");
-  });
-
-  it("chega ao bloco técnico quando usado no spec", () => {
-    const out = appendTechnicalBlock("cena", { aspectRatio: ART_ASPECT_RATIO }, []);
-    expect(out).toContain("proporção 3:4");
+    expect(appendTechnicalBlock(prompt, spec, refs)).toBe(appendTechnicalBlock(prompt, spec, refs));
   });
 });

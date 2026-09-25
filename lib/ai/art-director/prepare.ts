@@ -5,7 +5,8 @@
  * conceitos das irmãs já escritas e é obrigada a se diferenciar. ~4s por arte,
  * ~20s numa demanda de 5 — o custo de não ver 5 variações da mesma ideia.
  *
- * Nada aqui toca o caminho Magnific Spaces nem o /api/art-gen/queue legado.
+ * A logo nunca entra como referência do modelo de imagem: ela é composta depois,
+ * sem fundo e com contraste garantido (lib/ai/imagegen/brand-logo.ts).
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -22,11 +23,12 @@ import type {
   DirectionMeta,
   DirectionNote,
   ReferenceAsset,
+  ReferenceCatalog,
   ReferenceKind,
   SiblingConcept,
 } from "./types";
 
-/** O novo fluxo usa Gemini. O default global segue "gpt-2" para não mexer no legado. */
+/** A curadoria gera só pelo Gemini, direto — nada de Magnific. */
 export const ART_DIRECTOR_IMAGE_MODEL = "gemini";
 
 type Supabase = ReturnType<typeof createAdminClient>;
@@ -188,13 +190,21 @@ async function persistReferences(
   if (error) throw new Error(`Falha ao salvar referências: ${error.message}`);
 }
 
+function masterToken(direction: ArtDirection, catalog: ReferenceCatalog): string | null {
+  const master = direction.references[0];
+  if (!master) return null;
+  return catalog.entries.find((e) => e.asset.id === master.assetId)?.token ?? null;
+}
+
 function buildMeta(
   direction: ArtDirection,
   steer: string | null,
   model: string,
-  catalogSize: number
+  catalog: ReferenceCatalog
 ): DirectionMeta {
+  const catalogSize = catalog.entries.length;
   return {
+    master: masterToken(direction, catalog),
     concept: direction.concept,
     differentiator: direction.differentiator,
     negative: direction.negative,
@@ -209,7 +219,10 @@ function buildMeta(
 // prepareDemandPrompts
 // ---------------------------------------------------------------------------
 
-export async function prepareDemandPrompts(demandId: string): Promise<PrepareResult> {
+export async function prepareDemandPrompts(
+  demandId: string,
+  options: { parallel?: boolean } = {}
+): Promise<PrepareResult> {
   const supabase = createAdminClient();
 
   const { data: demand, error: demandError } = await supabase
@@ -269,7 +282,8 @@ export async function prepareDemandPrompts(demandId: string): Promise<PrepareRes
   // 3:4 SEMPRE: ignora profile.aspect_ratio e o aspectRatio da arte do Make.
   const aspectRatio = ART_ASPECT_RATIO;
   const imageSize = profile.image_size ?? ART_IMAGE_SIZE_FALLBACK;
-  const logoAsReference = profile.logo_mode === "reference";
+  // Logo nunca é referência do modelo de imagem (ver cabeçalho).
+  const logoAsReference = false;
 
   const jobRows = artes.map((arte, index) => ({
     demand_id: demandId,
@@ -312,7 +326,10 @@ export async function prepareDemandPrompts(demandId: string): Promise<PrepareRes
   const directions: { jobId: string; artIndex: number; direction: ArtDirection }[] = [];
   const warnings: string[] = [];
 
-  for (const job of jobs) {
+  const directJob = async (
+    job: (typeof jobs)[number],
+    extra: { siblings: SiblingConcept[]; assignedMaster: string | null }
+  ) => {
     const params = job.params as Record<string, unknown>;
     const artIndex = job.art_index as number;
 
@@ -338,13 +355,13 @@ export async function prepareDemandPrompts(demandId: string): Promise<PrepareRes
           aspectRatio,
           imageSize: (params.image_size as string) ?? imageSize,
         },
-        siblings: [...siblings],
+        siblings: extra.siblings,
+        assignedMaster: extra.assignedMaster,
         clientPhotos: [],
         steer: null,
       });
-
       directions.push({ jobId: job.id as string, artIndex, direction });
-      siblings.push({ index: artIndex, concept: direction.concept });
+      return direction;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       warnings.push(`Arte ${artIndex + 1}: ${message}`);
@@ -352,6 +369,34 @@ export async function prepareDemandPrompts(demandId: string): Promise<PrepareRes
         .from("art_generation_job")
         .update({ status: "failed", error: message, updated_at: new Date().toISOString() })
         .eq("id", job.id);
+      return null;
+    }
+  };
+
+  if (options.parallel) {
+    // Em paralelo, a variedade vem de mestres distintos pré-atribuídos (do menos
+    // usado para o mais usado), já que as irmãs ainda não existem.
+    await Promise.all(
+      jobs.map((job, i) =>
+        directJob(job, {
+          siblings: [],
+          assignedMaster: catalog.entries.length
+            ? catalog.entries[i % catalog.entries.length].token
+            : null,
+        })
+      )
+    );
+    directions.sort((x, y) => x.artIndex - y.artIndex);
+  } else {
+    for (const job of jobs) {
+      const direction = await directJob(job, { siblings: [...siblings], assignedMaster: null });
+      if (direction) {
+        siblings.push({
+          index: job.art_index as number,
+          concept: direction.concept,
+          master: masterToken(direction, catalog),
+        });
+      }
     }
   }
 
@@ -384,7 +429,7 @@ export async function prepareDemandPrompts(demandId: string): Promise<PrepareRes
         status: "awaiting_approval",
         prompt_draft: direction.prompt,
         prompt_edited: null,
-        direction: buildMeta(direction, null, "art-director", catalog.entries.length),
+        direction: buildMeta(direction, null, "art-director", catalog),
         error: null,
         updated_at: new Date().toISOString(),
       })
@@ -450,7 +495,7 @@ export async function rewriteJobPrompt(
     .map((row) => {
       const meta = row.direction as DirectionMeta | null;
       return meta?.concept
-        ? { index: row.art_index as number, concept: meta.concept }
+        ? ({ index: row.art_index as number, concept: meta.concept, master: meta.master ?? null } as SiblingConcept)
         : null;
     })
     .filter((s): s is SiblingConcept => s !== null);
@@ -495,7 +540,7 @@ export async function rewriteJobPrompt(
       jobId,
       direction,
       effectiveLogoUrl,
-      profile.logo_mode === "reference",
+      false,
       clientPhotos
     );
 
@@ -506,7 +551,7 @@ export async function rewriteJobPrompt(
         prompt_draft: direction.prompt,
         // Regenerar descarta a edição anterior — ela era de outro prompt.
         prompt_edited: null,
-        direction: buildMeta(direction, steer, "art-director", catalog.entries.length),
+        direction: buildMeta(direction, steer, "art-director", catalog),
         error: null,
         updated_at: new Date().toISOString(),
       })

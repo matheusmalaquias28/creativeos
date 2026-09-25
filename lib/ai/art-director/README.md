@@ -1,5 +1,41 @@
 # Camada de Direção de Arte — CreativeOS
 
+## V2 (atual) — resumo
+
+A curadoria gera **só pelo Gemini, direto** (nada de Magnific). Por arte:
+
+1. **Diretor com visão** (`direct-art.ts`, Claude Opus 5 — `ART_DIRECTOR_VISION_MODEL`):
+   vê as referências do acervo (até 10, rotuladas r01…), escolhe UMA como
+   **layout mestre** e escreve um briefing de design em inglês (composição em %,
+   herói visual, sistema tipográfico com estilos nomeados, cor, acabamento).
+   Mestres diferentes entre artes irmãs = variedade. Conceito/diferencial em PT.
+2. **Bloco técnico** (`technical-block.ts`): padrões fixos de produto —
+   área segura Meta, zona da logo (0–15% da altura, topo central, fundo liso e
+   contínuo), CTA sempre botão centralizado com base em ~89%, lista fechada de
+   textos com a caixa original, papéis sem título (`sanitizeBrief` troca
+   "contract" por "printed pages").
+3. **Gemini** gera a arte (Imagem 1 = mestre).
+4. **Logo** (`lib/ai/imagegen/brand-logo.ts`): fundo removido, contraste WCAG ≥ 3
+   (recolore para a cor escura da paleta ou branco), topo central. Mede a
+   uniformidade do fundo sob a logo — se ela atravessa uma borda, a arte refaz.
+5. **Revisão com visão** (`review-art.ts`): texto exato, palavras extras, zona da
+   logo, CTA, logos inventadas, glifos. Reprovou → UMA nova tentativa com as
+   correções (`ART_REVIEW_MAX_ATTEMPTS`, desligável com `ART_REVIEW_ENABLED=0`).
+   Resultado salvo em `direction.review`.
+6. Salva `vN.png` (final) e `vN_raw.png` (sem logo). Ajustes por instrução editam a
+   versão raw e recompõem a logo — ela nunca é redesenhada nem duplicada.
+
+Botão "Gerar artes" da curadoria (`/api/art-gen/queue`): diretor em paralelo com
+mestres pré-atribuídos → aprovação automática → worker. Para revisar briefings
+antes de gerar, use a página de prompts (`/api/art-gen/prepare`).
+
+Custo aproximado por arte: direção ~US$0,05–0,08 + geração 2K ~US$0,13 +
+revisão ~US$0,02 (+ uma geração extra quando a revisão reprova).
+
+---
+
+## Histórico (V1)
+
 Substitui a concatenação determinística de `compilePrompt()` por uma decisão de
 direção de arte: escolhe referências do acervo do cliente e escreve uma cena.
 
