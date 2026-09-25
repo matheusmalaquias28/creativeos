@@ -14,11 +14,13 @@ import {
   LayoutDashboard,
   Layers,
   LogOut,
+  Menu,
   Wand2,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { signOut } from "@/actions/auth";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { useNewDemandsCount } from "@/components/demands/new-demands-count-provider";
@@ -58,15 +60,20 @@ type AppSidebarProps = {
 };
 
 export function AppSidebar({ userName, userEmail }: AppSidebarProps) {
-  const pathname = usePathname();
-  const { count: newDemandsCount } = useNewDemandsCount();
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const pathname = usePathname();
 
   // Restaura a preferência salva (evita mismatch de hidratação lendo só no client).
   useEffect(() => {
     if (typeof window === "undefined") return;
     setCollapsed(window.localStorage.getItem(STORAGE_KEY) === "1");
   }, []);
+
+  // Fecha o menu mobile ao trocar de rota.
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
   function toggle() {
     setCollapsed((prev) => {
@@ -77,23 +84,81 @@ export function AppSidebar({ userName, userEmail }: AppSidebarProps) {
   }
 
   return (
-    <aside
-      className={cn(
-        "relative flex h-screen shrink-0 flex-col border-r border-sidebar-border bg-sidebar backdrop-blur-2xl transition-[width] duration-200 ease-out",
-        collapsed ? "w-[4.5rem]" : "w-[15.5rem]"
-      )}
-    >
-      {/* Toggle na borda */}
-      <button
-        type="button"
-        onClick={toggle}
-        aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
-        title={collapsed ? "Expandir menu" : "Recolher menu"}
-        className="absolute -right-3 top-9 z-30 flex size-6 -translate-y-1/2 items-center justify-center rounded-full border border-sidebar-border bg-sidebar text-muted-foreground shadow-sm transition-colors hover:text-foreground hover:border-positive/40"
-      >
-        {collapsed ? <ChevronRight className="size-3.5" /> : <ChevronLeft className="size-3.5" />}
-      </button>
+    <>
+      {/* Trigger mobile — ícone de menu fixo no topo esquerdo */}
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <button
+          type="button"
+          onClick={() => setMobileOpen(true)}
+          aria-label="Abrir menu"
+          className="fixed left-4 top-4 z-40 flex size-10 items-center justify-center rounded-xl border border-sidebar-border bg-sidebar/90 text-sidebar-foreground shadow-sm backdrop-blur-xl transition-colors hover:text-foreground lg:hidden"
+        >
+          <Menu className="size-5" strokeWidth={1.75} />
+        </button>
 
+        <SheetContent
+          side="left"
+          className="w-full max-w-none gap-0 border-none bg-sidebar p-0 sm:max-w-full lg:hidden"
+        >
+          <SheetTitle className="sr-only">Menu de navegação</SheetTitle>
+          <SidebarBody
+            collapsed={false}
+            pathname={pathname}
+            userName={userName}
+            userEmail={userEmail}
+            onNavigate={() => setMobileOpen(false)}
+          />
+        </SheetContent>
+      </Sheet>
+
+      {/* Sidebar desktop */}
+      <aside
+        className={cn(
+          "relative hidden h-screen shrink-0 flex-col border-r border-sidebar-border bg-sidebar backdrop-blur-2xl transition-[width] duration-200 ease-out lg:flex",
+          collapsed ? "w-[4.5rem]" : "w-[15.5rem]"
+        )}
+      >
+        {/* Toggle na borda */}
+        <button
+          type="button"
+          onClick={toggle}
+          aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
+          title={collapsed ? "Expandir menu" : "Recolher menu"}
+          className="absolute -right-3 top-9 z-30 flex size-6 -translate-y-1/2 items-center justify-center rounded-full border border-sidebar-border bg-sidebar text-muted-foreground shadow-sm transition-colors hover:text-foreground hover:border-positive/40"
+        >
+          {collapsed ? <ChevronRight className="size-3.5" /> : <ChevronLeft className="size-3.5" />}
+        </button>
+
+        <SidebarBody
+          collapsed={collapsed}
+          pathname={pathname}
+          userName={userName}
+          userEmail={userEmail}
+        />
+      </aside>
+    </>
+  );
+}
+
+type SidebarBodyProps = {
+  collapsed: boolean;
+  pathname: string;
+  userName?: string | null;
+  userEmail?: string | null;
+  onNavigate?: () => void;
+};
+
+function SidebarBody({
+  collapsed,
+  pathname,
+  userName,
+  userEmail,
+  onNavigate,
+}: SidebarBodyProps) {
+  const { count: newDemandsCount } = useNewDemandsCount();
+
+  return (
+    <div className="flex h-full flex-col">
       {/* Logo */}
       <div
         className={cn(
@@ -118,7 +183,7 @@ export function AppSidebar({ userName, userEmail }: AppSidebarProps) {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 space-y-0.5 px-3 pt-4">
+      <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pt-4">
         {!collapsed && (
           <p className="mb-2.5 px-3 text-[0.5625rem] font-semibold tracking-[0.14em] text-muted-foreground/50 uppercase">
             Workspace
@@ -136,6 +201,7 @@ export function AppSidebar({ userName, userEmail }: AppSidebarProps) {
               <Link
                 href={item.href}
                 title={collapsed ? item.label : undefined}
+                onClick={onNavigate}
                 className={cn(
                   "relative flex items-center rounded-xl text-[0.8125rem] font-medium transition-premium",
                   collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2.5",
@@ -188,6 +254,7 @@ export function AppSidebar({ userName, userEmail }: AppSidebarProps) {
                       <Link
                         key={child.href}
                         href={child.href}
+                        onClick={onNavigate}
                         className={cn(
                           "flex items-center rounded-lg px-3 py-1.5 text-[0.75rem] font-medium transition-premium",
                           childActive
@@ -268,6 +335,6 @@ export function AppSidebar({ userName, userEmail }: AppSidebarProps) {
           </form>
         </div>
       </div>
-    </aside>
+    </div>
   );
 }

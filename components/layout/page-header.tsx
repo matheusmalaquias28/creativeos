@@ -6,7 +6,7 @@ type PageHeaderProps = {
 
 export function PageHeader({ title, description, action }: PageHeaderProps) {
   return (
-    <header className="flex min-h-[var(--header-height)] flex-col justify-center gap-4 border-b border-border/60 px-8 py-6 backdrop-blur-sm dark:border-white/6 dark:bg-transparent lg:flex-row lg:items-end lg:justify-between lg:px-10">
+    <header className="flex min-h-[var(--header-height)] flex-col justify-center gap-4 border-b border-border/60 px-4 py-5 backdrop-blur-sm dark:border-white/6 dark:bg-transparent sm:px-6 sm:py-6 lg:flex-row lg:items-end lg:justify-between lg:px-10">
       <div className="space-y-1">
         <p className="text-[0.5625rem] font-semibold tracking-[0.14em] text-muted-foreground/60 uppercase">
           Creative OS

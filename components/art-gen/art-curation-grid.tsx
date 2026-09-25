@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ArtCard } from "./art-card";
+import { GenerationProgress } from "@/components/art-director/generation-progress";
+import { ImageLightbox, type LightboxItem } from "@/components/ui/image-lightbox";
 import type { ArtJobWithVersions } from "@/services/art-gen";
 
 type Props = {
@@ -19,6 +21,7 @@ type Props = {
 
 export function ArtCurationGrid({ demandId, initialJobs }: Props) {
   const [jobs, setJobs] = useState<ArtJobWithVersions[]>(initialJobs);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const initialized = useRef(false);
 
   // ------------------------------------------------------------------
@@ -211,8 +214,25 @@ export function ArtCurationGrid({ demandId, initialJobs }: Props) {
   const approvedCount = jobs.filter((j) => j.approved).length;
   const activeCount = jobs.filter((j) => j.status === "queued" || j.status === "processing").length;
 
+  const progress = {
+    total: jobs.length,
+    done: jobs.filter((j) => j.status === "succeeded").length,
+    working: activeCount,
+    failed: jobs.filter((j) => j.status === "failed").length,
+  };
+
+  const lightboxItems: LightboxItem[] = jobs
+    .filter((j) => j.currentVersion?.result_url)
+    .map((j) => ({
+      url: j.currentVersion!.result_url,
+      label: `Arte ${j.art_index + 1}`,
+      downloadName: `arte-${j.art_index + 1}.png`,
+    }));
+
   return (
     <div className="space-y-4">
+      <GenerationProgress counts={progress} label="Gerando as imagens" />
+
       {/* Header com ações em lote */}
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
@@ -254,9 +274,20 @@ export function ArtCurationGrid({ demandId, initialJobs }: Props) {
             onRegenerate={handleRegenerate}
             onAdjust={handleAdjust}
             onRestoreVersion={handleRestoreVersion}
+            onOpenFullscreen={(url) => {
+              const idx = lightboxItems.findIndex((item) => item.url === url);
+              if (idx >= 0) setLightboxIndex(idx);
+            }}
           />
         ))}
       </div>
+
+      <ImageLightbox
+        items={lightboxItems}
+        index={lightboxIndex}
+        onClose={() => setLightboxIndex(null)}
+        onNavigate={setLightboxIndex}
+      />
     </div>
   );
 }

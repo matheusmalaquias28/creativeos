@@ -202,8 +202,8 @@ export function DashboardDemandsAnalytics({ data }: Props) {
 
           {/* Seletor de mês — produção do mês escolhido */}
           {data.months.length > 0 && selected && (
-            <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3">
-              <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-4 rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+              <div className="flex flex-wrap items-center gap-3">
                 <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Produção no mês
                 </span>
@@ -227,7 +227,7 @@ export function DashboardDemandsAnalytics({ data }: Props) {
                   <ChevronDown className="pointer-events-none absolute right-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 </div>
               </div>
-              <div className="flex items-center gap-5">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-3 sm:flex sm:items-center sm:gap-5">
                 <div className="text-right">
                   <p className="text-2xl font-semibold tabular-nums leading-none text-cyan-700 dark:text-cyan-300">
                     {selected.total_demands}
@@ -236,7 +236,7 @@ export function DashboardDemandsAnalytics({ data }: Props) {
                     demandas
                   </p>
                 </div>
-                <div className="h-8 w-px bg-white/10" />
+                <div className="hidden h-8 w-px bg-white/10 sm:block" />
                 <div className="text-right">
                   <p className="text-2xl font-semibold tabular-nums leading-none text-violet-700 dark:text-violet-300">
                     {selected.total_artes}
@@ -245,7 +245,7 @@ export function DashboardDemandsAnalytics({ data }: Props) {
                     artes
                   </p>
                 </div>
-                <div className="h-8 w-px bg-white/10" />
+                <div className="hidden h-8 w-px bg-white/10 sm:block" />
                 <div className="text-right">
                   <p className="text-2xl font-semibold tabular-nums leading-none text-emerald-700 dark:text-emerald-300">
                     {selected.total_demands > 0
@@ -258,7 +258,7 @@ export function DashboardDemandsAnalytics({ data }: Props) {
                 </div>
                 {selected.avg_elapsed_minutes != null && (
                   <>
-                    <div className="h-8 w-px bg-white/10" />
+                    <div className="hidden h-8 w-px bg-white/10 sm:block" />
                     <div className="text-right">
                       <p className="text-2xl font-semibold tabular-nums leading-none text-amber-600 dark:text-amber-300">
                         {formatDesignerDuration(selected.avg_elapsed_minutes)}

@@ -5,6 +5,8 @@ import { DashboardPage } from "@/components/layout/dashboard-page";
 import { ReferenceUpload } from "@/components/clients/reference-upload";
 import { ReferenceGallery } from "@/components/clients/reference-gallery";
 import { ClientPhotosPanel } from "@/components/clients/client-photos-panel";
+import { ReferenceBank } from "@/components/art-director/reference-bank";
+import { ReadinessChips } from "@/components/art-director/readiness-chips";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Surface,
@@ -18,6 +20,7 @@ import { layout } from "@/lib/design/tokens";
 import { getAuthUser } from "@/lib/auth/session";
 import { getClientById, getClientReferences } from "@/services/clients";
 import { getClientPhotos } from "@/services/client-photos";
+import { getClientArtReadiness, getReferenceAssets } from "@/services/reference-assets";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -31,9 +34,11 @@ export default async function ReferencesPage({ params }: PageProps) {
   const client = await getClientById(id, user.id);
   if (!client) notFound();
 
-  const [references, clientPhotos] = await Promise.all([
+  const [references, clientPhotos, bankAssets, readiness] = await Promise.all([
     getClientReferences(id),
     getClientPhotos(id),
+    getReferenceAssets(id),
+    getClientArtReadiness(id),
   ]);
 
   return (
@@ -42,6 +47,25 @@ export default async function ReferencesPage({ params }: PageProps) {
       description={`${client.name} · inspirações para o Brand DNA`}
     >
       <div className={layout.sectionGap}>
+        <Surface variant="elevated">
+          <SurfaceHeader>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="space-y-1">
+                <SurfaceTitle>Acervo para geração com IA ({bankAssets.length})</SurfaceTitle>
+                <SurfaceDescription>
+                  Cada imagem é anotada por IA no upload. É essa descrição que o diretor
+                  de arte lê para escolher referências — confira se ela bate com o que
+                  a imagem tem de reaproveitável.
+                </SurfaceDescription>
+              </div>
+              <ReadinessChips readiness={readiness} />
+            </div>
+          </SurfaceHeader>
+          <SurfaceContent>
+            <ReferenceBank clientId={id} assets={bankAssets} />
+          </SurfaceContent>
+        </Surface>
+
         <div className="grid gap-6 lg:grid-cols-2">
           <div className="space-y-6">
             <Surface variant="elevated">

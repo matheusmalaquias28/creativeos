@@ -13,6 +13,9 @@ import { generateArt, type ImageSize, type AspectRatio } from "./client";
 import { urlsToInlineDataParts, urlToInlineDataPart } from "./storage-refs";
 import { compositeLogoFromBase64 } from "./logo-composite";
 import { compilePrompt, buildOrderedRefs } from "./prompt-compiler";
+import { appendTechnicalBlock } from "@/lib/ai/art-director/technical-block";
+import { ART_ASPECT_RATIO } from "@/lib/ai/art-director/constants";
+import type { ReferenceRole } from "@/lib/ai/art-director/types";
 import { generateMagnificArt } from "@/lib/magnific/generate-art";
 import { IMAGE_GEN_DEFAULTS } from "./defaults";
 import type { LogoPlacement } from "./logo-composite";
@@ -34,6 +37,10 @@ type JobRow = {
   demand_id: string;
   client_id: string | null;
   art_index: number;
+  /** Prompt escrito pelo diretor de arte (null no fluxo legado). */
+  prompt_draft?: string | null;
+  /** Edição do operador sobre o rascunho. Vence o rascunho quando existe. */
+  prompt_edited?: string | null;
   params: {
     headline?: string | null;
     subheadline?: string | null;
@@ -65,6 +72,14 @@ type ProfileRow = {
 type DemandRefRow = {
   storage_url: string;
   role: string | null;
+  position: number;
+};
+
+/** Referência resolvida pela camada de direção de arte — fonte única da ordem. */
+type DirectedRefRow = {
+  storage_url: string;
+  role: ReferenceRole;
+  intent: string | null;
   position: number;
 };
 
@@ -186,6 +201,17 @@ async function runJob(
     role: r.role,
   }));
 
+  // Referências escolhidas pelo diretor de arte, já ordenadas. Quando existem,
+  // elas são a ordem canônica — não há espelhamento com buildOrderedRefs.
+  const { data: directedRefRows } = await supabase
+    .from("art_job_reference")
+    .select("storage_url, role, intent, position")
+    .eq("job_id", job.id)
+    .order("position", { ascending: true });
+
+  const directedRefs = (directedRefRows ?? []) as DirectedRefRow[];
+  const approvedPrompt = (job.prompt_edited ?? job.prompt_draft)?.trim() || null;
+
   const flowRefs = job.params.flow_references ?? [];
   const flowLogoUrl = job.params.flow_logo_url ?? null;
   const usesFlowGraph = flowRefs.length > 0 || Boolean(flowLogoUrl);
@@ -212,7 +238,11 @@ async function runJob(
     subheadline: job.params.subheadline,
     cta: job.params.cta,
     informacoesExtras: job.params.informacoesExtras,
-    aspect_ratio: job.params.aspect_ratio ?? profile?.aspect_ratio ?? IMAGE_GEN_DEFAULTS.aspectRatio,
+    // Camada de direção de arte: 3:4 SEMPRE, seja qual for o perfil ou o que
+    // veio na arte do Make. O fluxo legado mantém a resolução antiga.
+    aspect_ratio: approvedPrompt
+      ? ART_ASPECT_RATIO
+      : job.params.aspect_ratio ?? profile?.aspect_ratio ?? IMAGE_GEN_DEFAULTS.aspectRatio,
     image_size: job.params.image_size ?? profile?.image_size ?? IMAGE_GEN_DEFAULTS.imageSize,
   };
 
@@ -243,6 +273,8 @@ async function runJob(
     // prompt do agente (ver lib/magnific/generate-art.ts).
     const result = await generateMagnificArt({
       model,
+      // Fluxo legado (sem prompt aprovado) mantém o prompt interno do módulo.
+      overridePrompt: approvedPrompt,
       quality: job.params.quality ?? IMAGE_GEN_DEFAULTS.quality,
       aspectRatio: artSpec.aspect_ratio ?? IMAGE_GEN_DEFAULTS.aspectRatio,
       resolution: (artSpec.image_size ?? IMAGE_GEN_DEFAULTS.imageSize).toLowerCase(),
@@ -254,7 +286,11 @@ async function runJob(
       briefingTipo: briefing.tipo,
       logoUrl: effectiveLogoUrl,
       visualIdentityPrompt: creativeProfile.base_prompt || null,
-      references: allDemandRefs,
+      references: approvedPrompt && directedRefs.length
+        ? directedRefs
+            .filter((r) => r.role !== "logo")
+            .map((r) => ({ url: r.storage_url, role: r.intent ?? r.role }))
+        : allDemandRefs,
     });
 
     promptFinal = `[Magnific ${model}] ${JSON.stringify({ artSpec, briefing })}`;
@@ -262,20 +298,41 @@ async function runJob(
     base64 = part.inlineData.data;
     mimeType = part.inlineData.mimeType;
   } else {
-    promptFinal = compilePrompt(creativeProfile, briefing, artSpec, allDemandRefs);
+    let refUrls: string[];
 
-    const refUrls: string[] = [
-      ...creativeProfile.style_reference_urls,
-      ...(creativeProfile.logo_mode === "reference" && effectiveLogoUrl
-        ? [effectiveLogoUrl]
-        : []),
-      ...allDemandRefs.map((r) => r.url),
-    ];
+    if (approvedPrompt) {
+      // Caminho da camada de direção de arte: o prompt aprovado carrega a
+      // direção, o bloco técnico impõe as regras de negócio.
+      promptFinal = appendTechnicalBlock(
+        approvedPrompt,
+        {
+          headline: artSpec.headline,
+          subheadline: artSpec.subheadline,
+          cta: artSpec.cta,
+          informacoesExtras: artSpec.informacoesExtras,
+          aspectRatio: artSpec.aspect_ratio,
+          imageSize: artSpec.image_size,
+        },
+        directedRefs.map((r) => ({ role: r.role, intent: r.intent }))
+      );
+      refUrls = directedRefs.map((r) => r.storage_url);
+    } else {
+      // Fluxo legado, intacto.
+      promptFinal = compilePrompt(creativeProfile, briefing, artSpec, allDemandRefs);
 
-    // Valida que a ordem bate com buildOrderedRefs (assertion em dev)
-    const expectedCount = buildOrderedRefs(creativeProfile, allDemandRefs).length;
-    if (refUrls.length !== expectedCount) {
-      console.warn(`[worker] ref count mismatch: urls=${refUrls.length} vs compiler=${expectedCount}`);
+      refUrls = [
+        ...creativeProfile.style_reference_urls,
+        ...(creativeProfile.logo_mode === "reference" && effectiveLogoUrl
+          ? [effectiveLogoUrl]
+          : []),
+        ...allDemandRefs.map((r) => r.url),
+      ];
+
+      // Valida que a ordem bate com buildOrderedRefs (assertion em dev)
+      const expectedCount = buildOrderedRefs(creativeProfile, allDemandRefs).length;
+      if (refUrls.length !== expectedCount) {
+        console.warn(`[worker] ref count mismatch: urls=${refUrls.length} vs compiler=${expectedCount}`);
+      }
     }
 
     const references = await urlsToInlineDataParts(refUrls);
@@ -353,7 +410,7 @@ export async function runWorker(demandId?: string): Promise<{ processed: number 
 
   let query = supabase
     .from("art_generation_job")
-    .select("id, demand_id, client_id, art_index, params")
+    .select("id, demand_id, client_id, art_index, params, prompt_draft, prompt_edited")
     .eq("status", "queued")
     .order("created_at", { ascending: true });
 

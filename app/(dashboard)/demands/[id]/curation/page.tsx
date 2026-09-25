@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Sparkles } from "lucide-react";
 import { DashboardPage } from "@/components/layout/dashboard-page";
 import { ArtCurationGrid } from "@/components/art-gen/art-curation-grid";
 import { GenerateArtsButton } from "@/components/art-gen/generate-arts-button";
@@ -46,10 +46,20 @@ export default async function ArtCurationPage({ params }: PageProps) {
             Voltar para demanda
           </Link>
 
-          <GenerateArtsButton
-            demandId={id}
-            disabled={!hasClient}
-          />
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/demands/${id}/prompts`}
+              className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "gap-2")}
+            >
+              <Sparkles className="size-4" />
+              Prompts com IA
+            </Link>
+
+            <GenerateArtsButton
+              demandId={id}
+              disabled={!hasClient}
+            />
+          </div>
         </div>
 
         {!hasClient && (

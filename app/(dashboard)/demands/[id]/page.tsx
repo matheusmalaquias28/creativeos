@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ArrowLeft, ExternalLink, Images, Sparkles } from "lucide-react";
 import { DashboardPage } from "@/components/layout/dashboard-page";
 import { DemandDetailStatusBar } from "@/components/demands/demand-detail-status-bar";
 import { MagnificSpaceButton } from "@/components/demands/magnific-space-button";
@@ -129,7 +129,27 @@ export default async function DemandDetailPage({ params }: PageProps) {
   const missingMateriaisEditados = isMateriaisEditadosMissing(demand.briefing);
 
   return (
-    <DashboardPage title={title}>
+    <DashboardPage
+      title={title}
+      headerAction={
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/demands/${id}/prompts`}
+            className={cn(buttonVariants({ variant: "default", size: "sm" }), "gap-2")}
+          >
+            <Sparkles className="size-4" />
+            Prompts com IA
+          </Link>
+          <Link
+            href={`/demands/${id}/curation`}
+            className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "gap-2")}
+          >
+            <Images className="size-4" />
+            Curadoria
+          </Link>
+        </div>
+      }
+    >
       <MarkDemandReadOnMount demandId={id} isNew={demand.is_new} />
       <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">

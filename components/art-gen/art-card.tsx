@@ -2,13 +2,15 @@
 
 import { useState, useTransition, useEffect } from "react";
 import Image from "next/image";
-import { Download, CheckCircle2, RefreshCw, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
+import { Download, CheckCircle2, RefreshCw, ChevronDown, ChevronUp, Loader2, Maximize2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ArtStatusBadge } from "./art-status-badge";
 import { ArtVersionStrip } from "./art-version-strip";
+import { CopySheet, copyFromParams } from "@/components/art-director/copy-sheet";
+import { ART_ASPECT_CLASS } from "@/lib/ai/art-director/constants";
 import type { ArtJobWithVersions, ArtVersion } from "@/services/art-gen";
 
 type Props = {
@@ -18,6 +20,7 @@ type Props = {
   onRegenerate: (jobId: string) => Promise<void>;
   onAdjust: (jobId: string, instruction: string) => Promise<void>;
   onRestoreVersion: (jobId: string, versionId: string) => Promise<void>;
+  onOpenFullscreen?: (url: string) => void;
 };
 
 export function ArtCard({
@@ -27,6 +30,7 @@ export function ArtCard({
   onRegenerate,
   onAdjust,
   onRestoreVersion,
+  onOpenFullscreen,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [instruction, setInstruction] = useState("");
@@ -120,17 +124,27 @@ export function ArtCard({
           expanded && "ring-2 ring-primary"
         )}
       >
-        {/* Thumbnail */}
-        <div className="relative aspect-square w-full overflow-hidden bg-muted">
+        {/* Thumbnail — 3:4, o formato único da camada */}
+        <div className={cn("relative w-full overflow-hidden bg-muted", ART_ASPECT_CLASS)}>
           {hasImage ? (
-            <Image
-              src={displayVersion!.result_url}
-              alt={`Arte ${artIndex + 1}`}
-              fill
-              unoptimized
-              className="object-cover transition-transform group-hover:scale-[1.02]"
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-            />
+            <button
+              type="button"
+              onClick={() => onOpenFullscreen?.(displayVersion!.result_url)}
+              className="absolute inset-0 cursor-zoom-in"
+              title="Abrir em tela cheia"
+            >
+              <Image
+                src={displayVersion!.result_url}
+                alt={`Arte ${artIndex + 1}`}
+                fill
+                unoptimized
+                className="object-cover transition-transform group-hover:scale-[1.02]"
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+              />
+              <span className="transition-premium absolute inset-0 flex items-center justify-center bg-background/55 opacity-0 backdrop-blur-sm group-hover:opacity-100">
+                <Maximize2 className="size-5 text-foreground" />
+              </span>
+            </button>
           ) : (
             <div className="flex h-full items-center justify-center">
               {job.status === "processing" || job.status === "queued" ? (
@@ -152,6 +166,11 @@ export function ArtCard({
               <CheckCircle2 className="size-5 text-primary drop-shadow-sm" />
             </div>
           )}
+        </div>
+
+        {/* Cola da copy — conferir de memória, 400x por mês, não funciona */}
+        <div className="px-2 pt-2">
+          <CopySheet copy={copyFromParams(job.params as Record<string, unknown>)} dense />
         </div>
 
         {/* Actions */}
@@ -218,19 +237,29 @@ export function ArtCard({
         >
           <div className="flex flex-col gap-6 p-6 sm:flex-row">
             {/* Imagem ampliada */}
-            <div className="relative aspect-square w-full shrink-0 overflow-hidden rounded-lg sm:w-64 lg:w-80">
+            <button
+              type="button"
+              onClick={() => onOpenFullscreen?.(displayVersion!.result_url)}
+              className={cn(
+                "relative w-full shrink-0 cursor-zoom-in overflow-hidden rounded-lg sm:w-64 lg:w-80",
+                ART_ASPECT_CLASS
+              )}
+              title="Abrir em tela cheia"
+            >
               <Image
                 src={displayVersion!.result_url}
                 alt={`Arte ${artIndex + 1} ampliada`}
                 fill
                 unoptimized
-                className="object-cover"
+                className="object-contain"
                 sizes="320px"
               />
-            </div>
+            </button>
 
             {/* Controles de ajuste + histórico */}
             <div className="flex flex-1 flex-col gap-4">
+              <CopySheet copy={copyFromParams(job.params as Record<string, unknown>)} />
+
               <div>
                 <h3 className="font-heading text-base font-medium">Arte {artIndex + 1}</h3>
                 {displayVersion?.instruction && (

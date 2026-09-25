@@ -13,6 +13,28 @@ export const MAGNIFIC_SPACE_STATUSES = [
 
 export type MagnificSpaceStatus = (typeof MAGNIFIC_SPACE_STATUSES)[number];
 
+export const ART_JOB_STATUSES = [
+  "draft",
+  "writing_prompt",
+  "awaiting_approval",
+  "queued",
+  "processing",
+  "succeeded",
+  "failed",
+] as const;
+
+export type ArtJobStatus = (typeof ART_JOB_STATUSES)[number];
+
+export type ReferenceAssetKind =
+  | "estilo"
+  | "layout"
+  | "tipografia"
+  | "personagem"
+  | "produto"
+  | "textura";
+
+export type ArtReferenceRole = "logo" | ReferenceAssetKind;
+
 export type UserRole = "admin" | "member";
 
 export type User = {
@@ -610,6 +632,7 @@ export type Database = {
           identity_extracted_at: string | null;
           identity_extraction_status: "idle" | "extracting" | "ready" | "failed";
           identity_extraction_error: string | null;
+          direction_notes: Json;
           created_at: string;
           updated_at: string;
         };
@@ -630,6 +653,7 @@ export type Database = {
           identity_extracted_at?: string | null;
           identity_extraction_status?: "idle" | "extracting" | "ready" | "failed";
           identity_extraction_error?: string | null;
+          direction_notes?: Json;
           created_at?: string;
           updated_at?: string;
         };
@@ -648,6 +672,7 @@ export type Database = {
           identity_extracted_at: string | null;
           identity_extraction_status: "idle" | "extracting" | "ready" | "failed";
           identity_extraction_error: string | null;
+          direction_notes: Json;
         }>;
         Relationships: [];
       };
@@ -701,8 +726,14 @@ export type Database = {
           id: string;
           demand_id: string;
           client_id: string | null;
-          status: "queued" | "processing" | "succeeded" | "failed";
+          status: ArtJobStatus;
           prompt_final: string | null;
+          prompt_draft: string | null;
+          prompt_edited: string | null;
+          prompt_approved_at: string | null;
+          prompt_approved_by: string | null;
+          direction: Json | null;
+          use_client_photos: boolean;
           params: Json;
           error: string | null;
           attempts: number;
@@ -715,8 +746,14 @@ export type Database = {
           id?: string;
           demand_id: string;
           client_id?: string | null;
-          status?: "queued" | "processing" | "succeeded" | "failed";
+          status?: ArtJobStatus;
           prompt_final?: string | null;
+          prompt_draft?: string | null;
+          prompt_edited?: string | null;
+          prompt_approved_at?: string | null;
+          prompt_approved_by?: string | null;
+          direction?: Json | null;
+          use_client_photos?: boolean;
           params?: Json;
           error?: string | null;
           attempts?: number;
@@ -726,8 +763,14 @@ export type Database = {
           updated_at?: string;
         };
         Update: Partial<{
-          status: "queued" | "processing" | "succeeded" | "failed";
+          status: ArtJobStatus;
           prompt_final: string | null;
+          prompt_draft: string | null;
+          prompt_edited: string | null;
+          prompt_approved_at: string | null;
+          prompt_approved_by: string | null;
+          direction: Json | null;
+          use_client_photos: boolean;
           params: Json;
           error: string | null;
           attempts: number;
@@ -986,8 +1029,129 @@ export type Database = {
           },
         ];
       };
+      client_reference_asset: {
+        Row: {
+          id: string;
+          client_id: string;
+          kind: ReferenceAssetKind;
+          storage_url: string;
+          storage_path: string | null;
+          file_name: string | null;
+          ai_description: string | null;
+          ai_tags: string[];
+          dominant_colors: Json;
+          annotation_status: "idle" | "annotating" | "ready" | "failed";
+          annotation_error: string | null;
+          usage_count: number;
+          last_used_at: string | null;
+          is_winner: boolean;
+          active: boolean;
+          position: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          client_id: string;
+          kind?: ReferenceAssetKind;
+          storage_url: string;
+          storage_path?: string | null;
+          file_name?: string | null;
+          ai_description?: string | null;
+          ai_tags?: string[];
+          dominant_colors?: Json;
+          annotation_status?: "idle" | "annotating" | "ready" | "failed";
+          annotation_error?: string | null;
+          usage_count?: number;
+          last_used_at?: string | null;
+          is_winner?: boolean;
+          active?: boolean;
+          position?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<{
+          kind: ReferenceAssetKind;
+          ai_description: string | null;
+          ai_tags: string[];
+          dominant_colors: Json;
+          annotation_status: "idle" | "annotating" | "ready" | "failed";
+          annotation_error: string | null;
+          usage_count: number;
+          last_used_at: string | null;
+          is_winner: boolean;
+          active: boolean;
+          position: number;
+        }>;
+        Relationships: [
+          {
+            foreignKeyName: "client_reference_asset_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      art_job_reference: {
+        Row: {
+          id: string;
+          job_id: string;
+          asset_id: string | null;
+          storage_url: string;
+          role: ArtReferenceRole;
+          intent: string | null;
+          position: number;
+          source: "ai" | "manual" | "client_fixed";
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          job_id: string;
+          asset_id?: string | null;
+          storage_url: string;
+          role: ArtReferenceRole;
+          intent?: string | null;
+          position?: number;
+          source?: "ai" | "manual" | "client_fixed";
+          created_at?: string;
+        };
+        Update: Partial<{
+          asset_id: string | null;
+          storage_url: string;
+          role: ArtReferenceRole;
+          intent: string | null;
+          position: number;
+          source: "ai" | "manual" | "client_fixed";
+        }>;
+        Relationships: [
+          {
+            foreignKeyName: "art_job_reference_job_id_fkey";
+            columns: ["job_id"];
+            isOneToOne: false;
+            referencedRelation: "art_generation_job";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
-    Views: Record<string, never>;
+    Views: {
+      client_art_readiness: {
+        Row: {
+          client_id: string;
+          name: string;
+          /** Logo efetiva: perfil criativo, com fallback no onboarding. */
+          logo_url: string | null;
+          has_logo: boolean;
+          has_palette: boolean;
+          has_dna: boolean;
+          reference_count: number;
+          style_reference_count: number;
+          is_ready: boolean;
+        };
+        Relationships: [];
+      };
+    };
     Functions: Record<string, never>;
     Enums: {
       client_status: ClientStatus;

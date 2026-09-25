@@ -5,8 +5,8 @@
 
 export const layout = {
   sidebarWidth: "w-[15.5rem]",
-  pageX: "px-8 lg:px-10",
-  pageY: "py-8 lg:py-10",
+  pageX: "px-4 sm:px-6 lg:px-10",
+  pageY: "py-6 sm:py-8 lg:py-10",
   sectionGap: "space-y-10",
 } as const;
 

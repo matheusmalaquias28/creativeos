@@ -46,6 +46,12 @@ export type GenerateMagnificArtInput = {
   logoUrl?: string | null;
   /** DNA visual do cliente (base_prompt) — memória persistente. */
   visualIdentityPrompt?: string | null;
+  /**
+   * Prompt escrito pela camada de direção de arte e aprovado pelo operador.
+   * Quando presente, substitui o corpo do prompt interno; as regras fixas
+   * (textos permitidos, CTA como botão, logo) continuam sendo aplicadas aqui.
+   */
+  overridePrompt?: string | null;
   references: { url: string; role: string | null }[];
 };
 
@@ -74,7 +80,9 @@ function buildPrompt(input: GenerateMagnificArtInput): string {
 
   const parts: string[] = [];
 
-  if (input.visualIdentityPrompt?.trim()) {
+  if (input.overridePrompt?.trim()) {
+    parts.push(input.overridePrompt.trim());
+  } else if (input.visualIdentityPrompt?.trim()) {
     parts.push(`IDENTIDADE VISUAL DO CLIENTE (siga fielmente):\n${input.visualIdentityPrompt.trim()}`);
   }
 
