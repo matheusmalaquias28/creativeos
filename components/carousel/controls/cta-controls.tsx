@@ -26,7 +26,7 @@ export function CtaControls({
     <div className="space-y-4">
       {/* Enable */}
       <label className="flex items-center justify-between gap-2 cursor-pointer">
-        <span className="text-xs font-medium text-foreground">Exibir CTA neste slide</span>
+        <span className="text-[0.8125rem] font-semibold text-foreground">Exibir CTA neste slide</span>
         <input
           type="checkbox"
           checked={cta.enabled}
@@ -37,8 +37,8 @@ export function CtaControls({
 
       {cta.enabled && (
         <>
-          {/* Live preview (CTA is always centered at the bottom of the slide) */}
-          <div className="flex justify-center rounded-xl border border-border/40 bg-muted/20 px-4 py-4">
+          {/* Live preview (CTA is always centered at the bottom of the slide) — estilos inline = conteúdo do slide */}
+          <div className="bg-dot-grid flex justify-center rounded-xl border border-border bg-surface px-4 py-4">
             <div
               className={cn(
                 "inline-flex items-center gap-2 px-4 py-2 text-sm font-bold",
@@ -58,7 +58,7 @@ export function CtaControls({
 
           {/* Text */}
           <div className="space-y-1.5">
-            <label className="text-[0.625rem] text-muted-foreground/70">Texto do botão</label>
+            <label className="text-xs font-medium text-muted-foreground">Texto do botão</label>
             <Input
               value={cta.text}
               onChange={(e) => onChange({ text: e.target.value })}
@@ -69,18 +69,18 @@ export function CtaControls({
 
           {/* Shape */}
           <div className="space-y-1.5">
-            <label className="text-[0.625rem] text-muted-foreground/70">Formato</label>
+            <label className="text-xs font-medium text-muted-foreground">Formato</label>
             <div className="flex gap-1">
               {SHAPES.map((s) => (
                 <button
                   key={s.id}
                   onClick={() => onChange({ shape: s.id })}
                   className={cn(
-                    "flex-1 px-2 py-1.5 text-[0.625rem] font-medium transition-colors border",
+                    "flex-1 border px-2 py-1.5 text-[0.6875rem] font-semibold transition-colors",
                     s.radius,
                     cta.shape === s.id
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+                      ? "border-primary/50 bg-primary/12 text-primary"
+                      : "border-border bg-surface text-muted-foreground hover:border-border-strong hover:bg-accent hover:text-foreground"
                   )}
                 >
                   {s.label}
@@ -89,7 +89,7 @@ export function CtaControls({
             </div>
           </div>
 
-          <p className="text-[0.5625rem] leading-relaxed text-muted-foreground/50">
+          <p className="text-[0.6875rem] leading-relaxed text-muted-foreground">
             O CTA aparece sempre centralizado na parte inferior do slide.
           </p>
 
@@ -103,13 +103,13 @@ export function CtaControls({
 
           {/* Icon */}
           <div className="space-y-1.5">
-            <label className="text-[0.625rem] text-muted-foreground/70">Ícone</label>
+            <label className="text-xs font-medium text-muted-foreground">Ícone</label>
             <div className="grid grid-cols-7 gap-1">
               <button
                 onClick={() => onChange({ icon: "" })}
                 className={cn(
                   "flex aspect-square items-center justify-center rounded-lg border transition-colors",
-                  !cta.icon ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-muted/40"
+                  !cta.icon ? "border-primary/50 bg-primary/12 text-primary" : "border-border bg-surface text-muted-foreground hover:border-border-strong hover:bg-accent hover:text-foreground"
                 )}
                 title="Sem ícone"
               >
@@ -122,7 +122,7 @@ export function CtaControls({
                   title={label}
                   className={cn(
                     "flex aspect-square items-center justify-center rounded-lg border transition-colors",
-                    cta.icon === id ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+                    cta.icon === id ? "border-primary/50 bg-primary/12 text-primary" : "border-border bg-surface text-muted-foreground hover:border-border-strong hover:bg-accent hover:text-foreground"
                   )}
                 >
                   <Icon className="size-3.5" />

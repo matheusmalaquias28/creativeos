@@ -46,7 +46,7 @@ export function MagnificSpaceEmbed({ spaceUrl, nodes = [] }: Props) {
       key={iframeKey}
       src={spaceUrl}
       title="Magnific Space"
-      className="size-full border-0 bg-black/40"
+      className="size-full border-0 bg-surface"
       allow="clipboard-read; clipboard-write; fullscreen"
       referrerPolicy="no-referrer-when-downgrade"
     />
@@ -71,7 +71,7 @@ export function MagnificSpaceEmbed({ spaceUrl, nodes = [] }: Props) {
             href={spaceUrl}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex h-7 items-center gap-1 rounded-lg px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+            className="inline-flex h-7 items-center gap-1 rounded-lg px-2.5 text-xs font-semibold text-muted-foreground transition-premium hover:bg-accent hover:text-foreground"
           >
             <ExternalLink className="size-3" />
             Abrir fora
@@ -81,15 +81,15 @@ export function MagnificSpaceEmbed({ spaceUrl, nodes = [] }: Props) {
 
       <div
         className={cn(
-          "overflow-hidden border border-white/8 bg-black/30",
+          "overflow-hidden border border-border bg-surface",
           fullscreen
             ? "fixed inset-0 z-50 rounded-none"
-            : "h-[min(78vh,880px)] rounded-xl"
+            : "h-[min(78vh,880px)] rounded-2xl shadow-[var(--surface-shadow)]"
         )}
       >
         {fullscreen && (
-          <div className="flex items-center justify-between gap-3 border-b border-white/8 bg-background px-4 py-2">
-            <span className="text-sm font-medium">Magnific Space</span>
+          <div className="flex items-center justify-between gap-3 border-b border-border bg-background px-4 py-2">
+            <span className="text-sm font-semibold text-foreground">Magnific Space</span>
             <div className="flex items-center gap-1.5">
               <Button type="button" variant="ghost" size="xs" onClick={reload}>
                 <RefreshCw />
@@ -110,7 +110,7 @@ export function MagnificSpaceEmbed({ spaceUrl, nodes = [] }: Props) {
           {nodes.map((node) => (
             <li
               key={node.id}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-black/20 px-2.5 py-1 text-xs text-foreground/80"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted px-2.5 py-1 text-xs text-foreground"
             >
               <span className="text-muted-foreground">
                 {SPACE_NODE_TYPE_LABELS[node.type] ?? node.type}

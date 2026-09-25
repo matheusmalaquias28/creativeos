@@ -1,25 +1,33 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
+  ArrowUpRight,
+  BarChart3,
   Brain,
-  ImageIcon,
-  ClipboardList,
-  Sparkles,
-  ArrowLeft,
-  Layers,
   CalendarClock,
+  CalendarDays,
+  Camera,
+  CheckCircle2,
+  ClipboardList,
+  ImageIcon,
+  Layers,
+  Sparkles,
+  TriangleAlert,
+  Workflow,
 } from "lucide-react";
 import { DashboardPage } from "@/components/layout/dashboard-page";
+import { SectionHeader } from "@/components/layout/section-header";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { WorkflowModuleCard } from "@/components/clients/workflow-module-card";
 import { GenerateBrainButton } from "@/components/creative-brain/generate-brain-button";
-import { ClientDisplayStatusBadge } from "@/components/clients/client-display-status-badge";
+import { getClientStatusConfig } from "@/components/clients/client-status-indicator";
 import { ArchiveClientButton } from "@/components/clients/archive-client-button";
 import { ReadinessChips } from "@/components/art-director/readiness-chips";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
+import { Surface } from "@/components/ui/surface";
 import { cn } from "@/lib/utils";
-import { layout } from "@/lib/design/tokens";
+import { layout, tones, type Tone } from "@/lib/design/tokens";
 import { getAuthUser } from "@/lib/auth/session";
 import {
   getClientById,
@@ -37,10 +45,18 @@ import { getClientArtReadiness } from "@/services/reference-assets";
 import { ClientPhotosPanel } from "@/components/clients/client-photos-panel";
 import { ClientDemandsPanel } from "@/components/demands/client-demands-panel";
 import { getDemandsByClientId } from "@/services/demands";
-import type { BrandDna } from "@/types";
+import type { BrandDna, CreativeBrainStatus } from "@/types";
 
 type PageProps = {
   params: Promise<{ id: string }>;
+};
+
+const BRAIN_STATUS: Record<CreativeBrainStatus, { label: string; tone: Tone }> = {
+  generating: { label: "Gerando", tone: "blue" },
+  draft: { label: "Rascunho", tone: "amber" },
+  approved: { label: "Aprovado", tone: "green" },
+  archived: { label: "Arquivado", tone: "slate" },
+  failed: { label: "Falhou", tone: "red" },
 };
 
 export default async function ClientDetailPage({ params }: PageProps) {
@@ -95,39 +111,67 @@ export default async function ClientDetailPage({ params }: PageProps) {
 
   const opportunityFlags: string[] = [];
 
+  const status = getClientStatusConfig(client.status);
+  const statusTone = tones[status.tone];
+  const brainStatus = creativeBrain ? BRAIN_STATUS[creativeBrain.status] : null;
+  const isReady = Boolean(readiness?.is_ready);
+  const readyTone = isReady ? tones.green : tones.amber;
+  const identitySummary = isVisualIdentityReady(visualIdentity)
+    ? visualIdentity.visualIdentityDna?.summary
+    : undefined;
+
+  // Uma única ação principal (violeta) por tela: o próximo passo do fluxo.
+  const primaryAction = !onboardingDone
+    ? { href: `/clients/${id}/onboarding`, label: "Iniciar onboarding", icon: ClipboardList }
+    : hasBrandDna
+      ? { href: `/clients/${id}/creatives`, label: "Gerar prompt", icon: Sparkles }
+      : null;
+  const PrimaryIcon = primaryAction?.icon;
+
   return (
     <DashboardPage
       title={client.name}
-      description={`/${client.slug}`}
-      headerAction={
-        <ArchiveClientButton
-          clientId={id}
-          isArchived={client.status === "archived"}
-        />
-      }
-    >
-      <div className={layout.sectionGap}>
-        <div className="flex flex-wrap items-center gap-2">
-          <ClientDisplayStatusBadge status={client.status} />
+      backHref="/clients"
+      backLabel="Clientes"
+      eyebrow={
+        <>
+          <Badge variant={status.tone} title={status.title}>
+            <span className={cn("size-1.5 rounded-full", statusTone.dot)} />
+            {status.label}
+          </Badge>
+          <span className="font-mono text-xs text-muted-foreground">/{client.slug}</span>
           {creativeBrain && (
-            <Badge variant="secondary">
+            <Badge variant="violet">
+              <Brain />
               Creative Brain v{creativeBrain.version}
             </Badge>
           )}
-        </div>
-
+        </>
+      }
+      headerAction={
+        <>
+          <ArchiveClientButton
+            clientId={id}
+            isArchived={client.status === "archived"}
+          />
+          {primaryAction && PrimaryIcon && (
+            <Link href={primaryAction.href} className={cn(buttonVariants({ size: "sm" }))}>
+              <PrimaryIcon className="size-3.5" strokeWidth={2.25} />
+              {primaryAction.label}
+            </Link>
+          )}
+        </>
+      }
+    >
+      <div className={layout.sectionGap}>
         {opportunityFlags.length > 0 && (
           <div className="space-y-1.5">
-            <p className="text-xs font-medium text-muted-foreground">
+            <p className="text-[0.8125rem] font-semibold text-muted-foreground">
               Oportunidades identificadas
             </p>
             <div className="flex flex-wrap gap-2">
               {opportunityFlags.map((flag) => (
-                <Badge
-                  key={flag}
-                  variant="outline"
-                  className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400"
-                >
+                <Badge key={flag} variant="amber">
                   {flag}
                 </Badge>
               ))}
@@ -135,160 +179,212 @@ export default async function ClientDetailPage({ params }: PageProps) {
           </div>
         )}
 
-        <div
-          className={cn(
-            "rounded-lg border p-4 text-sm",
-            readiness?.is_ready
-              ? "border-emerald-500/25 bg-emerald-500/5"
-              : "border-amber-500/25 bg-amber-500/5"
-          )}
-        >
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className={cn("font-medium", readiness?.is_ready ? "text-emerald-300" : "text-amber-300")}>
-              {readiness?.is_ready ? "Pronto para gerar artes" : "Cadastro de materiais incompleto"}
-            </p>
-            {!readiness?.is_ready && (
-              <Link
+        {/* Fluxo de trabalho + prontidão */}
+        <section className="space-y-4">
+          <SectionHeader
+            title="Fluxo de trabalho"
+            description="Do briefing ao prompt — cada etapa libera a próxima"
+            icon={Workflow}
+            tone="violet"
+          />
+          <div className="grid gap-4 xl:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 xl:col-span-2">
+              <WorkflowModuleCard
+                title="Onboarding"
+                description={
+                  onboardingDone
+                    ? "Logo, fotos e DNA visual configurados"
+                    : "Logo, fotos e extrator de identidade visual"
+                }
+                icon={ClipboardList}
+                tone="orange"
+                status={
+                  onboardingDone
+                    ? { label: "Concluído", tone: "green" }
+                    : { label: "Pendente", tone: "amber" }
+                }
+                actionLabel={onboardingDone ? "Editar briefing" : "Iniciar onboarding"}
                 href={`/clients/${id}/onboarding`}
-                className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-              >
-                Completar cadastro
-              </Link>
-            )}
-          </div>
-          <div className="mt-2">
-            <ReadinessChips readiness={readiness} />
-          </div>
-          {isVisualIdentityReady(visualIdentity) && (
-            <p className="mt-2 text-muted-foreground">
-              {visualIdentity.visualIdentityDna?.summary.slice(0, 180)}
-              {(visualIdentity.visualIdentityDna?.summary.length ?? 0) > 180 ? "…" : ""}
-            </p>
-          )}
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard
-            title="Demandas no mês"
-            value={demandsThisMonth}
-            description={`Solicitadas em ${monthLabel}`}
-            icon={CalendarClock}
-            accent={demandsThisMonth > 0 ? "positive" : "neutral"}
-          />
-          <StatCard
-            title="Últimos 30 dias"
-            value={demandsLast30}
-            description="Demandas solicitadas no período"
-            icon={CalendarClock}
-          />
-          <StatCard
-            title="Demandas no total"
-            value={totalDemands}
-            description="Briefings recebidos via Make"
-            icon={ClipboardList}
-          />
-          <StatCard
-            title="Artes"
-            value={totalArtes}
-            description="Peças solicitadas em todas as demandas"
-            icon={Layers}
-          />
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <WorkflowModuleCard
-            title="Onboarding"
-            description={
-              onboardingDone
-                ? "Logo, fotos e DNA visual configurados"
-                : "Logo, fotos e extrator de identidade visual"
-            }
-            icon={ClipboardList}
-            actionLabel={onboardingDone ? "Editar briefing" : "Iniciar onboarding"}
-            href={`/clients/${id}/onboarding`}
-          />
-          <WorkflowModuleCard
-            title="Referências"
-            description={`${references.length} imagem(ns) enviada(s)`}
-            icon={ImageIcon}
-            actionLabel="Gerenciar referências"
-            href={`/clients/${id}/references`}
-          />
-          <div className="surface-panel flex flex-col gap-6 p-6 hover-lift md:col-span-2 xl:col-span-1">
-            <div className="flex items-start gap-4">
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border/45 bg-muted/30">
-                <Brain className="size-4 text-muted-foreground" strokeWidth={1.5} />
-              </div>
-              <div className="min-w-0 space-y-1">
-                <h3 className="text-sm font-medium tracking-heading text-foreground">
-                  Creative Brain
-                </h3>
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  {creativeBrain
-                    ? `Status: ${creativeBrain.status}`
-                    : "Brand DNA ainda não gerado"}
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <GenerateBrainButton
-                clientId={id}
-                disabled={!briefingComplete}
               />
-              {creativeBrain && (
-                <Link
-                  href={`/clients/${id}/brain`}
+              <WorkflowModuleCard
+                title="Referências"
+                description={`${references.length} imagem(ns) enviada(s)`}
+                icon={ImageIcon}
+                tone="cyan"
+                actionLabel="Gerenciar referências"
+                href={`/clients/${id}/references`}
+              />
+              <WorkflowModuleCard
+                title="Creative Brain"
+                description={
+                  <>
+                    {creativeBrain ? "Brand DNA estruturado do cliente" : "Brand DNA ainda não gerado"}
+                    {!briefingComplete && (
+                      <span className="mt-1 block text-xs">
+                        Extraia a identidade visual no briefing para habilitar a geração.
+                      </span>
+                    )}
+                  </>
+                }
+                icon={Brain}
+                tone="violet"
+                status={brainStatus ?? undefined}
+                footer={
+                  <>
+                    <GenerateBrainButton
+                      clientId={id}
+                      disabled={!briefingComplete}
+                      size="sm"
+                      variant={primaryAction ? "outline" : "default"}
+                    />
+                    {creativeBrain && (
+                      <Link
+                        href={`/clients/${id}/brain`}
+                        className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+                      >
+                        Ver Brand DNA
+                        <ArrowUpRight className="size-3.5" />
+                      </Link>
+                    )}
+                  </>
+                }
+              />
+              <WorkflowModuleCard
+                title="Prompts"
+                description={
+                  hasBrandDna
+                    ? "Gerar prompt para Magnific Spaces"
+                    : "Requer Creative Brain"
+                }
+                icon={Sparkles}
+                tone="pink"
+                status={
+                  hasBrandDna
+                    ? { label: "Disponível", tone: "green" }
+                    : { label: "Bloqueado", tone: "slate" }
+                }
+                actionLabel="Gerar prompt"
+                href={hasBrandDna ? `/clients/${id}/creatives` : undefined}
+                disabled={!hasBrandDna}
+              />
+            </div>
+
+            <Surface className="flex flex-col gap-4 p-5">
+              <div className="flex items-start gap-3">
+                <span
                   className={cn(
-                    buttonVariants({ variant: "outline", size: "sm" })
+                    "flex size-10 shrink-0 items-center justify-center rounded-xl",
+                    readyTone.iconTile
                   )}
                 >
-                  Ver Brand DNA
+                  {isReady ? (
+                    <CheckCircle2 className="size-[1.125rem]" strokeWidth={2} />
+                  ) : (
+                    <TriangleAlert className="size-[1.125rem]" strokeWidth={2} />
+                  )}
+                </span>
+                <div className="min-w-0 space-y-0.5">
+                  <p className="text-[0.8125rem] font-semibold text-muted-foreground">
+                    Prontidão para artes
+                  </p>
+                  <p className={cn("text-[0.9375rem] font-bold tracking-tight", readyTone.text)}>
+                    {isReady ? "Pronto para gerar artes" : "Cadastro de materiais incompleto"}
+                  </p>
+                </div>
+              </div>
+
+              <ReadinessChips readiness={readiness} />
+
+              {identitySummary && (
+                <div className="rounded-xl border border-border bg-surface p-3">
+                  <p className="mb-1 text-xs font-semibold text-muted-foreground">DNA visual</p>
+                  <p className="text-[0.8125rem] leading-relaxed text-foreground/90">
+                    {identitySummary.slice(0, 180)}
+                    {identitySummary.length > 180 ? "…" : ""}
+                  </p>
+                </div>
+              )}
+
+              {!isReady && (
+                <Link
+                  href={`/clients/${id}/onboarding`}
+                  className={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-auto w-fit")}
+                >
+                  Completar cadastro
                 </Link>
               )}
-            </div>
-            {!briefingComplete && (
-              <p className="text-xs text-muted-foreground">
-                Extraia a identidade visual no briefing para habilitar a geração.
-              </p>
-            )}
+            </Surface>
           </div>
-          <WorkflowModuleCard
-            title="Prompts"
-            description={
-              hasBrandDna
-                ? "Gerar prompt para Magnific Spaces"
-                : "Requer Creative Brain"
-            }
-            icon={Sparkles}
-            actionLabel="Gerar prompt"
-            href={hasBrandDna ? `/clients/${id}/creatives` : undefined}
-            disabled={!hasBrandDna}
+        </section>
+
+        {/* Produção */}
+        <section className="space-y-4">
+          <SectionHeader
+            title="Produção"
+            description="Demandas e artes solicitadas por este cliente"
+            icon={BarChart3}
+            tone="blue"
           />
-        </div>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard
+              title="Demandas no mês"
+              value={demandsThisMonth}
+              description={`Solicitadas em ${monthLabel}`}
+              icon={CalendarClock}
+              tone={demandsThisMonth > 0 ? "green" : "slate"}
+              className="stagger-1 animate-in-soft"
+            />
+            <StatCard
+              title="Últimos 30 dias"
+              value={demandsLast30}
+              description="Demandas solicitadas no período"
+              icon={CalendarDays}
+              tone="blue"
+              className="stagger-2 animate-in-soft"
+            />
+            <StatCard
+              title="Demandas no total"
+              value={totalDemands}
+              description="Briefings recebidos via Make"
+              icon={ClipboardList}
+              tone="violet"
+              className="stagger-3 animate-in-soft"
+            />
+            <StatCard
+              title="Artes"
+              value={totalArtes}
+              description="Peças solicitadas em todas as demandas"
+              icon={Layers}
+              tone="pink"
+              className="stagger-4 animate-in-soft"
+            />
+          </div>
+        </section>
+
+        <ClientDemandsPanel clientId={id} demands={demands} />
 
         {references.length > 0 && (
-          <section className="space-y-5">
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-medium tracking-heading">
-                  Referências visuais
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Prévia das últimas referências
-                </p>
-              </div>
-              <Link
-                href={`/clients/${id}/references`}
-                className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-              >
-                Ver todas
-              </Link>
-            </div>
+          <section className="space-y-4">
+            <SectionHeader
+              title="Referências visuais"
+              description="Prévia das últimas referências"
+              icon={ImageIcon}
+              tone="cyan"
+              action={
+                <Link
+                  href={`/clients/${id}/references`}
+                  className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "text-foreground")}
+                >
+                  Ver todas
+                  <ArrowUpRight className="size-3.5" />
+                </Link>
+              }
+            />
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 md:grid-cols-6">
               {references.slice(0, 6).map((ref) => (
                 <div
                   key={ref.id}
-                  className="aspect-square overflow-hidden rounded-lg border border-border/50 bg-card/30"
+                  className="aspect-square overflow-hidden rounded-xl border border-border bg-surface"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -304,37 +400,22 @@ export default async function ClientDetailPage({ params }: PageProps) {
           </section>
         )}
 
-        <ClientDemandsPanel clientId={id} demands={demands} />
-
-        <section className="space-y-5">
-          <div className="flex items-end justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-medium tracking-heading">
-                Fotos do cliente
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Imagens de produto, espaço e contexto da marca
-              </p>
-            </div>
-          </div>
-          <ClientPhotosPanel
-            clientId={id}
-            clientName={client.name}
-            photos={clientPhotos}
-            logoUrl={logoUrl}
+        <section className="space-y-4">
+          <SectionHeader
+            title="Fotos do cliente"
+            description="Imagens de produto, espaço e contexto da marca"
+            icon={Camera}
+            tone="orange"
           />
+          <Surface padding="md">
+            <ClientPhotosPanel
+              clientId={id}
+              clientName={client.name}
+              photos={clientPhotos}
+              logoUrl={logoUrl}
+            />
+          </Surface>
         </section>
-
-        <Link
-          href="/clients"
-          className={cn(
-            buttonVariants({ variant: "ghost", size: "sm" }),
-            "inline-flex gap-2 text-muted-foreground"
-          )}
-        >
-          <ArrowLeft className="size-4" strokeWidth={1.75} />
-          Voltar para clientes
-        </Link>
       </div>
     </DashboardPage>
   );

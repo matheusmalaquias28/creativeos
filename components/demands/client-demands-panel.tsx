@@ -1,7 +1,9 @@
 import Link from "next/link";
-import { ClipboardList } from "lucide-react";
+import { ArrowUpRight, ClipboardList } from "lucide-react";
+import { SectionHeader } from "@/components/layout/section-header";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
+import { DEMAND_TONE, getStatusColorState } from "@/lib/demands/demand-color";
 import { cn } from "@/lib/utils";
 import type { CreativeDemand } from "@/types/demand";
 
@@ -23,43 +25,48 @@ export function ClientDemandsPanel({
 
   return (
     <section className="space-y-4">
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-medium tracking-heading">Demandas do cliente</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Briefings recebidos via Make
-          </p>
-        </div>
-        <Link
-          href="/demands"
-          className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-        >
-          Ver todas
-        </Link>
-      </div>
+      <SectionHeader
+        icon={ClipboardList}
+        tone="cyan"
+        title="Demandas do cliente"
+        description="Briefings recebidos via Make"
+        action={
+          <Link
+            href="/demands"
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          >
+            Ver todas
+          </Link>
+        }
+      />
 
       <div className="grid gap-3">
         {demands.slice(0, 3).map((demand) => (
           <div
             key={demand.id}
-            className="surface-panel flex flex-wrap items-center justify-between gap-3 p-4"
+            className="surface-panel hover-lift flex flex-wrap items-center justify-between gap-3 p-4"
           >
             <div className="min-w-0 space-y-1">
-              <p className="truncate text-sm font-medium">
+              <p className="truncate text-sm font-semibold text-foreground">
                 {demand.briefing.titulo || demand.client_name_external}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs tabular-nums text-muted-foreground">
                 {formatDate(demand.external_created_at ?? demand.created_at)} ·{" "}
                 {demand.artes.length} arte(s)
               </p>
             </div>
             <div className="flex items-center gap-2">
-              {demand.status && <Badge variant="secondary">{demand.status}</Badge>}
+              {demand.status && (
+                <Badge variant={DEMAND_TONE[getStatusColorState(demand.status)]}>
+                  {demand.status}
+                </Badge>
+              )}
               <Link
                 href={`/demands/${demand.id}`}
                 className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
               >
                 Abrir
+                <ArrowUpRight className="size-3.5" />
               </Link>
             </div>
           </div>
@@ -67,7 +74,7 @@ export function ClientDemandsPanel({
       </div>
 
       {demands.length > 3 && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-[0.8125rem] text-muted-foreground">
           <ClipboardList className="mr-1 inline size-3.5" />
           +{demands.length - 3} demanda(s) adicionais na listagem geral
         </p>

@@ -18,7 +18,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { Surface, SurfaceContent } from "@/components/ui/surface";
+import { EmptyState } from "@/components/ui/empty-state";
+import { SectionHeader } from "@/components/layout/section-header";
 import { ModernColorPicker, FontPicker } from "@/components/carousel/controls/pickers";
 import {
   saveCarouselProfileAction,
@@ -187,19 +188,23 @@ function ProfileEditor({
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-background/60 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative z-10 flex max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-2xl border border-border bg-card shadow-2xl dark:border-white/10 dark:bg-surface-elevated">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={draft.id ? "Editar perfil" : "Novo perfil"}
+        className="animate-in-soft relative z-10 flex max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-[var(--surface-shadow-elevated),var(--inner-highlight)]"
+      >
         {/* Left: preview */}
-        <div className="hidden w-64 shrink-0 flex-col gap-4 border-r border-border/50 bg-muted/20 p-5 sm:flex">
-          <p className="text-[0.625rem] font-semibold uppercase tracking-widest text-muted-foreground/60">
-            Prévia
-          </p>
+        <div className="hidden w-64 shrink-0 flex-col gap-4 border-r border-border bg-surface p-5 sm:flex">
+          <p className="text-[0.8125rem] font-semibold text-foreground">Prévia</p>
+          {/* Prévia renderiza as cores do perfil (conteúdo) */}
           <ProfilePreview draft={draft} />
           {draft.palette.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {draft.palette.map((c) => (
-                <span key={c} className="size-5 rounded border border-white/10" style={{ backgroundColor: c }} title={c} />
+                <span key={c} className="size-5 rounded border border-border-strong" style={{ backgroundColor: c }} title={c} />
               ))}
             </div>
           )}
@@ -207,13 +212,18 @@ function ProfileEditor({
 
         {/* Right: form */}
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex items-center justify-between border-b border-border/50 px-6 py-4">
-            <h2 className="text-base font-semibold tracking-tight">
-              {draft.id ? "Editar perfil" : "Novo perfil"}
-            </h2>
-            <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
-              <X className="size-4" />
-            </button>
+          <div className="flex items-center justify-between gap-3 border-b border-border px-6 py-4">
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold tracking-heading text-foreground">
+                {draft.id ? "Editar perfil" : "Novo perfil"}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Logo, fontes e cores reaproveitados nos carrosséis.
+              </p>
+            </div>
+            <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Fechar">
+              <X />
+            </Button>
           </div>
 
           <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
@@ -232,7 +242,7 @@ function ProfileEditor({
                 <select
                   value={draft.client_id ?? ""}
                   onChange={(e) => patch({ client_id: e.target.value || null })}
-                  className="h-9 w-full rounded-md border border-input bg-card px-3 text-sm text-foreground outline-none focus:border-primary/50 dark:bg-surface-elevated [&>option]:bg-card [&>option]:text-foreground dark:[&>option]:bg-surface-elevated"
+                  className="h-10 w-full rounded-xl border border-border bg-input px-3.5 text-sm text-foreground outline-none transition-premium hover:border-border-strong focus-visible:border-primary/60 focus-visible:ring-3 focus-visible:ring-ring/20 [&>option]:bg-popover [&>option]:text-popover-foreground"
                 >
                   <option value="">Nenhum</option>
                   {clients.map((c) => (
@@ -251,7 +261,7 @@ function ProfileEditor({
                     "flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed py-3 text-xs transition-colors",
                     draft.logo_url
                       ? "border-primary/40 bg-primary/5 text-primary"
-                      : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                      : "border-border-strong bg-surface text-muted-foreground hover:border-primary/50 hover:bg-primary/5 hover:text-foreground"
                   )}
                 >
                   <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={handleLogo} />
@@ -261,7 +271,7 @@ function ProfileEditor({
                 {draft.logo_url && (
                   <button
                     onClick={() => patch({ logo_url: null, logo_storage_path: null })}
-                    className="text-[0.625rem] text-negative hover:underline"
+                    className="text-xs font-semibold text-tone-red hover:underline"
                   >
                     Remover logo
                   </button>
@@ -293,9 +303,7 @@ function ProfileEditor({
 
             {/* Colors */}
             <div className="space-y-3">
-              <p className="text-[0.625rem] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                Cores da marca
-              </p>
+              <p className="text-[0.8125rem] font-semibold text-foreground">Cores da marca</p>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <ModernColorPicker label="Fundo" value={draft.color_background} onChange={(v) => patch({ color_background: v })} />
                 <ModernColorPicker label="Título" value={draft.color_title} onChange={(v) => patch({ color_title: v })} />
@@ -305,14 +313,14 @@ function ProfileEditor({
             </div>
 
             {/* Business context for Gerador Turbo */}
-            <div className="space-y-2 rounded-xl border border-border/40 bg-muted/10 p-3">
-              <div className="flex items-center gap-1.5">
-                <FileText className="size-3.5 text-primary" />
-                <p className="text-[0.625rem] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                  Contexto do cliente (Gerador Turbo)
-                </p>
+            <div className="space-y-2.5 rounded-xl border border-tone-pink/25 bg-tone-pink/5 p-4">
+              <div className="flex items-center gap-2">
+                <span className="flex size-6 items-center justify-center rounded-lg bg-tone-pink/14 text-tone-pink ring-1 ring-inset ring-tone-pink/20">
+                  <FileText className="size-3.5" />
+                </span>
+                <p className="text-[0.8125rem] font-semibold text-foreground">Contexto do cliente (Gerador Turbo)</p>
               </div>
-              <p className="text-[0.625rem] leading-relaxed text-muted-foreground/60">
+              <p className="text-xs leading-relaxed text-muted-foreground">
                 Descreva o negócio do cliente e o estilo de linguagem. A IA gera um
                 contexto (.md) lido toda vez que o Gerador Turbo for usado para este perfil.
               </p>
@@ -321,12 +329,12 @@ function ProfileEditor({
                 onChange={(e) => patch({ business_context: e.target.value || null })}
                 placeholder="Ex: Loja de suplementos premium para atletas. Tom direto, motivador, sem jargão médico. Foca em performance e resultado..."
                 rows={4}
-                className="text-xs resize-none"
+                className="resize-none text-xs"
               />
               <Button
                 variant="outline"
                 size="sm"
-                className="w-full gap-1.5 text-xs"
+                className="w-full"
                 onClick={handleGenerateContext}
                 disabled={genCtx}
               >
@@ -334,8 +342,8 @@ function ProfileEditor({
                 {draft.context_md ? "Regerar contexto (.md)" : "Gerar contexto (.md)"}
               </Button>
               {draft.context_md && (
-                <details className="rounded-lg border border-border/40 bg-background/40 p-2">
-                  <summary className="cursor-pointer text-[0.625rem] font-medium text-muted-foreground">
+                <details className="rounded-xl border border-border bg-card p-2.5">
+                  <summary className="cursor-pointer text-xs font-semibold text-muted-foreground hover:text-foreground">
                     Ver contexto gerado
                   </summary>
                   <Textarea
@@ -349,14 +357,14 @@ function ProfileEditor({
             </div>
 
             {/* Reference images (backgrounds) */}
-            <div className="space-y-2 rounded-xl border border-border/40 bg-muted/10 p-3">
-              <div className="flex items-center gap-1.5">
-                <ImagePlus className="size-3.5 text-primary" />
-                <p className="text-[0.625rem] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                  Imagens de referência (fundos)
-                </p>
+            <div className="space-y-2.5 rounded-xl border border-border bg-surface p-4">
+              <div className="flex items-center gap-2">
+                <span className="flex size-6 items-center justify-center rounded-lg bg-tone-cyan/14 text-tone-cyan ring-1 ring-inset ring-tone-cyan/20">
+                  <ImagePlus className="size-3.5" />
+                </span>
+                <p className="text-[0.8125rem] font-semibold text-foreground">Imagens de referência (fundos)</p>
               </div>
-              <p className="text-[0.625rem] leading-relaxed text-muted-foreground/60">
+              <p className="text-xs leading-relaxed text-muted-foreground">
                 Envie imagens que representem o estilo visual da marca. Elas guiam a
                 geração das imagens de fundo dos carrosséis no Gerador Turbo.
               </p>
@@ -367,12 +375,13 @@ function ProfileEditor({
                     <img
                       src={ref.url}
                       alt="referência"
-                      className="size-16 rounded-lg border border-white/10 object-cover"
+                      className="size-16 rounded-lg border border-border object-cover"
                     />
                     <button
                       onClick={() => removeReference(ref.url)}
-                      className="absolute -right-1.5 -top-1.5 hidden size-5 items-center justify-center rounded-full bg-negative text-white group-hover:flex"
+                      className="absolute -top-1.5 -right-1.5 hidden size-5 items-center justify-center rounded-full border border-border bg-popover text-tone-red shadow-[var(--surface-shadow)] group-hover:flex hover:bg-tone-red/15"
                       title="Remover"
+                      aria-label="Remover referência"
                     >
                       <X className="size-3" />
                     </button>
@@ -380,8 +389,8 @@ function ProfileEditor({
                 ))}
                 <label
                   className={cn(
-                    "flex size-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed text-[0.55rem] transition-colors",
-                    "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                    "flex size-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed text-[0.625rem] font-semibold transition-colors",
+                    "border-border-strong bg-card text-muted-foreground hover:border-primary/50 hover:bg-primary/5 hover:text-primary"
                   )}
                 >
                   <input
@@ -405,16 +414,15 @@ function ProfileEditor({
 
             {/* Palette */}
             <div className="space-y-2">
-              <p className="text-[0.625rem] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                Paleta extra
-              </p>
+              <p className="text-[0.8125rem] font-semibold text-foreground">Paleta extra</p>
               <div className="flex flex-wrap items-center gap-2">
                 {draft.palette.map((c) => (
                   <div key={c} className="group relative">
-                    <span className="block size-8 rounded-lg border border-white/10" style={{ backgroundColor: c }} title={c} />
+                    <span className="block size-8 rounded-lg border border-border-strong" style={{ backgroundColor: c }} title={c} />
                     <button
                       onClick={() => patch({ palette: draft.palette.filter((x) => x !== c) })}
-                      className="absolute -right-1 -top-1 hidden size-4 items-center justify-center rounded-full bg-negative text-white group-hover:flex"
+                      aria-label="Remover cor"
+                      className="absolute -top-1 -right-1 hidden size-4 items-center justify-center rounded-full border border-border bg-popover text-tone-red shadow-[var(--surface-shadow)] group-hover:flex hover:bg-tone-red/15"
                     >
                       <X className="size-2.5" />
                     </button>
@@ -425,29 +433,29 @@ function ProfileEditor({
                     type="color"
                     value={newSwatch}
                     onChange={(e) => setNewSwatch(e.target.value)}
+                    aria-label="Nova cor"
                     className="size-8 cursor-pointer rounded-lg border border-border bg-transparent"
                   />
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 text-xs"
                     onClick={() => {
                       if (!draft.palette.includes(newSwatch)) {
                         patch({ palette: [...draft.palette, newSwatch] });
                       }
                     }}
                   >
-                    <Plus className="size-3" /> Cor
+                    <Plus /> Cor
                   </Button>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 border-t border-border/50 px-6 py-4">
+          <div className="flex justify-end gap-2 border-t border-border bg-surface/60 px-6 py-4">
             <Button variant="ghost" size="sm" onClick={onClose}>Cancelar</Button>
             <Button size="sm" onClick={handleSave} disabled={saving || uploading}>
-              {saving ? <Loader2 className="size-3.5 animate-spin" /> : null}
+              {saving ? <Loader2 className="animate-spin" /> : null}
               Salvar perfil
             </Button>
           </div>
@@ -470,32 +478,36 @@ function ProfileCard({
   onDelete: () => void;
 }) {
   return (
-    <div className="group overflow-hidden rounded-2xl border border-border/50 bg-card transition-premium hover-lift dark:border-white/7">
-      <div className="p-3">
+    <div className="surface-panel hover-lift group flex flex-col overflow-hidden p-2">
+      <button
+        type="button"
+        onClick={onEdit}
+        aria-label={`Editar ${profile.name}`}
+        className="block rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+      >
         <ProfilePreview draft={profile} />
-      </div>
-      <div className="flex items-start justify-between gap-2 px-4 pb-4">
+      </button>
+      <div className="flex items-start justify-between gap-2 px-2 pt-3 pb-1.5">
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-foreground">{profile.name}</p>
-          <p className="truncate text-xs text-muted-foreground">
+          <p className="truncate text-sm font-bold tracking-tight text-foreground">{profile.name}</p>
+          <p className="truncate text-[0.6875rem] text-muted-foreground">
             {clientName ?? "Sem cliente"}
           </p>
         </div>
-        <div className="flex shrink-0 gap-1">
-          <button
-            onClick={onEdit}
-            className="flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors"
-            title="Editar"
-          >
-            <Pencil className="size-3.5" />
-          </button>
-          <button
+        <div className="flex shrink-0 gap-0.5">
+          <Button variant="ghost" size="icon-xs" onClick={onEdit} title="Editar" aria-label="Editar perfil">
+            <Pencil />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-xs"
             onClick={onDelete}
-            className="flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-negative/10 hover:text-negative transition-colors"
             title="Deletar"
+            aria-label="Deletar perfil"
+            className="hover:bg-tone-red/12 hover:text-tone-red"
           >
-            <Trash2 className="size-3.5" />
-          </button>
+            <Trash2 />
+          </Button>
         </div>
       </div>
     </div>
@@ -535,44 +547,49 @@ export function ProfilesManager({
     });
   }
 
+  const newButton = (
+    <Button size="sm" onClick={() => setEditing(makeEmptyProfileDraft())}>
+      <Plus />
+      Novo perfil
+    </Button>
+  );
+
   return (
     <>
-      <div className="flex justify-end">
-        <Button size="sm" className="gap-1.5" onClick={() => setEditing(makeEmptyProfileDraft())}>
-          <Plus className="size-4" />
-          Novo perfil
-        </Button>
-      </div>
-
       {profiles.length === 0 ? (
-        <Surface variant="dashed" padding="lg">
-          <SurfaceContent className="flex flex-col items-center text-center">
-            <Palette className="mb-4 size-8 text-muted-foreground/40" strokeWidth={1.25} />
-            <p className="text-sm font-medium text-foreground">Nenhum perfil ainda</p>
-            <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
-              Crie perfis de design pré-configurados (logo, fontes e cores) por
-              cliente para reaproveitar em qualquer carrossel.
-            </p>
-            <div className="mt-4">
-              <Button size="sm" className="gap-1.5" onClick={() => setEditing(makeEmptyProfileDraft())}>
-                <Plus className="size-4" />
-                Criar primeiro perfil
-              </Button>
-            </div>
-          </SurfaceContent>
-        </Surface>
+        <EmptyState
+          icon={Palette}
+          tone="violet"
+          title="Nenhum perfil ainda"
+          description="Crie perfis de design pré-configurados (logo, fontes e cores) por cliente para reaproveitar em qualquer carrossel."
+          action={
+            <Button size="sm" onClick={() => setEditing(makeEmptyProfileDraft())}>
+              <Plus />
+              Criar primeiro perfil
+            </Button>
+          }
+        />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-          {profiles.map((profile) => (
-            <ProfileCard
-              key={profile.id}
-              profile={profile}
-              clientName={clientName(profile.client_id)}
-              onEdit={() => setEditing({ ...profile, reference_images: profile.reference_images ?? [] })}
-              onDelete={() => handleDelete(profile)}
-            />
-          ))}
-        </div>
+        <section className="space-y-4">
+          <SectionHeader
+            icon={Palette}
+            tone="violet"
+            title="Perfis salvos"
+            description={`${profiles.length} ${profiles.length === 1 ? "perfil" : "perfis"}`}
+            action={newButton}
+          />
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {profiles.map((profile) => (
+              <ProfileCard
+                key={profile.id}
+                profile={profile}
+                clientName={clientName(profile.client_id)}
+                onEdit={() => setEditing({ ...profile, reference_images: profile.reference_images ?? [] })}
+                onDelete={() => handleDelete(profile)}
+              />
+            ))}
+          </div>
+        </section>
       )}
 
       {editing && (

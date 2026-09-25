@@ -3,56 +3,38 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTheme } from "next-themes";
 import {
-  Brain,
-  ChevronLeft,
-  ChevronRight,
-  ClipboardList,
-  CreditCard,
-  Globe,
-  Images,
-  LayoutDashboard,
-  Layers,
+  ArrowRight,
+  ChevronsUpDown,
   LogOut,
   Menu,
-  Wand2,
-  Users,
+  Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Search,
+  Sun,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { signOut } from "@/actions/auth";
-import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { useNewDemandsCount } from "@/components/demands/new-demands-count-provider";
+import { BrandMark, BrandWordmark } from "@/components/layout/brand-mark";
+import { useCommandMenu } from "@/components/layout/command-menu";
+import {
+  NAV_SECTIONS,
+  isNavChildActive,
+  isNavItemActive,
+} from "@/components/layout/nav-config";
 
 const STORAGE_KEY = "sidebar-collapsed";
-
-type NavChild = { href: string; label: string };
-type NavItem = {
-  href: string;
-  label: string;
-  icon: typeof LayoutDashboard;
-  children?: NavChild[];
-};
-
-const navItems: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/clients", label: "Clientes", icon: Users },
-  { href: "/demands", label: "Demandas", icon: ClipboardList },
-  { href: "/web-demands", label: "Demandas Web", icon: Globe },
-  { href: "/assinaturas", label: "Assinaturas", icon: CreditCard },
-  {
-    href: "/carousel",
-    label: "Carrosséis",
-    icon: Layers,
-    children: [
-      { href: "/carousel", label: "Todos os carrosséis" },
-      { href: "/carousel/perfis", label: "Perfis" },
-    ],
-  },
-  { href: "/gerador", label: "Gerador", icon: Wand2 },
-  { href: "/galeria", label: "Galeria", icon: Images },
-];
 
 type AppSidebarProps = {
   userName?: string | null;
@@ -63,11 +45,15 @@ export function AppSidebar({ userName, userEmail }: AppSidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
+  const { open: openCommand } = useCommandMenu();
 
   // Restaura a preferência salva (evita mismatch de hidratação lendo só no client).
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    setCollapsed(window.localStorage.getItem(STORAGE_KEY) === "1");
+    try {
+      setCollapsed(window.localStorage.getItem(STORAGE_KEY) === "1");
+    } catch {
+      /* storage indisponível */
+    }
   }, []);
 
   // Fecha o menu mobile ao trocar de rota.
@@ -78,27 +64,46 @@ export function AppSidebar({ userName, userEmail }: AppSidebarProps) {
   function toggle() {
     setCollapsed((prev) => {
       const next = !prev;
-      window.localStorage.setItem(STORAGE_KEY, next ? "1" : "0");
+      try {
+        window.localStorage.setItem(STORAGE_KEY, next ? "1" : "0");
+      } catch {
+        /* storage indisponível */
+      }
       return next;
     });
   }
 
   return (
     <>
-      {/* Trigger mobile — ícone de menu fixo no topo esquerdo */}
-      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+      {/* Top bar mobile */}
+      <div className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-sidebar-border bg-sidebar/90 px-4 backdrop-blur-xl lg:hidden">
         <button
           type="button"
           onClick={() => setMobileOpen(true)}
           aria-label="Abrir menu"
-          className="fixed left-4 top-4 z-40 flex size-10 items-center justify-center rounded-xl border border-sidebar-border bg-sidebar/90 text-sidebar-foreground shadow-sm backdrop-blur-xl transition-colors hover:text-foreground lg:hidden"
+          className="flex size-9 items-center justify-center rounded-xl text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground"
         >
           <Menu className="size-5" strokeWidth={1.75} />
         </button>
+        <Link href="/dashboard" className="flex items-center gap-2.5">
+          <BrandMark size="sm" />
+          <span className="text-sm font-bold tracking-tight">Creative OS</span>
+        </Link>
+        <button
+          type="button"
+          onClick={openCommand}
+          aria-label="Buscar"
+          className="ml-auto flex size-9 items-center justify-center rounded-xl text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground"
+        >
+          <Search className="size-[1.125rem]" strokeWidth={1.75} />
+        </button>
+      </div>
 
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetContent
           side="left"
-          className="w-full max-w-none gap-0 border-none bg-sidebar p-0 sm:max-w-full lg:hidden"
+          showCloseButton={false}
+          className="w-[18rem] max-w-[85vw] gap-0 border-r border-sidebar-border bg-sidebar p-0 lg:hidden"
         >
           <SheetTitle className="sr-only">Menu de navegação</SheetTitle>
           <SidebarBody
@@ -107,6 +112,10 @@ export function AppSidebar({ userName, userEmail }: AppSidebarProps) {
             userName={userName}
             userEmail={userEmail}
             onNavigate={() => setMobileOpen(false)}
+            onSearch={() => {
+              setMobileOpen(false);
+              openCommand();
+            }}
           />
         </SheetContent>
       </Sheet>
@@ -114,26 +123,17 @@ export function AppSidebar({ userName, userEmail }: AppSidebarProps) {
       {/* Sidebar desktop */}
       <aside
         className={cn(
-          "relative hidden h-screen shrink-0 flex-col border-r border-sidebar-border bg-sidebar backdrop-blur-2xl transition-[width] duration-200 ease-out lg:flex",
-          collapsed ? "w-[4.5rem]" : "w-[15.5rem]"
+          "sticky top-0 hidden h-screen shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-200 ease-out lg:flex",
+          collapsed ? "w-[4.75rem]" : "w-[16.5rem]"
         )}
       >
-        {/* Toggle na borda */}
-        <button
-          type="button"
-          onClick={toggle}
-          aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
-          title={collapsed ? "Expandir menu" : "Recolher menu"}
-          className="absolute -right-3 top-9 z-30 flex size-6 -translate-y-1/2 items-center justify-center rounded-full border border-sidebar-border bg-sidebar text-muted-foreground shadow-sm transition-colors hover:text-foreground hover:border-positive/40"
-        >
-          {collapsed ? <ChevronRight className="size-3.5" /> : <ChevronLeft className="size-3.5" />}
-        </button>
-
         <SidebarBody
           collapsed={collapsed}
           pathname={pathname}
           userName={userName}
           userEmail={userEmail}
+          onToggle={toggle}
+          onSearch={openCommand}
         />
       </aside>
     </>
@@ -146,6 +146,8 @@ type SidebarBodyProps = {
   userName?: string | null;
   userEmail?: string | null;
   onNavigate?: () => void;
+  onToggle?: () => void;
+  onSearch: () => void;
 };
 
 function SidebarBody({
@@ -154,187 +156,268 @@ function SidebarBody({
   userName,
   userEmail,
   onNavigate,
+  onToggle,
+  onSearch,
 }: SidebarBodyProps) {
   const { count: newDemandsCount } = useNewDemandsCount();
+  const [isMac, setIsMac] = useState(false);
+
+  useEffect(() => {
+    setIsMac(/mac|iphone|ipad/i.test(navigator.userAgent));
+  }, []);
 
   return (
     <div className="flex h-full flex-col">
-      {/* Logo */}
+      {/* Marca + recolher */}
       <div
         className={cn(
-          "flex h-[var(--header-height)] items-center border-b border-sidebar-border/60",
+          "flex h-[4.5rem] shrink-0 items-center",
           collapsed ? "justify-center px-0" : "gap-3 px-5"
         )}
       >
-        <div className="relative flex size-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/6 dark:bg-white/5">
-          <Brain className="size-4 text-foreground/90" strokeWidth={1.75} />
-          <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-positive animate-glow-pulse dark:shadow-[0_0_6px_var(--positive)]" />
-        </div>
-        {!collapsed && (
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold tracking-tight text-foreground">
-              Creative OS
-            </p>
-            <p className="truncate text-[0.6rem] font-medium tracking-[0.12em] uppercase text-muted-foreground/70">
-              Operating System
-            </p>
-          </div>
+        <Link
+          href="/dashboard"
+          onClick={onNavigate}
+          className="flex min-w-0 items-center gap-3"
+          title={collapsed ? "Creative OS" : undefined}
+        >
+          <BrandMark />
+          {!collapsed && <BrandWordmark />}
+        </Link>
+        {onToggle && !collapsed && (
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-label="Recolher menu"
+            title="Recolher menu"
+            className="ml-auto flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground"
+          >
+            <PanelLeftClose className="size-4" strokeWidth={1.75} />
+          </button>
         )}
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pt-4">
-        {!collapsed && (
-          <p className="mb-2.5 px-3 text-[0.5625rem] font-semibold tracking-[0.14em] text-muted-foreground/50 uppercase">
-            Workspace
-          </p>
-        )}
-        {navItems.map((item) => {
-          const isActive =
-            pathname === item.href || pathname.startsWith(`${item.href}/`);
-          const Icon = item.icon;
-          const showChildren = !collapsed && !!item.children && isActive;
-          const hasBadge = item.href === "/demands" && newDemandsCount > 0;
-
-          return (
-            <div key={item.href}>
-              <Link
-                href={item.href}
-                title={collapsed ? item.label : undefined}
-                onClick={onNavigate}
-                className={cn(
-                  "relative flex items-center rounded-xl text-[0.8125rem] font-medium transition-premium",
-                  collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2.5",
-                  isActive
-                    ? cn(
-                        "nav-active-indicator bg-sidebar-accent text-sidebar-accent-foreground dark:bg-white/7",
-                        !collapsed && "pl-4"
-                      )
-                    : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-foreground dark:hover:bg-white/5"
-                )}
-              >
-                <span className="relative flex shrink-0 items-center justify-center">
-                  <Icon
-                    className={cn(
-                      "size-4",
-                      isActive
-                        ? "text-positive dark:drop-shadow-[0_0_6px_var(--positive)]"
-                        : "text-muted-foreground"
-                    )}
-                    strokeWidth={isActive ? 2 : 1.75}
-                  />
-                  {/* Badge de demandas vira um ponto quando recolhido */}
-                  {hasBadge && collapsed && (
-                    <span className="absolute -right-1 -top-1 size-2 rounded-full bg-positive dark:shadow-[0_0_6px_var(--positive)]" />
-                  )}
-                </span>
-                {!collapsed && (
-                  <>
-                    {item.label}
-                    {hasBadge && (
-                      <span className="ml-auto flex size-5 items-center justify-center rounded-full bg-positive text-[0.6rem] font-bold text-positive-foreground dark:shadow-[0_0_8px_var(--positive)]">
-                        {newDemandsCount > 99 ? "99+" : newDemandsCount}
-                      </span>
-                    )}
-                  </>
-                )}
-              </Link>
-
-              {showChildren && (
-                <div className="mt-0.5 mb-1 ml-[1.35rem] space-y-0.5 border-l border-sidebar-border/70 pl-3">
-                  {item.children!.map((child) => {
-                    const childActive =
-                      child.href === "/carousel"
-                        ? pathname === "/carousel" ||
-                          (pathname.startsWith("/carousel/") &&
-                            !pathname.startsWith("/carousel/perfis"))
-                        : pathname === child.href ||
-                          pathname.startsWith(`${child.href}/`);
-                    return (
-                      <Link
-                        key={child.href}
-                        href={child.href}
-                        onClick={onNavigate}
-                        className={cn(
-                          "flex items-center rounded-lg px-3 py-1.5 text-[0.75rem] font-medium transition-premium",
-                          childActive
-                            ? "text-foreground"
-                            : "text-muted-foreground/70 hover:text-foreground"
-                        )}
-                      >
-                        <span
-                          className={cn(
-                            "mr-2 size-1.5 rounded-full transition-colors",
-                            childActive ? "bg-positive" : "bg-muted-foreground/30"
-                          )}
-                        />
-                        {child.label}
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </nav>
-
-      {/* Footer */}
-      <div
-        className={cn(
-          "mt-auto border-t border-sidebar-border/60",
-          collapsed ? "space-y-2 p-3" : "space-y-3 p-4"
-        )}
-      >
+      {/* Busca / command menu */}
+      <div className={cn("shrink-0 pb-2", collapsed ? "px-3" : "px-4")}>
         {collapsed ? (
-          <div
-            className="mx-auto flex size-8 items-center justify-center rounded-full border border-white/10 bg-white/8 text-[0.6875rem] font-semibold text-foreground/80 uppercase"
-            title={userName ?? userEmail ?? "Usuário"}
-          >
-            {userName?.charAt(0) ?? "U"}
+          <div className="flex flex-col items-center gap-1">
+            {onToggle && (
+              <button
+                type="button"
+                onClick={onToggle}
+                aria-label="Expandir menu"
+                title="Expandir menu"
+                className="flex size-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground"
+              >
+                <PanelLeftOpen className="size-4" strokeWidth={1.75} />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onSearch}
+              aria-label="Buscar"
+              title="Buscar (Ctrl K)"
+              className="flex size-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground"
+            >
+              <Search className="size-4" strokeWidth={1.75} />
+            </button>
           </div>
         ) : (
-          <div className="rounded-xl border border-white/7 bg-white/4 px-3.5 py-3 dark:bg-white/3">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="flex size-6 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/8 text-[0.5625rem] font-semibold text-foreground/80 uppercase">
-                {userName?.charAt(0) ?? "U"}
-              </div>
-              <div className="min-w-0">
-                <p className="truncate text-[0.8125rem] font-medium text-foreground/90">
-                  {userName ?? "Usuário"}
-                </p>
-                <p className="truncate text-[0.6875rem] text-muted-foreground/70">
-                  {userEmail}
-                </p>
-              </div>
+          <button
+            type="button"
+            onClick={onSearch}
+            className="group flex h-10 w-full items-center gap-2.5 rounded-xl border border-sidebar-border bg-background/60 px-3 text-left text-[0.8125rem] text-muted-foreground transition-premium hover:border-border-strong hover:text-foreground"
+          >
+            <Search className="size-4 shrink-0" strokeWidth={1.75} />
+            <span className="flex-1 truncate">Buscar…</span>
+            <kbd className="rounded-md border border-sidebar-border bg-sidebar-accent px-1.5 py-0.5 font-sans text-[0.625rem] font-semibold text-muted-foreground">
+              {isMac ? "⌘" : "Ctrl"} K
+            </kbd>
+          </button>
+        )}
+      </div>
+
+      {/* Navegação */}
+      <nav className={cn("flex-1 overflow-y-auto pb-4", collapsed ? "px-3" : "px-4")}>
+        {NAV_SECTIONS.map((section, sectionIndex) => (
+          <div key={section.id} className={cn(sectionIndex > 0 && "mt-5")}>
+            {collapsed ? (
+              sectionIndex > 0 && <div className="mx-auto mb-3 h-px w-6 bg-sidebar-border" />
+            ) : (
+              <p className="mb-1.5 px-3 text-[0.6875rem] font-semibold tracking-[0.04em] text-muted-foreground/70">
+                {section.label}
+              </p>
+            )}
+
+            <div className="space-y-0.5">
+              {section.items.map((item) => {
+                const isActive = isNavItemActive(pathname, item.href);
+                const Icon = item.icon;
+                const showChildren = !collapsed && !!item.children && isActive;
+                const badge = item.href === "/demands" && newDemandsCount > 0 ? newDemandsCount : 0;
+
+                return (
+                  <div key={item.href}>
+                    <Link
+                      href={item.href}
+                      title={collapsed ? item.label : undefined}
+                      onClick={onNavigate}
+                      aria-current={isActive ? "page" : undefined}
+                      className={cn(
+                        "group/nav relative flex items-center rounded-xl text-[0.8125rem] font-semibold transition-premium",
+                        collapsed ? "mx-auto size-10 justify-center" : "h-10 gap-3 px-3",
+                        isActive
+                          ? "bg-primary text-primary-foreground shadow-[inset_0_1px_0_oklch(1_0_0/18%),0_6px_16px_-8px_color-mix(in_oklch,var(--primary)_80%,transparent)]"
+                          : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                      )}
+                    >
+                      <span className="relative flex shrink-0 items-center justify-center">
+                        <Icon
+                          className={cn(
+                            "size-[1.0625rem]",
+                            isActive
+                              ? "text-primary-foreground"
+                              : "text-muted-foreground group-hover/nav:text-foreground"
+                          )}
+                          strokeWidth={isActive ? 2 : 1.75}
+                        />
+                        {badge > 0 && collapsed && (
+                          <span className="absolute -top-1 -right-1 size-2 rounded-full bg-highlight ring-2 ring-sidebar" />
+                        )}
+                      </span>
+                      {!collapsed && (
+                        <>
+                          <span className="truncate">{item.label}</span>
+                          {badge > 0 && (
+                            <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-highlight px-1.5 text-[0.625rem] font-bold text-highlight-foreground tabular-nums">
+                              {badge > 99 ? "99+" : badge}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </Link>
+
+                    {showChildren && (
+                      <div className="mt-1 mb-1 ml-[1.3rem] space-y-0.5 border-l border-sidebar-border pl-3">
+                        {item.children!.map((child) => {
+                          const childActive = isNavChildActive(pathname, child.href);
+                          return (
+                            <Link
+                              key={child.href}
+                              href={child.href}
+                              onClick={onNavigate}
+                              className={cn(
+                                "flex h-8 items-center rounded-lg px-2.5 text-[0.78rem] font-medium transition-premium",
+                                childActive
+                                  ? "bg-sidebar-accent text-foreground"
+                                  : "text-muted-foreground hover:text-foreground"
+                              )}
+                            >
+                              {child.label}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
-        )}
+        ))}
+      </nav>
 
-        <div
-          className={cn(
-            "flex items-center gap-2",
-            collapsed ? "flex-col" : "justify-between"
-          )}
-        >
-          <ThemeToggle compact />
-          <form action={signOut} className={collapsed ? "w-full" : "flex-1"}>
-            <Button
-              type="submit"
-              variant="ghost"
-              size={collapsed ? "icon-sm" : "sm"}
-              title={collapsed ? "Sair" : undefined}
-              className={cn(
-                "text-muted-foreground hover:text-foreground",
-                collapsed ? "mx-auto" : "w-full justify-start gap-2"
-              )}
-            >
-              <LogOut className="size-4" strokeWidth={1.75} />
-              {!collapsed && "Sair"}
-            </Button>
-          </form>
+      {/* Card de fila — só quando há demandas novas */}
+      {!collapsed && newDemandsCount > 0 && (
+        <div className="shrink-0 px-4 pb-3">
+          <Link
+            href="/demands"
+            onClick={onNavigate}
+            className="group/queue relative flex items-center gap-3 overflow-hidden rounded-2xl border border-sidebar-border bg-[radial-gradient(120%_90%_at_100%_0%,color-mix(in_oklch,var(--primary)_28%,transparent),transparent_60%)] bg-sidebar-accent/60 p-3 transition-premium hover:border-border-strong"
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block text-[0.8125rem] font-bold tracking-tight">
+                {newDemandsCount} {newDemandsCount === 1 ? "demanda nova" : "demandas novas"}
+              </span>
+              <span className="block truncate text-[0.6875rem] text-muted-foreground">
+                Aguardando triagem
+              </span>
+            </span>
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-highlight text-highlight-foreground transition-transform group-hover/queue:translate-x-0.5">
+              <ArrowRight className="size-4" />
+            </span>
+          </Link>
         </div>
+      )}
+
+      {/* Usuário */}
+      <div
+        className={cn(
+          "shrink-0 border-t border-sidebar-border",
+          collapsed ? "p-3" : "p-3"
+        )}
+      >
+        <UserMenu collapsed={collapsed} userName={userName} userEmail={userEmail} />
       </div>
     </div>
+  );
+}
+
+function UserMenu({
+  collapsed,
+  userName,
+  userEmail,
+}: {
+  collapsed: boolean;
+  userName?: string | null;
+  userEmail?: string | null;
+}) {
+  const { resolvedTheme, setTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
+  const initial = (userName ?? userEmail ?? "U").charAt(0).toUpperCase();
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        className={cn(
+          "flex w-full items-center rounded-xl text-left transition-premium outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring/50",
+          collapsed ? "justify-center p-1.5" : "gap-3 p-2"
+        )}
+        title={collapsed ? (userName ?? userEmail ?? "Usuário") : undefined}
+      >
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,var(--tone-orange),var(--tone-pink))] text-sm font-bold text-white shadow-[inset_0_1px_0_oklch(1_0_0/25%)]">
+          {initial}
+        </span>
+        {!collapsed && (
+          <>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[0.8125rem] font-semibold text-foreground">
+                {userName ?? "Usuário"}
+              </span>
+              <span className="block truncate text-[0.6875rem] text-muted-foreground">
+                {userEmail}
+              </span>
+            </span>
+            <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
+          </>
+        )}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="top" align="start" sideOffset={8} className="w-60">
+        <DropdownMenuItem onClick={() => setTheme(isDark ? "light" : "dark")}>
+          {isDark ? <Sun /> : <Moon />}
+          {isDark ? "Tema claro" : "Tema escuro"}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          variant="destructive"
+          onClick={() => {
+            void signOut();
+          }}
+        >
+          <LogOut />
+          Sair
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

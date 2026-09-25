@@ -4,27 +4,27 @@ import type { PromptJobStatus } from "@/services/art-director";
 
 const config: Record<
   PromptJobStatus,
-  { label: string; variant: "default" | "secondary" | "destructive" | "outline" | "warning"; icon: React.ReactNode }
+  { label: string; variant: "cyan" | "pink" | "amber" | "blue" | "green" | "red"; icon: React.ReactNode }
 > = {
-  draft: { label: "Na fila", variant: "outline", icon: <Clock className="size-3" /> },
+  draft: { label: "Na fila", variant: "cyan", icon: <Clock className="size-3" /> },
   writing_prompt: {
     label: "Dirigindo",
-    variant: "secondary",
+    variant: "pink",
     icon: <Loader2 className="size-3 animate-spin" />,
   },
   awaiting_approval: {
     label: "Revisar",
-    variant: "warning",
+    variant: "amber",
     icon: <PenLine className="size-3" />,
   },
-  queued: { label: "Aprovado", variant: "outline", icon: <Sparkles className="size-3" /> },
+  queued: { label: "Aprovado", variant: "cyan", icon: <Sparkles className="size-3" /> },
   processing: {
     label: "Gerando",
-    variant: "secondary",
+    variant: "blue",
     icon: <Loader2 className="size-3 animate-spin" />,
   },
-  succeeded: { label: "Pronta", variant: "default", icon: <CheckCircle2 className="size-3" /> },
-  failed: { label: "Falhou", variant: "destructive", icon: <XCircle className="size-3" /> },
+  succeeded: { label: "Pronta", variant: "green", icon: <CheckCircle2 className="size-3" /> },
+  failed: { label: "Falhou", variant: "red", icon: <XCircle className="size-3" /> },
 };
 
 export function PromptStatusBadge({ status }: { status: PromptJobStatus }) {

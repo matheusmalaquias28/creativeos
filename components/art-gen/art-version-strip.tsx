@@ -26,10 +26,10 @@ export function ArtVersionStrip({ versions, currentVersionId, onSelect }: Props)
             onClick={() => onSelect(v)}
             title={v.instruction ? `v${v.version_number}: ${v.instruction}` : `v${v.version_number} (original)`}
             className={cn(
-              "relative size-14 overflow-hidden rounded-lg border-2 transition-all hover:scale-105",
+              "relative size-14 overflow-hidden rounded-lg border-2 bg-muted transition-premium hover:scale-105",
               isCurrent
-                ? "border-primary shadow-md"
-                : "border-border opacity-60 hover:opacity-100"
+                ? "border-primary shadow-[var(--surface-shadow)]"
+                : "border-border opacity-60 hover:border-border-strong hover:opacity-100"
             )}
           >
             <Image
@@ -40,11 +40,11 @@ export function ArtVersionStrip({ versions, currentVersionId, onSelect }: Props)
               className="object-cover"
               sizes="56px"
             />
-            <span className="absolute bottom-0 right-0 rounded-tl bg-black/60 px-1 text-[9px] text-white">
+            <span className="absolute bottom-0 right-0 rounded-tl-md bg-background/80 px-1 text-[0.625rem] font-semibold tabular-nums text-foreground">
               v{v.version_number}
             </span>
             {isCurrent && (
-              <span className="absolute left-0 top-0 rounded-br bg-primary px-1 text-[9px] text-primary-foreground">
+              <span className="absolute left-0 top-0 rounded-br-md bg-primary px-1 text-[0.625rem] font-semibold text-primary-foreground">
                 atual
               </span>
             )}

@@ -1,11 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { Archive, Search, Users } from "lucide-react";
 import { ClientCard } from "@/components/clients/client-card";
 import { Input } from "@/components/ui/input";
-import { Surface, SurfaceContent } from "@/components/ui/surface";
-import { cn } from "@/lib/utils";
+import { EmptyState } from "@/components/ui/empty-state";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import type { ClientListItem } from "@/types";
 
 type ClientListProps = {
@@ -55,87 +55,65 @@ export function ClientList({ clients }: ClientListProps) {
     ? `Nenhum cliente encontrado para “${query.trim()}”.`
     : view === "active"
       ? "Nenhum cliente cadastrado."
-      : "Nenhum cliente arquivado.";
+      : "Nenhum cliente finalizado.";
 
   return (
     <div className="space-y-6">
-      <div className="relative max-w-md">
-        <Search
-          className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
-          strokeWidth={1.75}
-          aria-hidden
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <SegmentedControl
+          aria-label="Filtrar clientes"
+          value={view}
+          onChange={setView}
+          options={[
+            { value: "active", label: "Ativos", count: activeClients.length },
+            {
+              value: "archived",
+              label: "Finalizados",
+              count: archivedClients.length,
+              icon: <Archive className="size-3.5" />,
+            },
+          ]}
         />
-        <Input
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder={
-            view === "active"
-              ? "Buscar cliente por nome..."
-              : "Buscar cliente arquivado..."
-          }
-          className="pl-10"
-          aria-label="Buscar cliente por nome"
-        />
+        <div className="relative w-full sm:max-w-xs">
+          <Search
+            className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
+            strokeWidth={1.75}
+            aria-hidden
+          />
+          <Input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={
+              view === "active"
+                ? "Buscar cliente por nome..."
+                : "Buscar cliente finalizado..."
+            }
+            className="pl-10"
+            aria-label="Buscar cliente por nome"
+          />
+        </div>
       </div>
 
       {filteredClients.length === 0 ? (
-        <Surface variant="dashed" padding="lg">
-          <SurfaceContent className="text-center">
-            <p className="text-sm text-muted-foreground">{emptyMessage}</p>
-          </SurfaceContent>
-        </Surface>
+        <EmptyState
+          icon={query.trim() ? Search : Users}
+          tone="orange"
+          title={emptyMessage}
+          description={
+            query.trim()
+              ? "Tente outro termo ou limpe a busca."
+              : view === "active"
+                ? "Use o botão “Novo cliente” para cadastrar a primeira marca."
+                : undefined
+          }
+        />
       ) : (
-        <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(12.5rem,13.5rem))]">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
           {filteredClients.map((client) => (
             <ClientCard key={client.id} client={client} />
           ))}
         </div>
-      )}
-
-      {(activeClients.length > 0 || archivedClients.length > 0) && (
-        <nav
-          aria-label="Filtrar clientes"
-          className="flex items-center justify-center gap-2 border-t border-border/20 pt-8"
-        >
-          <button
-            type="button"
-            onClick={() => setView("active")}
-            className={cn(
-              "rounded-md px-2.5 py-1 text-xs transition-colors",
-              view === "active"
-                ? "text-foreground"
-                : "text-muted-foreground/55 hover:text-muted-foreground"
-            )}
-          >
-            Ativos
-            {activeClients.length > 0 && (
-              <span className="ml-1 text-muted-foreground/45">
-                ({activeClients.length})
-              </span>
-            )}
-          </button>
-          <span className="text-[0.625rem] text-muted-foreground/25" aria-hidden>
-            ·
-          </span>
-          <button
-            type="button"
-            onClick={() => setView("archived")}
-            className={cn(
-              "rounded-md px-2.5 py-1 text-xs transition-colors",
-              view === "archived"
-                ? "text-foreground"
-                : "text-muted-foreground/55 hover:text-muted-foreground"
-            )}
-          >
-            Arquivados
-            {archivedClients.length > 0 && (
-              <span className="ml-1 text-muted-foreground/45">
-                ({archivedClients.length})
-              </span>
-            )}
-          </button>
-        </nav>
       )}
     </div>
   );

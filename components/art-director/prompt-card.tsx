@@ -157,13 +157,13 @@ export function PromptCard({
     <Surface padding="md" className="space-y-5">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="font-mono text-xs text-muted-foreground">
+          <span className="text-sm font-bold tracking-tight text-foreground tabular-nums">
             Arte {job.art_index + 1}
           </span>
           <PromptStatusBadge status={job.status} />
           {edited && <Badge variant="secondary">editado</Badge>}
           {job.use_client_photos && (
-            <Badge variant="positive" className="gap-1">
+            <Badge variant="green" className="gap-1">
               <UserRound className="size-3" />
               foto do cliente
             </Badge>
@@ -187,7 +187,7 @@ export function PromptCard({
           ) : (
             <>
               {job.direction?.concept && (
-                <div className="space-y-1 rounded-xl border border-border/60 bg-muted/40 p-3.5 dark:border-white/6 dark:bg-white/3">
+                <div className="space-y-1 rounded-xl border border-tone-pink/20 bg-tone-pink/8 p-3.5">
                   <p className="text-sm leading-snug text-foreground">
                     {job.direction.concept}
                   </p>
@@ -222,7 +222,11 @@ export function PromptCard({
                 }
               />
 
-              {job.error && <p className="text-xs text-negative">{job.error}</p>}
+              {job.error && (
+                <p className="rounded-lg border border-tone-red/25 bg-tone-red/12 px-3 py-2 text-xs text-tone-red">
+                  {job.error}
+                </p>
+              )}
             </>
           )}
         </div>
@@ -237,7 +241,7 @@ export function PromptCard({
               onClick={() => artUrl && onOpenFullscreen(job.id)}
               disabled={!artUrl}
               className={cn(
-                "group/art relative w-full overflow-hidden rounded-xl border border-border dark:border-white/8",
+                "group/art relative w-full overflow-hidden rounded-xl border border-border bg-muted",
                 ART_ASPECT_CLASS,
                 artUrl ? "cursor-zoom-in" : "cursor-default"
               )}
@@ -257,7 +261,7 @@ export function PromptCard({
                   </span>
                 </>
               ) : (
-                <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-muted/40 dark:bg-white/3">
+                <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-surface">
                   <Loader2 className="size-5 animate-spin text-muted-foreground" />
                   <span className="text-[0.6875rem] text-muted-foreground">gerando…</span>
                 </span>
@@ -268,7 +272,7 @@ export function PromptCard({
       </div>
 
       {editable && (
-        <div className="flex flex-wrap items-center gap-2 border-t border-border/60 pt-4 dark:border-white/6">
+        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
           <Button onClick={() => void handleApprove()} disabled={busy !== null} className="gap-2">
             {busy === "approve" ? (
               <Loader2 className="size-4 animate-spin" />
@@ -322,7 +326,7 @@ export function PromptCard({
 
       {generating && !artUrl && (
         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Sparkles className="size-3" />
+          <Sparkles className="size-3 text-tone-pink" />
           Aprovado — a arte aparece aqui assim que ficar pronta.
         </p>
       )}

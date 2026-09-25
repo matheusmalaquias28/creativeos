@@ -101,24 +101,11 @@ export function DemandCard({
   return (
     <article
       className={cn(
-        "group relative overflow-hidden rounded-2xl border p-5 transition-premium hover:-translate-y-0.5 animate-in-soft",
+        "group relative overflow-hidden rounded-2xl border p-5 pl-6 transition-premium hover:-translate-y-0.5 animate-in-soft",
         theme.card
       )}
     >
-      <div
-        className={cn(
-          "pointer-events-none absolute -right-16 -top-16 size-40 rounded-full blur-3xl transition-opacity group-hover:opacity-100",
-          theme.glowA
-        )}
-        aria-hidden
-      />
-      <div
-        className={cn(
-          "pointer-events-none absolute -bottom-20 -left-12 size-36 rounded-full blur-3xl transition-opacity group-hover:opacity-100",
-          theme.glowB
-        )}
-        aria-hidden
-      />
+      <span aria-hidden className={cn("absolute inset-y-5 left-0 w-[3px] rounded-r-full", theme.bar)} />
 
       <div className="relative flex flex-col gap-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -126,39 +113,33 @@ export function DemandCard({
             <p className={cn("truncate text-xs", theme.muted)}>
               {displayClient}
             </p>
-            <h3 className="line-clamp-2 text-sm font-medium tracking-heading text-foreground">
+            <h3 className="line-clamp-2 text-sm font-bold tracking-tight text-foreground">
               {title}
             </h3>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {demand.is_new && (
-              <Badge className="gap-1 border border-cyan-400/40 bg-cyan-500/15 text-cyan-200 shadow-[0_0_12px_rgba(34,211,238,0.2)] hover:bg-cyan-500/20">
+              <Badge variant="highlight" className="gap-1">
                 <Sparkles className="size-3" />
                 Nova
               </Badge>
             )}
             {clientNotFound && (
-              <Badge
-                variant="outline"
-                className="gap-1 border-amber-500/40 bg-amber-500/10 text-amber-300"
-              >
+              <Badge variant="amber" className="gap-1">
                 <AlertTriangle className="size-3" />
                 Sem cliente
               </Badge>
             )}
             {tipo && (
-              <Badge
-                variant="outline"
-                className="border-white/10 bg-black/20 text-[0.65rem] text-foreground/80"
-              >
+              <Badge variant="secondary">
                 {tipo}
               </Badge>
             )}
             {missingMateriaisEditados && (
               <Badge
-                variant="outline"
+                variant="amber"
                 title="Demanda sem link de Materiais Editados"
-                className="gap-1 border-amber-500/40 bg-amber-500/10 text-amber-300"
+                className="gap-1"
               >
                 <AlertTriangle className="size-3" />
                 Sem Materiais Editados

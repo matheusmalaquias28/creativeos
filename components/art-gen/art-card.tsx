@@ -119,8 +119,8 @@ export function ArtCard({
       {/* Card normal */}
       <div
         className={cn(
-          "group relative overflow-hidden rounded-xl border bg-card shadow-sm transition-all",
-          job.approved && "ring-2 ring-primary/40",
+          "surface-panel hover-lift group relative overflow-hidden",
+          job.approved && "ring-2 ring-tone-green/40",
           expanded && "ring-2 ring-primary"
         )}
       >
@@ -148,7 +148,7 @@ export function ArtCard({
           ) : (
             <div className="flex h-full items-center justify-center">
               {job.status === "processing" || job.status === "queued" ? (
-                <Loader2 className="size-8 animate-spin text-muted-foreground/40" />
+                <Loader2 className="size-8 animate-spin text-tone-blue/60" />
               ) : (
                 <span className="text-xs text-muted-foreground">Sem imagem</span>
               )}
@@ -162,8 +162,8 @@ export function ArtCard({
 
           {/* Approved mark */}
           {job.approved && (
-            <div className="absolute right-2 top-2">
-              <CheckCircle2 className="size-5 text-primary drop-shadow-sm" />
+            <div className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-popover shadow-[var(--surface-shadow)]">
+              <CheckCircle2 className="size-4 text-tone-green" />
             </div>
           )}
         </div>
@@ -175,7 +175,7 @@ export function ArtCard({
 
         {/* Actions */}
         <div className="flex items-center justify-between gap-1 p-2">
-          <span className="text-xs font-medium text-muted-foreground">Arte {artIndex + 1}</span>
+          <span className="text-xs font-semibold tabular-nums text-foreground">Arte {artIndex + 1}</span>
           <div className="flex items-center gap-1">
             {hasImage && (
               <>
@@ -191,7 +191,7 @@ export function ArtCard({
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="size-7"
+                  className="size-7 hover:text-tone-green"
                   onClick={handleApprove}
                   disabled={isPending || job.approved}
                   title="Aprovar arte"
@@ -232,7 +232,7 @@ export function ArtCard({
       {/* Painel inline expandido — ocupa largura total da linha do grid */}
       {expanded && hasImage && (
         <div
-          className="col-span-full overflow-hidden rounded-xl border bg-card shadow-md"
+          className="surface-panel-elevated col-span-full overflow-hidden"
           style={{ gridColumn: "1 / -1" }}
         >
           <div className="flex flex-col gap-6 p-6 sm:flex-row">
@@ -241,7 +241,7 @@ export function ArtCard({
               type="button"
               onClick={() => onOpenFullscreen?.(displayVersion!.result_url)}
               className={cn(
-                "relative w-full shrink-0 cursor-zoom-in overflow-hidden rounded-lg sm:w-64 lg:w-80",
+                "relative w-full shrink-0 cursor-zoom-in overflow-hidden rounded-xl border border-border bg-muted sm:w-64 lg:w-80",
                 ART_ASPECT_CLASS
               )}
               title="Abrir em tela cheia"
@@ -261,7 +261,7 @@ export function ArtCard({
               <CopySheet copy={copyFromParams(job.params as Record<string, unknown>)} />
 
               <div>
-                <h3 className="font-heading text-base font-medium">Arte {artIndex + 1}</h3>
+                <h3 className="text-base font-bold tracking-tight text-foreground">Arte {artIndex + 1}</h3>
                 {displayVersion?.instruction && (
                   <p className="mt-1 text-xs text-muted-foreground">
                     Último ajuste: {displayVersion.instruction}
@@ -271,7 +271,7 @@ export function ArtCard({
 
               {/* Histórico de versões */}
               <div>
-                <p className="mb-2 text-xs font-medium text-muted-foreground">
+                <p className="mb-2 text-[0.8125rem] font-semibold text-muted-foreground">
                   Versões ({localVersions.length})
                 </p>
                 <ArtVersionStrip
@@ -283,7 +283,7 @@ export function ArtCard({
 
               {/* Instrução de ajuste */}
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-medium text-muted-foreground">
+                <label className="text-[0.8125rem] font-semibold text-muted-foreground">
                   Instrução de ajuste
                 </label>
                 <Textarea
@@ -310,7 +310,7 @@ export function ArtCard({
               </div>
 
               {/* Ações da versão atual */}
-              <div className="flex flex-wrap gap-2 border-t pt-4">
+              <div className="flex flex-wrap gap-2 border-t border-border pt-4">
                 <Button
                   size="sm"
                   variant="outline"
@@ -322,7 +322,7 @@ export function ArtCard({
                 </Button>
                 <Button
                   size="sm"
-                  variant={job.approved ? "secondary" : "default"}
+                  variant={job.approved ? "positive" : "default"}
                   onClick={handleApprove}
                   disabled={isPending || job.approved}
                   className="gap-2"

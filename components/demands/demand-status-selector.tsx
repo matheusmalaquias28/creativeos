@@ -12,6 +12,7 @@ import {
   BadgeCheck,
   CalendarClock,
   CheckCircle2,
+  ChevronDown,
   Circle,
   Clock,
   FileCheck,
@@ -23,66 +24,68 @@ import {
 import { toast } from "sonner";
 import { updateDemandStatusAction } from "@/actions/demands";
 import { DEMAND_STATUSES, DEMAND_INITIAL_STATUS, isDoneStatus } from "@/types/demand";
+import { tones, type Tone } from "@/lib/design/tokens";
+import { cn } from "@/lib/utils";
 
-type StatusConfig = { label: string; icon: React.ElementType; className: string };
+type StatusConfig = { label: string; icon: React.ElementType; tone: Tone };
 
 const STATUS_CONFIG: Record<string, StatusConfig> = {
   "Aguardando Definição de Data": {
     label: "Aguardando Data",
     icon: CalendarClock,
-    className: "text-amber-600 border-amber-500/40 bg-amber-500/10",
+    tone: "amber",
   },
   "Em Fila": {
     label: "Em Fila",
     icon: ListChecks,
-    className: "text-cyan-600 border-cyan-500/40 bg-cyan-500/10",
+    tone: "cyan",
   },
   Fazendo: {
     label: "Fazendo",
     icon: Clock,
-    className: "text-blue-600 border-blue-500/40 bg-blue-500/10",
+    tone: "blue",
   },
   "Aprovação de Copy": {
     label: "Aprovação de Copy",
     icon: FileCheck,
-    className: "text-violet-600 border-violet-500/40 bg-violet-500/10",
+    tone: "violet",
   },
   "Aprovação do Gestor": {
     label: "Aprovação do Gestor",
     icon: UserCheck,
-    className: "text-violet-600 border-violet-500/40 bg-violet-500/10",
+    tone: "violet",
   },
   Ajuste: {
     label: "Ajuste",
     icon: RotateCcw,
-    className: "text-orange-600 border-orange-500/40 bg-orange-500/10",
+    tone: "orange",
   },
   "Aprovação do Cliente": {
     label: "Aprovação do Cliente",
     icon: Users,
-    className: "text-violet-600 border-violet-500/40 bg-violet-500/10",
+    tone: "violet",
   },
   Aprovado: {
     label: "Aprovado",
     icon: BadgeCheck,
-    className: "text-emerald-600 border-emerald-500/40 bg-emerald-500/10",
+    tone: "green",
   },
   Atrasado: {
     label: "Atrasado",
     icon: Clock,
-    className: "text-red-600 border-red-500/40 bg-red-500/10",
+    tone: "red",
   },
   Concluído: {
     label: "Concluído",
     icon: CheckCircle2,
-    className: "text-emerald-600 border-emerald-500/40 bg-emerald-500/10",
+    tone: "green",
   },
 };
 
 const DEFAULT_STATUS_CONFIG: StatusConfig = {
   label: "Status",
   icon: Circle,
-  className: "text-zinc-500 border-zinc-400/40 bg-zinc-500/10",
+  tone: "slate",
 };
 
 function statusConfig(status: string): StatusConfig {
@@ -197,7 +200,7 @@ export function DemandStatusSelector({
             />
             <div
               role="menu"
-              className="fixed z-50 min-w-[168px] overflow-hidden rounded-xl border border-border/60 bg-popover p-1 shadow-xl"
+              className="fixed z-50 min-w-[188px] overflow-hidden rounded-xl border border-border bg-popover p-1 shadow-[var(--surface-shadow-elevated),var(--inner-highlight)]"
               style={{ top: menuPos.top, left: menuPos.left }}
             >
               {menuStatuses.map((status) => {
@@ -209,13 +212,12 @@ export function DemandStatusSelector({
                     type="button"
                     role="menuitem"
                     onClick={() => handleSelect(status)}
-                    className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-xs transition-colors hover:bg-accent ${
-                      selected === status ? "bg-accent/60 font-medium" : ""
-                    }`}
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[0.8125rem] text-foreground transition-colors hover:bg-accent",
+                      selected === status && "bg-accent font-semibold"
+                    )}
                   >
-                    <SIcon
-                      className={`size-3.5 ${c.className.split(" ")[0]}`}
-                    />
+                    <SIcon className={cn("size-3.5", tones[c.tone].text)} />
                     {c.label}
                   </button>
                 );
@@ -233,11 +235,14 @@ export function DemandStatusSelector({
         type="button"
         disabled={isPending}
         onClick={() => setOpen((value) => !value)}
-        className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all outline-none ${config.className} disabled:opacity-60`}
+        className={cn(
+          "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-premium outline-none hover:brightness-110 focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-60",
+          tones[config.tone].badge
+        )}
       >
         <Icon className="size-3.5" />
         {config.label}
-        <span className="ml-0.5 text-[0.6rem] opacity-60">▾</span>
+        <ChevronDown className="size-3 opacity-70" />
       </button>
       {menu}
     </>

@@ -5,6 +5,13 @@ import { Handle, Position, useNodes, useEdges } from "@xyflow/react";
 import { Sparkles, Play, Loader2, Check } from "lucide-react";
 import { toast } from "sonner";
 import { IMAGE_GEN_DEFAULTS } from "@/lib/ai/imagegen/defaults";
+import {
+  FLOW_NODE_TONE,
+  NodeShell,
+  flowHandleClass,
+} from "@/components/flow/nodes/node-shell";
+import { tones } from "@/lib/design/tokens";
+import { cn } from "@/lib/utils";
 import type { GerarImagemData, SaidaArteData } from "@/lib/flow/types";
 
 type Props = { id: string; data: GerarImagemData; selected?: boolean };
@@ -55,38 +62,23 @@ export function GerarImagemNode({ id, data, selected }: Props) {
   }
 
   return (
-    <div
-      className={`w-52 rounded-xl border bg-cyan-500/5 p-3 backdrop-blur-sm transition-colors ${
-        selected
-          ? "border-cyan-500/50 shadow-[0_0_0_2px_oklch(0.75_0.15_200/15%)]"
-          : "border-cyan-500/20"
-      }`}
-    >
-      <Handle type="target" position={Position.Left} id="logo" style={{ top: "28%" }}
-        className="!size-2.5 !border-blue-500/50 !bg-blue-500/30" />
-      <Handle type="target" position={Position.Left} id="refs" style={{ top: "50%" }}
-        className="!size-2.5 !border-violet-500/50 !bg-violet-500/30" />
-      <Handle type="target" position={Position.Left} id="prompt" style={{ top: "72%" }}
-        className="!size-2.5 !border-amber-500/50 !bg-amber-500/30" />
-
-      <div className="mb-2 flex items-center justify-between gap-1">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <div className="flex size-5 shrink-0 items-center justify-center rounded-md border border-cyan-500/30 bg-cyan-500/15">
-            <Sparkles className="size-3 text-cyan-400" strokeWidth={1.5} />
-          </div>
-          <span className="text-[0.6875rem] font-semibold uppercase tracking-widest text-cyan-400">
-            Gerar
-          </span>
-        </div>
+    <NodeShell
+      tone={FLOW_NODE_TONE.gerarImagem}
+      icon={Sparkles}
+      title="Gerar imagem"
+      selected={selected}
+      className="w-52"
+      meta={
         <button
           onClick={handleExecute}
           disabled={executing}
           title="Executar somente este nó"
-          className={`flex size-5 items-center justify-center rounded border transition-colors ${
+          className={cn(
+            "nodrag flex size-6 shrink-0 items-center justify-center rounded-lg border transition-premium disabled:pointer-events-none disabled:opacity-50",
             done
-              ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400"
-              : "border-cyan-500/30 bg-cyan-500/10 text-cyan-400 hover:border-cyan-500/60 hover:bg-cyan-500/20"
-          } disabled:pointer-events-none disabled:opacity-50`}
+              ? tones.green.badge
+              : "border-border bg-secondary text-foreground hover:border-primary/50 hover:bg-primary hover:text-primary-foreground"
+          )}
         >
           {executing ? (
             <Loader2 className="size-3 animate-spin" />
@@ -96,28 +88,42 @@ export function GerarImagemNode({ id, data, selected }: Props) {
             <Play className="size-2.5 fill-current" />
           )}
         </button>
+      }
+    >
+      {/* Entradas tipadas — a cor do conector acompanha o nó de origem */}
+      <Handle type="target" position={Position.Left} id="logo" style={{ top: "28%" }}
+        className={cn(flowHandleClass, "!bg-tone-blue")} title="Logo" />
+      <Handle type="target" position={Position.Left} id="refs" style={{ top: "50%" }}
+        className={cn(flowHandleClass, "!bg-tone-violet")} title="Referências" />
+      <Handle type="target" position={Position.Left} id="prompt" style={{ top: "72%" }}
+        className={cn(flowHandleClass, "!bg-tone-amber")} title="Prompt" />
+
+      <div className="flex flex-wrap items-center gap-1.5">
+        {["Magnific", IMAGE_GEN_DEFAULTS.aspectRatio, IMAGE_GEN_DEFAULTS.imageSize, IMAGE_GEN_DEFAULTS.quality].map(
+          (chip, i) => (
+            <span
+              key={i}
+              className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[0.625rem] text-muted-foreground"
+            >
+              {chip}
+            </span>
+          )
+        )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[0.5625rem] text-muted-foreground/60">
-          Magnific
+      <div className="mt-2.5 flex items-center gap-2.5 text-[0.625rem] text-muted-foreground">
+        <span className="inline-flex items-center gap-1">
+          <span className={cn("size-1.5 rounded-full", tones.blue.dot)} /> Logo
         </span>
-        <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[0.5625rem] text-muted-foreground/60">
-          {IMAGE_GEN_DEFAULTS.aspectRatio}
+        <span className="inline-flex items-center gap-1">
+          <span className={cn("size-1.5 rounded-full", tones.violet.dot)} /> Refs
         </span>
-        <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[0.5625rem] text-muted-foreground/60">
-          {IMAGE_GEN_DEFAULTS.imageSize}
-        </span>
-        <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[0.5625rem] text-muted-foreground/60">
-          {IMAGE_GEN_DEFAULTS.quality}
+        <span className="inline-flex items-center gap-1">
+          <span className={cn("size-1.5 rounded-full", tones.amber.dot)} /> Prompt
         </span>
       </div>
 
-      <Handle
-        type="source"
-        position={Position.Right}
-        className="!size-2.5 !border-cyan-500/50 !bg-cyan-500/30"
-      />
-    </div>
+      <Handle type="source" position={Position.Right} className={flowHandleClass} />
+    </NodeShell>
   );
 }

@@ -78,19 +78,19 @@ function tokenizeJsonLine(line: string): Token[] {
 }
 
 const tokenClass: Record<TokenType, string> = {
-  key: "text-[#9cdcfe]",
-  string: "text-[#ce9178]",
-  number: "text-[#b5cea8]",
-  boolean: "text-[#569cd6]",
-  null: "text-[#569cd6]",
-  punctuation: "text-[#d4d4d4]",
-  plain: "text-[#d4d4d4]",
+  key: "text-tone-cyan",
+  string: "text-tone-green",
+  number: "text-tone-amber",
+  boolean: "text-tone-violet",
+  null: "text-tone-pink",
+  punctuation: "text-muted-foreground",
+  plain: "text-foreground/90",
 };
 
 function HighlightedLine({ line }: { line: string }) {
   const tokens = tokenizeJsonLine(line);
   if (tokens.length === 0) {
-    return <span className="text-[#d4d4d4]">&nbsp;</span>;
+    return <span className="text-foreground/90">&nbsp;</span>;
   }
   return (
     <>
@@ -125,7 +125,7 @@ export function JsonCodeViewer({
   return (
     <div
       className={cn(
-        "w-full max-w-full overflow-hidden rounded-lg border border-[#3c3c3c] bg-[#1e1e1e] font-mono text-[13px] leading-[1.55] shadow-inner",
+        "w-full max-w-full overflow-hidden rounded-xl border border-border bg-surface font-mono text-[13px] leading-[1.55]",
         className
       )}
     >
@@ -136,7 +136,7 @@ export function JsonCodeViewer({
         )}
       >
         <div
-          className="shrink-0 border-r border-[#3c3c3c] bg-[#252526] px-3 py-4 text-right text-[#858585]"
+          className="shrink-0 border-r border-border bg-muted/40 px-3 py-4 text-right tabular-nums text-muted-foreground/70"
           aria-hidden
         >
           {lines.map((_, idx) => (

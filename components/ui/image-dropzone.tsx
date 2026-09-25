@@ -134,10 +134,10 @@ export function ImageDropzone({
         variant === "neon" && isDragging && "dropzone-neon-active",
         variant === "default" &&
           (isDragging
-            ? "border-foreground/40 bg-accent/20"
-            : "border-border/50 bg-card/25"),
+            ? "border-primary bg-primary/8"
+            : "border-border-strong bg-surface"),
         interactive
-          ? "cursor-pointer hover:border-white/30"
+          ? "cursor-pointer hover:border-primary/50 hover:bg-primary/4"
           : "cursor-not-allowed opacity-50",
         className
       )}
@@ -155,7 +155,7 @@ export function ImageDropzone({
         }}
       />
       {children && isDragging && (
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-white/6 backdrop-blur-[2px]">
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-primary/10 backdrop-blur-[2px]">
           <p className="text-sm font-medium text-foreground">Solte a imagem aqui</p>
         </div>
       )}

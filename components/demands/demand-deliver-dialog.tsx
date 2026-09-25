@@ -11,6 +11,7 @@ import {
   PackageCheck,
   Trash2,
   Upload,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ImageDropzone } from "@/components/ui/image-dropzone";
@@ -31,6 +32,7 @@ import {
 } from "@/lib/export/filename";
 import type { DemandArte } from "@/types/demand";
 import type { DemandExportFile, GoogleDriveAuth } from "@/types/demand-export";
+import { tones } from "@/lib/design/tokens";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -251,12 +253,13 @@ export function DemandDeliverDialog({
       <Button
         type="button"
         onClick={() => setOpen(true)}
-        className="gap-2 bg-emerald-500 text-emerald-950 shadow-[0_0_20px_rgba(16,185,129,0.28)] hover:bg-emerald-400 hover:opacity-100"
+        variant="highlight"
+        className="gap-2"
       >
         <PackageCheck className="size-4" />
         Entregar demanda
         {exportStatus === "done" ? (
-          <span className="rounded-full bg-emerald-950/15 px-1.5 text-[10px] font-medium">
+          <span className="rounded-full bg-highlight-foreground/15 px-1.5 text-[0.6875rem] font-semibold">
             {sent > 0 ? `${sent} no Drive` : "salva"}
           </span>
         ) : null}
@@ -266,32 +269,40 @@ export function DemandDeliverDialog({
         ? createPortal(
             <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
               <div
-                className="absolute inset-0 bg-black/65 backdrop-blur-sm"
+                className="absolute inset-0 bg-background/60 backdrop-blur-sm"
                 onClick={() => setOpen(false)}
               />
-              <div className="relative z-10 flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl dark:border-white/10 dark:bg-surface-elevated">
-                <div className="border-b border-border/60 px-6 py-5">
+              <div className="relative z-10 flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-[var(--surface-shadow-elevated),var(--inner-highlight)]">
+                <div className="border-b border-border px-6 py-5">
                   <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <h2 className="text-base font-semibold tracking-tight">
+                    <div className="flex items-start gap-3">
+                      <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-xl", tones.green.iconTile)}>
+                        <PackageCheck className="size-4" />
+                      </span>
+                      <div>
+                      <h2 className="text-lg font-semibold tracking-tight text-foreground">
                         Entregar demanda
                       </h2>
                       <p className="mt-1 text-sm text-muted-foreground">
                         Solte o feed e o stories de cada arte. Os arquivos são
                         renomeados no padrão do quadro.
                       </p>
+                      </div>
                     </div>
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="icon-sm"
                       onClick={() => setOpen(false)}
-                      className="text-sm text-muted-foreground hover:text-foreground"
+                      title="Fechar"
                     >
-                      Fechar
-                    </button>
+                      <X />
+                      <span className="sr-only">Fechar</span>
+                    </Button>
                   </div>
 
                   <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
-                    <span className="rounded-full border border-border/70 px-2.5 py-1 text-muted-foreground">
+                    <span className="rounded-full border border-border bg-muted px-2.5 py-1 font-semibold tabular-nums text-foreground">
                       {uploaded}/{expected} arquivos
                     </span>
                     {driveFolderId ? (
@@ -299,24 +310,24 @@ export function DemandDeliverDialog({
                         href={driveFolderUrl ?? undefined}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-emerald-300"
+                        className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-medium transition-premium hover:brightness-110", tones.green.badge)}
                       >
                         <FolderOpen className="size-3.5" />
                         Pasta do Drive pronta
                       </a>
                     ) : missingFolder ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/35 bg-amber-500/10 px-2.5 py-1 text-amber-300">
+                      <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-medium", tones.amber.badge)}>
                         <AlertTriangle className="size-3.5" />
                         Link do Drive sem pasta válida
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/35 bg-amber-500/10 px-2.5 py-1 text-amber-300">
+                      <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-medium", tones.amber.badge)}>
                         <AlertTriangle className="size-3.5" />
                         Sem pasta do Drive nesta demanda
                       </span>
                     )}
                     {driveAuth.connected && driveAuth.email ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-emerald-300">
+                      <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-medium", tones.green.badge)}>
                         Drive: {driveAuth.email}
                         <button
                           type="button"
@@ -332,7 +343,7 @@ export function DemandDeliverDialog({
                               router.refresh();
                             })
                           }
-                          className="text-[10px] underline-offset-2 hover:underline"
+                          className="text-[0.6875rem] font-semibold underline-offset-2 hover:underline"
                         >
                           sair
                         </button>
@@ -345,7 +356,7 @@ export function DemandDeliverDialog({
                             window.location.pathname
                           )}`;
                         }}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/35 bg-sky-500/10 px-2.5 py-1 text-sky-300"
+                        className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-semibold transition-premium hover:brightness-110", tones.blue.badge)}
                       >
                         Conectar Google Drive
                       </button>
@@ -364,12 +375,12 @@ export function DemandDeliverDialog({
                           value={folderUrl}
                           onChange={(event) => setFolderUrl(event.target.value)}
                           placeholder="Cole o link da pasta do cliente"
-                          className="h-7 w-full rounded-md border border-border/70 bg-transparent px-2 text-xs outline-none placeholder:text-muted-foreground/60 focus:border-foreground/40"
+                          className="h-8 w-full rounded-lg border border-border bg-input px-2.5 text-xs text-foreground outline-none transition-premium placeholder:text-muted-foreground/70 hover:border-border-strong focus:border-primary/60 focus:ring-2 focus:ring-ring/20"
                         />
                       </label>
                     ) : null}
                     {exportError ? (
-                      <span className="text-amber-300">{exportError}</span>
+                      <span className="font-medium text-tone-amber">{exportError}</span>
                     ) : null}
                   </div>
                 </div>
@@ -383,13 +394,13 @@ export function DemandDeliverDialog({
                     slots.map((slot) => (
                       <section
                         key={slot.artIndex}
-                        className="rounded-2xl border border-border/60 p-4 dark:border-white/8"
+                        className="rounded-2xl border border-border bg-surface/50 p-4"
                       >
                         <div className="mb-3">
-                          <p className="text-[10px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
+                          <span className="inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-[0.6875rem] font-semibold tabular-nums text-muted-foreground">
                             Arte {slot.artIndex}
-                          </p>
-                          <h3 className="mt-1 text-sm font-medium text-foreground">
+                          </span>
+                          <h3 className="mt-1.5 text-sm font-semibold text-foreground">
                             {slot.title}
                           </h3>
                           {slot.subheadline ? (
@@ -407,7 +418,7 @@ export function DemandDeliverDialog({
                             return (
                               <div key={format} className="space-y-2">
                                 <div className="flex items-center justify-between gap-2">
-                                  <p className="text-xs font-medium">
+                                  <p className="text-[0.8125rem] font-semibold text-foreground">
                                     {meta.label}{" "}
                                     <span className="text-muted-foreground">
                                       {meta.hint}
@@ -417,7 +428,7 @@ export function DemandDeliverDialog({
                                     <button
                                       type="button"
                                       onClick={() => handleRemove(current)}
-                                      className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+                                      className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-muted-foreground transition-premium hover:bg-accent hover:text-foreground"
                                     >
                                       <Trash2 className="size-3" />
                                       Trocar
@@ -444,19 +455,19 @@ export function DemandDeliverDialog({
                                     // então não tem mais o que mostrar como preview aqui.
                                     <div
                                       className={cn(
-                                        "flex flex-col items-center justify-center gap-1.5 rounded-xl border border-emerald-500/25 bg-emerald-500/5 text-center",
+                                        "flex flex-col items-center justify-center gap-1.5 rounded-xl border border-tone-green/25 bg-tone-green/8 text-center",
                                         meta.preview
                                       )}
                                     >
-                                      <Check className="size-5 text-emerald-400" />
-                                      <p className="px-3 text-[11px] text-emerald-300">
+                                      <Check className="size-5 text-tone-green" />
+                                      <p className="px-3 text-xs font-medium text-tone-green">
                                         Entregue no Drive
                                       </p>
                                     </div>
                                   ) : current ? (
                                     <div
                                       className={cn(
-                                        "overflow-hidden rounded-xl border border-border/50 bg-black/20",
+                                        "overflow-hidden rounded-xl border border-border bg-muted",
                                         meta.preview
                                       )}
                                     >
@@ -470,7 +481,7 @@ export function DemandDeliverDialog({
                                   ) : (
                                     <div
                                       className={cn(
-                                        "flex items-center justify-center rounded-xl border border-dashed border-border/50 text-xs text-muted-foreground",
+                                        "flex items-center justify-center rounded-xl border border-dashed border-border-strong px-3 text-center text-xs text-muted-foreground",
                                         meta.preview
                                       )}
                                     >
@@ -478,11 +489,11 @@ export function DemandDeliverDialog({
                                     </div>
                                   )}
                                 </ImageDropzone>
-                                <p className="truncate font-mono text-[10px] text-muted-foreground">
+                                <p className="truncate font-mono text-[0.6875rem] text-muted-foreground">
                                   {current?.filename ??
                                     previewName(slot.artIndex, format)}
                                   {current?.drive_file_id ? (
-                                    <span className="ml-1.5 inline-flex items-center gap-0.5 text-emerald-400">
+                                    <span className="ml-1.5 inline-flex items-center gap-0.5 font-sans font-semibold text-tone-green">
                                       <Check className="size-3" />
                                       Drive
                                     </span>
@@ -497,7 +508,7 @@ export function DemandDeliverDialog({
                   )}
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 px-6 py-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-surface/60 px-6 py-4">
                   <p className="text-xs text-muted-foreground">
                     Feed fica na pasta principal. Stories vão para a subpasta
                     Stories.

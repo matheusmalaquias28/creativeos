@@ -8,6 +8,7 @@ import {
   Zap, X, Loader2, ArrowLeft, Sparkles, Check, AlertCircle, Image as ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { SlidePreview } from "@/components/carousel/slide-preview";
@@ -273,44 +274,45 @@ export function TurboButton({ profiles }: { profiles: TurboProfile[] }) {
 
   return (
     <>
-      <Button
-        onClick={() => setOpen(true)}
-        size="sm"
-        className="gap-1.5 bg-positive text-positive-foreground hover:bg-positive/90 dark:shadow-[0_0_18px_-2px_var(--positive)]"
-      >
-        <Zap className="size-4" strokeWidth={2.5} />
+      <Button onClick={() => setOpen(true)} size="sm" variant="highlight">
+        <Zap strokeWidth={2.5} />
         Gerador Turbo
       </Button>
 
       {open &&
         createPortal(
           <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={close} />
+            <div className="absolute inset-0 bg-background/60 backdrop-blur-sm" onClick={close} />
 
-            <div className="relative z-10 flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl dark:border-white/10 dark:bg-surface-elevated">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Gerador Turbo"
+              className="animate-in-soft relative z-10 flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-[var(--surface-shadow-elevated),var(--inner-highlight)]"
+            >
               {/* Header */}
-              <div className="flex items-center justify-between border-b border-border/50 px-6 py-4">
-                <div className="flex items-center gap-2">
-                  <div className="flex size-7 items-center justify-center rounded-lg bg-positive/15 text-positive">
+              <div className="flex items-center justify-between gap-3 border-b border-border px-6 py-4">
+                <div className="flex items-center gap-3">
+                  <span className="flex size-9 items-center justify-center rounded-xl bg-tone-pink/14 text-tone-pink ring-1 ring-inset ring-tone-pink/20">
                     <Zap className="size-4" strokeWidth={2.5} />
-                  </div>
+                  </span>
                   <div>
-                    <h2 className="text-sm font-semibold tracking-tight">Gerador Turbo</h2>
-                    <p className="text-[0.65rem] text-muted-foreground">Geração guiada por IA</p>
+                    <h2 className="text-base font-bold tracking-tight text-foreground">Gerador Turbo</h2>
+                    <p className="text-xs text-muted-foreground">Geração guiada por IA</p>
                   </div>
                 </div>
-                <button onClick={close} className="text-muted-foreground hover:text-foreground">
-                  <X className="size-4" />
-                </button>
+                <Button variant="ghost" size="icon-sm" onClick={close} aria-label="Fechar">
+                  <X />
+                </Button>
               </div>
 
               <div className="flex-1 overflow-y-auto px-6 py-5">
                 {/* Step 1 — profile */}
                 {step === "profile" && (
                   <div className="space-y-3">
-                    <p className="text-sm font-medium text-foreground">Para qual cliente vamos gerar?</p>
+                    <p className="text-sm font-semibold text-foreground">Para qual cliente vamos gerar?</p>
                     {profiles.length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+                      <div className="rounded-xl border border-dashed border-border-strong bg-surface p-4 text-center text-sm text-muted-foreground">
                         Nenhum perfil cadastrado. Crie um perfil em <b>Perfis</b> (com cores e
                         contexto do cliente) para usar o Turbo.
                       </div>
@@ -323,22 +325,22 @@ export function TurboButton({ profiles }: { profiles: TurboProfile[] }) {
                               setProfileId(p.id);
                               setStep("theme");
                             }}
-                            className="flex w-full items-center gap-3 rounded-xl border border-border p-3 text-left transition-premium hover:border-primary/50 hover:bg-muted/40"
+                            className="flex w-full items-center gap-3 rounded-xl border border-border bg-card p-3 text-left transition-premium hover:border-primary/50 hover:bg-accent"
                           >
                             <div className="flex -space-x-1">
                               {p.colors.slice(0, 4).map((c, i) => (
-                                <span key={i} className="size-6 rounded-full border-2 border-card" style={{ backgroundColor: c }} />
+                                <span key={i} className="size-6 rounded-full border-2 border-popover ring-1 ring-border" style={{ backgroundColor: c }} />
                               ))}
                             </div>
                             <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-medium text-foreground">{p.name}</p>
+                              <p className="truncate text-sm font-semibold text-foreground">{p.name}</p>
                               <p className="truncate text-xs text-muted-foreground">{p.clientName ?? "Sem cliente"}</p>
                             </div>
                             {!p.hasContext && (
-                              <span className="flex items-center gap-1 text-[0.6rem] text-warning">
-                                <AlertCircle className="size-3" />
-                                sem contexto
-                              </span>
+                              <Badge variant="amber">
+                                <AlertCircle />
+                                Sem contexto
+                              </Badge>
                             )}
                           </button>
                         ))}
@@ -350,12 +352,12 @@ export function TurboButton({ profiles }: { profiles: TurboProfile[] }) {
                 {/* Step 2 — theme */}
                 {step === "theme" && (
                   <div className="space-y-4">
-                    <button onClick={() => setStep("profile")} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                    <button onClick={() => setStep("profile")} className="inline-flex items-center gap-1 rounded-lg text-[0.8125rem] font-medium text-muted-foreground transition-colors hover:text-foreground">
                       <ArrowLeft className="size-3.5" />
                       {selectedProfile?.name}
                     </button>
                     <div className="space-y-2">
-                      <p className="text-sm font-medium text-foreground">O que vamos gerar hoje?</p>
+                      <p className="text-sm font-semibold text-foreground">O que vamos gerar hoje?</p>
                       <Textarea
                         autoFocus
                         value={theme}
@@ -365,8 +367,8 @@ export function TurboButton({ profiles }: { profiles: TurboProfile[] }) {
                         className="resize-none text-sm"
                       />
                     </div>
-                    <Button onClick={startContent} disabled={!theme.trim()} className="w-full gap-1.5 bg-positive text-positive-foreground hover:bg-positive/90">
-                      <Sparkles className="size-4" />
+                    <Button onClick={startContent} disabled={!theme.trim()} className="w-full">
+                      <Sparkles />
                       Gerar conteúdo
                     </Button>
                   </div>
@@ -375,19 +377,19 @@ export function TurboButton({ profiles }: { profiles: TurboProfile[] }) {
                 {/* Step 3 — review */}
                 {step === "review" && (
                   <div className="space-y-4">
-                    <button onClick={() => setStep("theme")} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                    <button onClick={() => setStep("theme")} className="inline-flex items-center gap-1 rounded-lg text-[0.8125rem] font-medium text-muted-foreground transition-colors hover:text-foreground">
                       <ArrowLeft className="size-3.5" />
                       Trocar tema
                     </button>
 
                     {!spec ? (
                       <div className="space-y-3">
-                        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                          <Loader2 className="size-4 animate-spin text-positive" />
+                        <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                          <Loader2 className="size-4 animate-spin text-tone-pink" />
                           {status || "Pensando…"}
                         </div>
                         {thinking && (
-                          <div ref={thinkRef} className="max-h-56 overflow-y-auto rounded-xl border border-border/50 bg-muted/20 p-3 text-[0.72rem] leading-relaxed text-muted-foreground whitespace-pre-wrap">
+                          <div ref={thinkRef} className="max-h-56 overflow-y-auto rounded-xl border border-border bg-surface p-3 text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground">
                             {thinking}
                           </div>
                         )}
@@ -395,12 +397,12 @@ export function TurboButton({ profiles }: { profiles: TurboProfile[] }) {
                     ) : (
                       <>
                         {/* Card count selector */}
-                        <div className="rounded-xl border border-border/50 bg-muted/10 p-3">
+                        <div className="rounded-xl border border-border bg-surface p-4">
                           <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-foreground">Quantidade de cards</span>
+                            <span className="text-[0.8125rem] font-semibold text-foreground">Quantidade de cards</span>
                             <span className="flex items-center gap-2 text-xs text-muted-foreground">
                               {contentLoading && <Loader2 className="size-3 animate-spin" />}
-                              <b className="text-foreground">{cardCount}</b>
+                              <span className="rounded-md bg-muted px-1.5 py-0.5 font-bold tabular-nums text-foreground">{cardCount}</span>
                             </span>
                           </div>
                           <input
@@ -410,13 +412,13 @@ export function TurboButton({ profiles }: { profiles: TurboProfile[] }) {
                             value={cardCount}
                             onChange={(e) => setCardCount(Number(e.target.value))}
                             disabled={contentLoading}
-                            className="mt-2 w-full accent-positive"
+                            className="mt-2 w-full accent-primary"
                           />
                           {cardCount !== spec.slides.length ? (
                             <Button
                               size="sm"
                               variant="outline"
-                              className="mt-2 w-full gap-1.5 text-xs"
+                              className="mt-2 w-full"
                               onClick={() => fetchContent(cardCount)}
                               disabled={contentLoading}
                             >
@@ -428,7 +430,7 @@ export function TurboButton({ profiles }: { profiles: TurboProfile[] }) {
                               Confirmar {cardCount} cards e reescrever conteúdo
                             </Button>
                           ) : (
-                            <p className="mt-1 text-[0.625rem] text-muted-foreground/60">
+                            <p className="mt-1 text-[0.6875rem] text-muted-foreground">
                               Ajuste o slider e confirme para a IA reescrever o conteúdo.
                             </p>
                           )}
@@ -437,28 +439,28 @@ export function TurboButton({ profiles }: { profiles: TurboProfile[] }) {
                         {/* Content preview */}
                         <div className={cn("space-y-2", contentLoading && "opacity-50")}>
                           {spec.slides.map((s, i) => (
-                            <div key={i} className="rounded-lg border border-border/40 bg-background/40 p-2.5">
+                            <div key={i} className="rounded-xl border border-border bg-card p-3">
                               <div className="flex items-center gap-2">
                                 <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-[0.6rem] font-bold text-muted-foreground">
                                   {i + 1}
                                 </span>
                                 <p className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground">{s.titulo}</p>
-                                <span className="shrink-0 text-[0.55rem] uppercase tracking-wider text-muted-foreground/50">{s.layout}</span>
+                                <Badge variant="outline" className="shrink-0">{s.layout}</Badge>
                               </div>
-                              {s.subtitulo && <p className="mt-1 pl-7 text-[0.7rem] leading-snug text-muted-foreground">{s.subtitulo}</p>}
+                              {s.subtitulo && <p className="mt-1 pl-7 text-xs leading-snug text-muted-foreground">{s.subtitulo}</p>}
                             </div>
                           ))}
                         </div>
 
-                        <Button onClick={startBuild} disabled={contentLoading} className="w-full gap-1.5 bg-positive text-positive-foreground hover:bg-positive/90">
-                          <Sparkles className="size-4" />
+                        <Button onClick={startBuild} disabled={contentLoading} className="w-full">
+                          <Sparkles />
                           Aplicar e gerar imagens
                         </Button>
                       </>
                     )}
 
                     {error && (
-                      <div className="flex items-start gap-2 rounded-xl border border-negative/30 bg-negative/10 p-3 text-sm text-negative">
+                      <div className="flex items-start gap-2 rounded-xl border border-tone-red/25 bg-tone-red/12 p-3 text-sm text-tone-red">
                         <AlertCircle className="mt-0.5 size-4 shrink-0" />
                         <span>{error}</span>
                       </div>
@@ -469,23 +471,23 @@ export function TurboButton({ profiles }: { profiles: TurboProfile[] }) {
                 {/* Step 4 — building (live) */}
                 {step === "building" && (
                   <div className="space-y-4">
-                    <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                       {buildDone ? (
-                        <Check className="size-4 text-positive" />
+                        <Check className="size-4 text-tone-green" />
                       ) : (
-                        <Loader2 className="size-4 animate-spin text-positive" />
+                        <Loader2 className="size-4 animate-spin text-tone-pink" />
                       )}
                       {buildDone ? "Carrossel pronto — abrindo o editor…" : "Montando os cards e gerando as imagens…"}
                     </div>
 
                     {imgProgress && imgProgress.total > 0 && (
                       <div className="space-y-1.5">
-                        <div className="flex justify-between text-[0.7rem] text-muted-foreground">
-                          <span>Imagens</span>
-                          <span>{imgProgress.done}/{imgProgress.total}</span>
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span className="font-medium">Imagens</span>
+                          <span className="font-semibold tabular-nums text-foreground">{imgProgress.done}/{imgProgress.total}</span>
                         </div>
                         <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                          <div className="h-full rounded-full bg-positive transition-all" style={{ width: `${(imgProgress.done / imgProgress.total) * 100}%` }} />
+                          <div className="h-full rounded-full bg-tone-pink transition-all" style={{ width: `${(imgProgress.done / imgProgress.total) * 100}%` }} />
                         </div>
                       </div>
                     )}
@@ -496,7 +498,7 @@ export function TurboButton({ profiles }: { profiles: TurboProfile[] }) {
                         {buildSlides.map((slide, i) => {
                           const pending = (expected[i] ?? 0) > (received[i] ?? 0);
                           return (
-                            <div key={slide.id} className="relative overflow-hidden rounded-lg ring-1 ring-white/8">
+                            <div key={slide.id} className="relative overflow-hidden rounded-lg ring-1 ring-border">
                               <SlidePreview
                                 slide={slide}
                                 format="carousel"
@@ -506,9 +508,9 @@ export function TurboButton({ profiles }: { profiles: TurboProfile[] }) {
                                 previewWidth={130}
                               />
                               {pending && (
-                                <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/50 backdrop-blur-[1px]">
-                                  <Loader2 className="size-4 animate-spin text-white/80" />
-                                  <span className="flex items-center gap-1 text-[0.5rem] text-white/70">
+                                <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-background/70 backdrop-blur-[1px]">
+                                  <Loader2 className="size-4 animate-spin text-tone-pink" />
+                                  <span className="flex items-center gap-1 text-[0.625rem] font-medium text-foreground">
                                     <ImageIcon className="size-2.5" />
                                     gerando
                                   </span>
@@ -527,7 +529,7 @@ export function TurboButton({ profiles }: { profiles: TurboProfile[] }) {
                     )}
 
                     {error && (
-                      <div className="flex items-start gap-2 rounded-xl border border-negative/30 bg-negative/10 p-3 text-sm text-negative">
+                      <div className="flex items-start gap-2 rounded-xl border border-tone-red/25 bg-tone-red/12 p-3 text-sm text-tone-red">
                         <AlertCircle className="mt-0.5 size-4 shrink-0" />
                         <span>{error}</span>
                       </div>

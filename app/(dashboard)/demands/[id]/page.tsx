@@ -1,7 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ExternalLink, Images, Sparkles } from "lucide-react";
+import {
+  AlertTriangle,
+  ExternalLink,
+  FileText,
+  ImageIcon,
+  Images,
+  Sparkles,
+} from "lucide-react";
 import { DashboardPage } from "@/components/layout/dashboard-page";
+import { SectionHeader } from "@/components/layout/section-header";
 import { DemandDetailStatusBar } from "@/components/demands/demand-detail-status-bar";
 import { MagnificSpaceButton } from "@/components/demands/magnific-space-button";
 import { DemandDeliverDialog } from "@/components/demands/demand-deliver-dialog";
@@ -14,13 +22,8 @@ import { DemandArteFeed } from "@/components/demands/demand-arte-feed";
 import { DemandReferenceManager } from "@/components/demands/demand-reference-manager";
 import { CreativeBriefPanel } from "@/components/demands/creative-brief-panel";
 import { buttonVariants } from "@/components/ui/button";
-import {
-  Surface,
-  SurfaceContent,
-  SurfaceDescription,
-  SurfaceHeader,
-  SurfaceTitle,
-} from "@/components/ui/surface";
+import { Surface } from "@/components/ui/surface";
+import { layout, tones } from "@/lib/design/tokens";
 import { cn } from "@/lib/utils";
 import { getDemandById } from "@/services/demands";
 import {
@@ -59,12 +62,22 @@ function formatDate(value: string | null): string {
 function MetaItem({ label, value }: { label: string; value: string | null | undefined }) {
   if (!value) return null;
   return (
-    <span className="inline-flex items-center gap-1.5">
-      <span className="text-muted-foreground/70">{label}</span>
-      <span className="text-foreground/85">{value}</span>
-    </span>
+    <div className="min-w-0 space-y-0.5">
+      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
+      <dd className="truncate text-sm font-semibold text-foreground" title={value}>
+        {value}
+      </dd>
+    </div>
   );
 }
+
+const linkChip =
+  "inline-flex h-7 items-center gap-1.5 rounded-full border border-border bg-card px-3 text-xs font-semibold text-foreground transition-premium hover:border-border-strong hover:bg-accent";
+
+const warningChip = cn(
+  "inline-flex h-7 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold",
+  tones.amber.badge
+);
 
 function ExternalHref({
   href,
@@ -75,14 +88,9 @@ function ExternalHref({
 }) {
   if (!href) return null;
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="inline-flex items-center gap-1 text-foreground/85 underline-offset-2 hover:underline"
-    >
+    <a href={href} target="_blank" rel="noopener noreferrer" className={linkChip}>
       {label}
-      <ExternalLink className="size-3" />
+      <ExternalLink className="size-3 text-muted-foreground" />
     </a>
   );
 }
@@ -131,186 +139,183 @@ export default async function DemandDetailPage({ params }: PageProps) {
   return (
     <DashboardPage
       title={title}
+      backHref="/demands"
+      backLabel="Demandas"
       headerAction={
-        <div className="flex items-center gap-2">
-          <Link
-            href={`/demands/${id}/prompts`}
-            className={cn(buttonVariants({ variant: "default", size: "sm" }), "gap-2")}
-          >
-            <Sparkles className="size-4" />
-            Prompts com IA
-          </Link>
+        <>
           <Link
             href={`/demands/${id}/curation`}
-            className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "gap-2")}
+            className={cn(buttonVariants({ variant: "outline" }), "gap-2")}
           >
             <Images className="size-4" />
             Curadoria
           </Link>
-        </div>
+          <Link
+            href={`/demands/${id}/prompts`}
+            className={cn(buttonVariants({ variant: "default" }), "gap-2")}
+          >
+            <Sparkles className="size-4" />
+            Prompts com IA
+          </Link>
+        </>
       }
     >
       <MarkDemandReadOnMount demandId={id} isNew={demand.is_new} />
-      <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <DemandDetailStatusBar
-              demandId={demand.id}
-              status={demand.status}
-              allowedStatuses={demand.status_permitidos}
-              startedAt={demand.started_at}
-              elapsedSeconds={demand.elapsed_seconds}
-              currentClientId={demand.client_id}
-              currentClientName={demand.client_name}
-              externalClientName={demand.client_name_external}
-              clientNotFound={demand.client_not_found}
-              clients={clients}
-            />
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <DemandDeliverDialog
-              demandId={demand.id}
-              artes={demand.artes}
-              demandTitle={demand.briefing.titulo}
-              demandTipo={demand.tipo ?? demand.briefing.tipo}
-              clientName={
-                demand.client_name ||
-                displayExternalClientName(demand.client_name_external) ||
-                demand.client_name_external
-              }
-              clientSlug={demand.client_slug}
-              driveFolderUrl={driveFolderUrl}
-              driveFolderId={driveFolderId}
-              exportStatus={demand.export_status ?? null}
-              exportError={demand.export_error ?? null}
-              initialFiles={exportFiles}
-              driveAuth={driveAuth}
-            />
-            {!demand.client_not_found && (
-              <MagnificSpaceButton
+      <div className={layout.sectionGap}>
+        {/* Status, cliente, tempo + entrega */}
+        <Surface className="overflow-visible">
+          <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <DemandDetailStatusBar
                 demandId={demand.id}
-                status={demand.magnific_space_status}
-                spaceUrl={demand.magnific_space_url}
-                errorMessage={demand.magnific_space_error}
+                status={demand.status}
+                allowedStatuses={demand.status_permitidos}
+                startedAt={demand.started_at}
+                elapsedSeconds={demand.elapsed_seconds}
+                currentClientId={demand.client_id}
+                currentClientName={demand.client_name}
+                externalClientName={demand.client_name_external}
+                clientNotFound={demand.client_not_found}
+                clients={clients}
               />
-            )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {!demand.client_not_found && (
+                <MagnificSpaceButton
+                  demandId={demand.id}
+                  status={demand.magnific_space_status}
+                  spaceUrl={demand.magnific_space_url}
+                  errorMessage={demand.magnific_space_error}
+                />
+              )}
+              <DemandDeliverDialog
+                demandId={demand.id}
+                artes={demand.artes}
+                demandTitle={demand.briefing.titulo}
+                demandTipo={demand.tipo ?? demand.briefing.tipo}
+                clientName={
+                  demand.client_name ||
+                  displayExternalClientName(demand.client_name_external) ||
+                  demand.client_name_external
+                }
+                clientSlug={demand.client_slug}
+                driveFolderUrl={driveFolderUrl}
+                driveFolderId={driveFolderId}
+                exportStatus={demand.export_status ?? null}
+                exportError={demand.export_error ?? null}
+                initialFiles={exportFiles}
+                driveAuth={driveAuth}
+              />
+            </div>
           </div>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
-          <MetaItem label="Tipo" value={demand.tipo ?? demand.briefing.tipo} />
-          <MetaItem
-            label="Artes"
-            value={
-              demand.briefing.quantidadeArtes != null
-                ? String(demand.briefing.quantidadeArtes)
-                : String(demand.artes.length)
-            }
-          />
-          <MetaItem label="Squad" value={demand.squad} />
-          <MetaItem label="Gestor" value={demand.gestor} />
-          <MetaItem label="Webdesigner" value={demand.webdesigner} />
-          <MetaItem label="Solicitante" value={demand.solicitante} />
-          <MetaItem
-            label="Criada"
-            value={formatDate(demand.external_created_at ?? demand.created_at)}
-          />
-          <MetaItem label="Prazo" value={formatDate(demand.due_date)} />
-          {instagram ? (
-            <a
-              href={instagramHref(instagram)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-foreground/85 underline-offset-2 hover:underline"
-            >
-              Instagram
-              <ExternalLink className="size-3" />
-            </a>
-          ) : null}
-          {missingMateriaisEditados ? (
-            <span
-              title="A demanda não trouxe o link de Materiais Editados — confira no WAR"
-              className="inline-flex items-center gap-1 text-amber-400"
-            >
-              Sem link de Materiais Editados
-            </span>
-          ) : (
-            <ExternalHref
-              href={demand.briefing.materiaisEditados}
-              label="Materiais"
-            />
-          )}
-          <ExternalHref
-            href={driveFolderUrl || demand.briefing.driveMateriais}
-            label="Drive"
-          />
-          {driveFolderUrl && !driveFolderId ? (
-            <span className="inline-flex items-center gap-1 text-amber-400">
-              Link do Drive sem pasta válida
-            </span>
-          ) : null}
-        </div>
-
-        <Surface variant="elevated">
-          <SurfaceHeader className="pb-4">
-            <SurfaceTitle>Logo e referências</SurfaceTitle>
-            <SurfaceDescription>
-              Materiais do cliente e referências específicas desta demanda
-            </SurfaceDescription>
-          </SurfaceHeader>
-          <SurfaceContent className="space-y-6">
-            {clientAssets ? (
-              <DemandClientAssets
-                clientId={clientAssets.clientId}
-                clientName={clientAssets.clientName}
-                logoUrl={clientAssets.logoUrl}
-                references={clientAssets.references}
+          {/* Detalhes do briefing */}
+          <div className="border-t border-border px-4 py-4">
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 lg:grid-cols-4">
+              <MetaItem label="Tipo" value={demand.tipo ?? demand.briefing.tipo} />
+              <MetaItem
+                label="Artes"
+                value={
+                  demand.briefing.quantidadeArtes != null
+                    ? String(demand.briefing.quantidadeArtes)
+                    : String(demand.artes.length)
+                }
               />
-            ) : (
-              <DemandClientAssetsEmpty />
-            )}
-            <DemandReferenceManager
-              demandId={id}
-              initialRefs={demandRefs}
-              showClientRefs={false}
-              clientRefs={
-                clientAssets?.references.map((r) => ({
-                  public_url: r.public_url,
-                  file_name: r.file_name,
-                })) ?? []
-              }
-            />
-          </SurfaceContent>
+              <MetaItem label="Squad" value={demand.squad} />
+              <MetaItem label="Gestor" value={demand.gestor} />
+              <MetaItem label="Webdesigner" value={demand.webdesigner} />
+              <MetaItem label="Solicitante" value={demand.solicitante} />
+              <MetaItem
+                label="Criada"
+                value={formatDate(demand.external_created_at ?? demand.created_at)}
+              />
+              <MetaItem label="Prazo" value={formatDate(demand.due_date)} />
+            </dl>
+
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              {instagram ? (
+                <a
+                  href={instagramHref(instagram)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={linkChip}
+                >
+                  Instagram
+                  <ExternalLink className="size-3 text-muted-foreground" />
+                </a>
+              ) : null}
+              {missingMateriaisEditados ? (
+                <span
+                  title="A demanda não trouxe o link de Materiais Editados — confira no WAR"
+                  className={warningChip}
+                >
+                  <AlertTriangle className="size-3" />
+                  Sem link de Materiais Editados
+                </span>
+              ) : (
+                <ExternalHref
+                  href={demand.briefing.materiaisEditados}
+                  label="Materiais"
+                />
+              )}
+              <ExternalHref
+                href={driveFolderUrl || demand.briefing.driveMateriais}
+                label="Drive"
+              />
+              {driveFolderUrl && !driveFolderId ? (
+                <span className={warningChip}>
+                  <AlertTriangle className="size-3" />
+                  Link do Drive sem pasta válida
+                </span>
+              ) : null}
+            </div>
+          </div>
         </Surface>
 
+        <section className="space-y-4">
+          <SectionHeader
+            icon={FileText}
+            tone="cyan"
+            title={`Briefing das artes (${demand.artes.length})`}
+            description="Headlines e CTAs no formato 3:4"
+          />
+          <DemandArteFeed demandId={id} artes={demand.artes} />
+        </section>
+
+        <Surface padding="md" className="space-y-6">
+          <SectionHeader
+            icon={ImageIcon}
+            tone="violet"
+            title="Logo e referências"
+            description="Materiais do cliente e referências específicas desta demanda"
+          />
+          {clientAssets ? (
+            <DemandClientAssets
+              clientId={clientAssets.clientId}
+              clientName={clientAssets.clientName}
+              logoUrl={clientAssets.logoUrl}
+              references={clientAssets.references}
+            />
+          ) : (
+            <DemandClientAssetsEmpty />
+          )}
+          <DemandReferenceManager
+            demandId={id}
+            initialRefs={demandRefs}
+            showClientRefs={false}
+            clientRefs={
+              clientAssets?.references.map((r) => ({
+                public_url: r.public_url,
+                file_name: r.file_name,
+              })) ?? []
+            }
+          />
+        </Surface>
 
         <CreativeBriefPanel
           demandId={id}
           hasClient={Boolean(demand.client_id)}
         />
-
-        <section className="space-y-4">
-          <div>
-            <h2 className="text-lg font-medium tracking-heading">
-              Briefing das artes ({demand.artes.length})
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Headlines e CTAs no formato 3:4
-            </p>
-          </div>
-          <DemandArteFeed demandId={id} artes={demand.artes} />
-        </section>
-
-        <Link
-          href="/demands"
-          className={cn(
-            buttonVariants({ variant: "ghost", size: "sm" }),
-            "inline-flex gap-2 text-muted-foreground"
-          )}
-        >
-          <ArrowLeft className="size-4" />
-          Voltar para demandas
-        </Link>
       </div>
     </DashboardPage>
   );

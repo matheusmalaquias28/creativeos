@@ -100,16 +100,18 @@ export function CarouselCard({ carousel }: CarouselCardProps) {
   return (
     <div
       className={cn(
-        "group relative overflow-hidden rounded-2xl border border-border/50 bg-card transition-premium hover-lift",
-        "dark:border-white/7 dark:bg-card",
-        deleting && "opacity-50 pointer-events-none"
+        "surface-panel hover-lift group relative flex flex-col overflow-hidden p-2",
+        deleting && "pointer-events-none opacity-50"
       )}
     >
-      {/* Thumbnail */}
-      <Link href={`/carousel/${carousel.id}`}>
+      {/* Thumbnail — renderiza o conteúdo real do 1º slide */}
+      <Link
+        href={`/carousel/${carousel.id}`}
+        className="block rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+      >
         <div
           className={cn(
-            "relative w-full overflow-hidden rounded-t-2xl bg-muted/30",
+            "relative w-full overflow-hidden rounded-xl bg-surface ring-1 ring-inset ring-border",
             aspectClass
           )}
           style={{ maxHeight: 220 }}
@@ -119,15 +121,15 @@ export function CarouselCard({ carousel }: CarouselCardProps) {
       </Link>
 
       {/* Info */}
-      <div className="p-4">
+      <div className="flex flex-1 flex-col gap-2 px-2 pt-3 pb-1.5">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <Link href={`/carousel/${carousel.id}`}>
-              <p className="truncate text-sm font-medium text-foreground hover:text-primary transition-colors">
+              <p className="truncate text-sm font-bold tracking-tight text-foreground transition-colors hover:text-primary">
                 {carousel.name}
               </p>
             </Link>
-            <p className="mt-0.5 text-xs text-muted-foreground">
+            <p className="mt-0.5 text-[0.6875rem] text-muted-foreground">
               {carousel.slides.length} slide
               {carousel.slides.length !== 1 ? "s" : ""} ·{" "}
               {formatRelativeDate(carousel.updated_at)}
@@ -138,8 +140,8 @@ export function CarouselCard({ carousel }: CarouselCardProps) {
             <Button
               ref={menuBtnRef}
               variant="ghost"
-              size="icon"
-              className="size-7 text-muted-foreground"
+              size="icon-xs"
+              aria-label="Ações do carrossel"
               onClick={() => (menuOpen ? setMenuOpen(false) : openMenu())}
             >
               <MoreVertical className="size-3.5" />
@@ -154,12 +156,12 @@ export function CarouselCard({ carousel }: CarouselCardProps) {
                     onClick={() => setMenuOpen(false)}
                   />
                   <div
-                    className="fixed z-[999] min-w-[9rem] rounded-xl border border-border bg-card p-1 shadow-2xl dark:border-white/10 dark:bg-surface-elevated"
+                    className="fixed z-[999] min-w-[9rem] rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-[var(--surface-shadow-elevated)]"
                     style={{ top: menuPos.top, right: menuPos.right }}
                   >
                     <Link
                       href={`/carousel/${carousel.id}`}
-                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs text-foreground hover:bg-muted/60"
+                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-[0.8125rem] font-medium text-foreground transition-colors hover:bg-accent"
                       onClick={() => setMenuOpen(false)}
                     >
                       <Pencil className="size-3.5" />
@@ -170,7 +172,7 @@ export function CarouselCard({ carousel }: CarouselCardProps) {
                         setMenuOpen(false);
                         handleDelete();
                       }}
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-negative hover:bg-negative/10"
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[0.8125rem] font-medium text-tone-red transition-colors hover:bg-tone-red/12"
                     >
                       <Trash2 className="size-3.5" />
                       Deletar
@@ -182,9 +184,9 @@ export function CarouselCard({ carousel }: CarouselCardProps) {
           </div>
         </div>
 
-        <div className="mt-3 flex items-center gap-2">
-          <Badge variant="outline" className="text-[0.65rem]">
-            <Layers className="mr-1 size-3" />
+        <div className="mt-auto flex items-center gap-2">
+          <Badge variant="outline">
+            <Layers />
             {FORMAT_LABELS[carousel.format]}
           </Badge>
         </div>

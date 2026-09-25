@@ -16,15 +16,16 @@ import {
   ArrowDownRight,
   ArrowRight,
   ArrowUpRight,
+  BarChart3,
   CalendarDays,
   CheckCircle2,
   ChevronDown,
   Clock,
   ImageIcon,
   Layers,
+  PieChart,
   Sparkles,
   Timer,
-  TrendingUp,
   Zap,
 } from "lucide-react";
 import type { DashboardAnalytics, DashboardDelta } from "@/types/demand";
@@ -35,36 +36,18 @@ import {
   TRADITIONAL_DESIGNER_MINUTES,
   HYBRID_DESIGNER_MINUTES,
 } from "@/lib/demands/designer-time";
+import { DEMAND_TONE, getStatusColorState } from "@/lib/demands/demand-color";
+import { tones, type Tone } from "@/lib/design/tokens";
+import { SectionHeader } from "@/components/layout/section-header";
 import { cn } from "@/lib/utils";
 
 type Props = {
   data: DashboardAnalytics;
 };
 
-type Accent = "cyan" | "violet" | "emerald" | "amber";
-
-const STATUS_COLORS: Record<string, string> = {
-  // Vocabulário do WAR
-  "Aguardando Definição de Data": "#fbbf24",
-  "Em Fila": "#22d3ee",
-  Fazendo: "#3b82f6",
-  "Aprovação de Copy": "#a78bfa",
-  "Aprovação do Gestor": "#a78bfa",
-  Ajuste: "#fb923c",
-  "Aprovação do Cliente": "#a78bfa",
-  Aprovado: "#34d399",
-  Atrasado: "#f87171",
-  Concluído: "#34d399",
-  // Legado
-  Nova: "#22d3ee",
-  Revisão: "#fbbf24",
-  Concluída: "#34d399",
-  Cancelada: "#f87171",
-  "Sem status": "#64748b",
-};
-
-function statusColor(status: string): string {
-  return STATUS_COLORS[status] ?? "#64748b";
+function statusTone(status: string): Tone {
+  if (status === "Sem status" || status === "Cancelada") return "slate";
+  return DEMAND_TONE[getStatusColorState(status)];
 }
 
 function ChartTooltip({
@@ -78,21 +61,21 @@ function ChartTooltip({
 }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-xl border border-cyan-500/30 bg-popover/95 p-3 shadow-[0_0_24px_rgba(34,211,238,0.15)] backdrop-blur-md">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-cyan-700 dark:text-cyan-300/90">
-        {label}
-      </p>
+    <div className="min-w-40 rounded-xl border border-border bg-popover p-3 shadow-[var(--surface-shadow-elevated)]">
+      <p className="mb-2 text-xs font-bold text-foreground capitalize">{label}</p>
       <div className="space-y-1.5 text-xs">
         {payload.map((entry) => (
           <div key={entry.name} className="flex items-center justify-between gap-4">
             <span className="flex items-center gap-2 text-muted-foreground">
               <span
-                className="size-2 rounded-full shadow-[0_0_8px_currentColor]"
-                style={{ background: entry.color, color: entry.color }}
+                className="size-2 rounded-full"
+                style={{
+                  background: entry.name === "Artes" ? tones.violet.cssVar : tones.lime.cssVar,
+                }}
               />
               {entry.name}
             </span>
-            <span className="font-medium tabular-nums text-foreground">{entry.value}</span>
+            <span className="font-semibold tabular-nums text-foreground">{entry.value}</span>
           </div>
         ))}
       </div>
@@ -123,21 +106,21 @@ export function DashboardDemandsAnalytics({ data }: Props) {
   const totalStatus = data.statusCounts.reduce((sum, s) => sum + s.count, 0);
 
   return (
-    <div className="space-y-6">
-      {/* ── Delta KPIs ── */}
+    <div className="space-y-5">
+      {/* ── KPIs ── */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <DeltaCard
           label="Demandas no mês"
           value={data.demandsMonth.current}
           delta={data.demandsMonth}
-          accent="cyan"
+          tone="cyan"
           icon={Zap}
         />
         <DeltaCard
           label="Artes no mês"
           value={data.artesMonth.current}
           delta={data.artesMonth}
-          accent="violet"
+          tone="violet"
           icon={ImageIcon}
         />
         <DeltaCard
@@ -145,288 +128,272 @@ export function DashboardDemandsAnalytics({ data }: Props) {
           value={data.artesWeek.current}
           delta={data.artesWeek}
           deltaSuffix="vs. semana anterior"
-          accent="emerald"
+          tone="orange"
           icon={CalendarDays}
         />
-        <div className="relative overflow-hidden rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/10 to-cyan-500/5 p-5 shadow-[0_0_24px_rgba(52,211,153,0.08)]">
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-emerald-700/90 dark:text-emerald-300/90">
+
+        {/* Card de destaque — tempo economizado */}
+        <div className="relative overflow-hidden rounded-2xl border border-primary/30 bg-[linear-gradient(145deg,color-mix(in_oklch,var(--primary)_32%,var(--card)),var(--card)_70%)] p-5 shadow-[var(--surface-shadow-elevated),var(--inner-highlight)]">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -right-10 -bottom-14 size-44 rounded-full bg-highlight/20 blur-3xl"
+          />
+          <div className="relative flex items-center gap-3">
+            <span className="flex size-9 items-center justify-center rounded-xl bg-highlight text-highlight-foreground shadow-[inset_0_1px_0_oklch(1_0_0/35%)]">
+              <Sparkles className="size-4" strokeWidth={2} />
+            </span>
+            <p className="text-[0.8125rem] font-semibold text-foreground/85">
               Tempo economizado no mês
             </p>
-            <TrendingUp className="size-4 shrink-0 text-emerald-600/70 dark:text-emerald-300/70" strokeWidth={1.75} />
           </div>
-          <p className="mt-3 text-3xl font-semibold tracking-tight tabular-nums text-foreground">
+          <p className="relative mt-4 text-[2rem] leading-none font-bold tracking-[-0.03em] tabular-nums text-foreground">
             {formatDesignerDuration(data.savedMinutesMonth)}
           </p>
-          <p className="mt-1 text-xs text-emerald-700/70 dark:text-emerald-300/60">
-            {data.demandsMonth.current} demanda{data.demandsMonth.current === 1 ? "" : "s"} · fluxo híbrido vs. tradicional
+          <p className="relative mt-2 text-xs text-muted-foreground">
+            {data.demandsMonth.current} demanda{data.demandsMonth.current === 1 ? "" : "s"} · fluxo
+            híbrido vs. tradicional
           </p>
         </div>
       </div>
 
-      {/* ── Chart + status panel ── */}
-      <div className="relative overflow-hidden rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-card/80 via-background to-violet-100/60 p-6 shadow-[0_0_40px_rgba(34,211,238,0.06)] dark:border-white/7 dark:to-violet-950/20 dark:shadow-[0_0_0_1px_oklch(1_0_0/6%),0_8px_40px_oklch(0_0_0/55%)] animate-in-soft">
-        <div
-          className="pointer-events-none absolute -right-20 -top-20 size-64 rounded-full bg-cyan-500/10 blur-3xl"
-          aria-hidden
-        />
-        <div
-          className="pointer-events-none absolute -bottom-24 -left-16 size-72 rounded-full bg-violet-500/10 blur-3xl"
-          aria-hidden
-        />
-
-        <div className="relative space-y-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-[0.65rem] font-medium uppercase tracking-wider text-cyan-700 dark:text-cyan-300">
-                <Sparkles className="size-3" />
-                Analytics · Produção
-              </div>
-              <h2 className="text-lg font-medium tracking-heading text-foreground">
-                Demandas e artes por mês
-              </h2>
-              <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-                Volume de demandas (linha) e artes solicitadas (barras) desde o início da operação
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <MiniStat label="Total demandas" value={data.totalDemands} accent="cyan" />
-              <MiniStat label="Total artes" value={data.totalArtes} accent="violet" />
-              <MiniStat
-                label="Média artes/demanda"
-                value={data.totalDemands > 0 ? (data.totalArtes / data.totalDemands).toFixed(1) : "—"}
-                accent="emerald"
-              />
-            </div>
-          </div>
-
-          {/* Seletor de mês — produção do mês escolhido */}
-          {data.months.length > 0 && selected && (
-            <div className="flex flex-col gap-4 rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Produção no mês
-                </span>
+      {/* ── Gráfico + status ── */}
+      <div className="grid gap-5 xl:grid-cols-3">
+        <section className="surface-panel animate-in-soft p-5 sm:p-6 xl:col-span-2">
+          <SectionHeader
+            title="Produção por mês"
+            description="Demandas (linha) e artes solicitadas (barras) desde o início da operação"
+            icon={BarChart3}
+            tone="violet"
+            action={
+              data.months.length > 0 && selected ? (
                 <div className="relative">
                   <select
                     value={selectedMonth || selected.month}
                     onChange={(e) => setSelectedMonth(e.target.value)}
-                    className="appearance-none rounded-lg border border-white/10 bg-[#0d1117] py-1.5 pl-3 pr-8 text-sm font-medium capitalize text-foreground transition-colors hover:border-cyan-500/30 focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+                    aria-label="Mês em destaque"
+                    className="h-9 appearance-none rounded-xl border border-border bg-input py-1.5 pr-9 pl-3.5 text-[0.8125rem] font-semibold text-foreground transition-colors outline-none hover:border-border-strong focus-visible:border-primary/60 focus-visible:ring-3 focus-visible:ring-ring/20 dark:[color-scheme:dark]"
                   >
                     {[...data.months].reverse().map((m) => (
-                      <option
-                        key={m.month}
-                        value={m.month}
-                        className="bg-[#0d1117] text-foreground"
-                        style={{ backgroundColor: "#0d1117", color: "#e5e7eb" }}
-                      >
+                      <option key={m.month} value={m.month}>
                         {m.label}
                       </option>
                     ))}
                   </select>
-                  <ChevronDown className="pointer-events-none absolute right-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <ChevronDown className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground" />
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-3 sm:flex sm:items-center sm:gap-5">
-                <div className="text-right">
-                  <p className="text-2xl font-semibold tabular-nums leading-none text-cyan-700 dark:text-cyan-300">
-                    {selected.total_demands}
-                  </p>
-                  <p className="mt-1 text-[0.6rem] uppercase tracking-wide text-muted-foreground/70">
-                    demandas
-                  </p>
-                </div>
-                <div className="hidden h-8 w-px bg-white/10 sm:block" />
-                <div className="text-right">
-                  <p className="text-2xl font-semibold tabular-nums leading-none text-violet-700 dark:text-violet-300">
-                    {selected.total_artes}
-                  </p>
-                  <p className="mt-1 text-[0.6rem] uppercase tracking-wide text-muted-foreground/70">
-                    artes
-                  </p>
-                </div>
-                <div className="hidden h-8 w-px bg-white/10 sm:block" />
-                <div className="text-right">
-                  <p className="text-2xl font-semibold tabular-nums leading-none text-emerald-700 dark:text-emerald-300">
-                    {selected.total_demands > 0
-                      ? (selected.total_artes / selected.total_demands).toFixed(1)
-                      : "—"}
-                  </p>
-                  <p className="mt-1 text-[0.6rem] uppercase tracking-wide text-muted-foreground/70">
-                    artes/demanda
-                  </p>
-                </div>
-                {selected.avg_elapsed_minutes != null && (
-                  <>
-                    <div className="hidden h-8 w-px bg-white/10 sm:block" />
-                    <div className="text-right">
-                      <p className="text-2xl font-semibold tabular-nums leading-none text-amber-600 dark:text-amber-300">
-                        {formatDesignerDuration(selected.avg_elapsed_minutes)}
-                      </p>
-                      <p className="mt-1 text-[0.6rem] uppercase tracking-wide text-muted-foreground/70">
-                        tempo médio
-                      </p>
-                    </div>
-                  </>
-                )}
-              </div>
+              ) : null
+            }
+          />
+
+          {/* Números do mês escolhido */}
+          {selected && (
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <MonthFigure label="Demandas" value={selected.total_demands} tone="lime" />
+              <MonthFigure label="Artes" value={selected.total_artes} tone="violet" />
+              <MonthFigure
+                label="Artes / demanda"
+                value={
+                  selected.total_demands > 0
+                    ? (selected.total_artes / selected.total_demands).toFixed(1)
+                    : "—"
+                }
+                tone="cyan"
+              />
+              <MonthFigure
+                label="Tempo médio"
+                value={
+                  selected.avg_elapsed_minutes != null
+                    ? formatDesignerDuration(selected.avg_elapsed_minutes)
+                    : "—"
+                }
+                tone="orange"
+              />
             </div>
           )}
 
-          <div className="grid gap-6 xl:grid-cols-5">
-            {/* Chart — dual Y axis fixes the scale mismatch */}
-            <div className="xl:col-span-3">
-              <div className="h-80 rounded-xl border border-white/5 bg-black/20 p-2">
-                {chartData.length === 0 ? (
-                  <p className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                    Nenhum dado ainda
-                  </p>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={chartData} margin={{ top: 12, right: 8, left: -12, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="artesBarFill" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#a78bfa" stopOpacity={0.95} />
-                          <stop offset="100%" stopColor="#a78bfa" stopOpacity={0.4} />
-                        </linearGradient>
-                        <linearGradient id="artesBarDim" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#a78bfa" stopOpacity={0.32} />
-                          <stop offset="100%" stopColor="#a78bfa" stopOpacity={0.1} />
-                        </linearGradient>
-                        <filter id="demandGlow" x="-20%" y="-20%" width="140%" height="140%">
-                          <feGaussianBlur stdDeviation="3" result="blur" />
-                          <feMerge>
-                            <feMergeNode in="blur" />
-                            <feMergeNode in="SourceGraphic" />
-                          </feMerge>
-                        </filter>
-                      </defs>
-                      <CartesianGrid strokeDasharray="4 4" stroke="rgba(148,163,184,0.12)" vertical={false} />
-                      <XAxis
-                        dataKey="label"
-                        tick={{ fontSize: 11, fill: "rgba(148,163,184,0.85)" }}
-                        axisLine={false}
-                        tickLine={false}
+          <div className="mt-5 h-72">
+            {chartData.length === 0 ? (
+              <p className="flex h-full items-center justify-center rounded-xl border border-dashed border-border-strong text-sm text-muted-foreground">
+                Nenhum dado ainda
+              </p>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={chartData} margin={{ top: 8, right: 0, left: -18, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="artesBarFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--tone-violet)" stopOpacity={1} />
+                      <stop offset="100%" stopColor="var(--tone-violet)" stopOpacity={0.55} />
+                    </linearGradient>
+                    <linearGradient id="artesBarDim" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--tone-violet)" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="var(--tone-violet)" stopOpacity={0.12} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid
+                    strokeDasharray="3 6"
+                    stroke="var(--border)"
+                    vertical={false}
+                  />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                    axisLine={false}
+                    tickLine={false}
+                    dy={6}
+                  />
+                  <YAxis
+                    yAxisId="artes"
+                    tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                    axisLine={false}
+                    tickLine={false}
+                    allowDecimals={false}
+                  />
+                  <YAxis
+                    yAxisId="demandas"
+                    orientation="right"
+                    tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                    axisLine={false}
+                    tickLine={false}
+                    allowDecimals={false}
+                  />
+                  <Tooltip
+                    content={<ChartTooltip />}
+                    cursor={{ fill: "var(--accent)", opacity: 0.5, radius: 8 }}
+                  />
+                  <Bar
+                    yAxisId="artes"
+                    dataKey="Artes"
+                    radius={[8, 8, 3, 3]}
+                    maxBarSize={36}
+                    isAnimationActive
+                    animationDuration={900}
+                  >
+                    {chartData.map((entry) => (
+                      <Cell
+                        key={entry.label}
+                        fill={
+                          entry.label === selected?.label
+                            ? "url(#artesBarFill)"
+                            : "url(#artesBarDim)"
+                        }
                       />
-                      <YAxis
-                        yAxisId="artes"
-                        tick={{ fontSize: 11, fill: "rgba(167,139,250,0.85)" }}
-                        axisLine={false}
-                        tickLine={false}
-                        allowDecimals={false}
-                      />
-                      <YAxis
-                        yAxisId="demandas"
-                        orientation="right"
-                        tick={{ fontSize: 11, fill: "rgba(34,211,238,0.85)" }}
-                        axisLine={false}
-                        tickLine={false}
-                        allowDecimals={false}
-                      />
-                      <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(148,163,184,0.06)" }} />
-                      <Bar
-                        yAxisId="artes"
-                        dataKey="Artes"
-                        radius={[6, 6, 0, 0]}
-                        maxBarSize={40}
-                        isAnimationActive
-                        animationDuration={1200}
-                      >
-                        {chartData.map((entry) => (
-                          <Cell
-                            key={entry.label}
-                            fill={
-                              entry.label === selected?.label
-                                ? "url(#artesBarFill)"
-                                : "url(#artesBarDim)"
-                            }
-                          />
-                        ))}
-                      </Bar>
-                      <Line
-                        yAxisId="demandas"
-                        type="monotone"
-                        dataKey="Demandas"
-                        stroke="#22d3ee"
-                        strokeWidth={2.5}
-                        filter="url(#demandGlow)"
-                        isAnimationActive
-                        animationDuration={1400}
-                        dot={{ r: 3, fill: "#22d3ee", strokeWidth: 0 }}
-                        activeDot={{ r: 6, fill: "#22d3ee", stroke: "#67e8f9", strokeWidth: 2 }}
-                      />
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
-              <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1.5">
-                  <span className="h-0.5 w-4 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]" />
-                  Demandas (eixo direito)
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="size-2.5 rounded-sm bg-violet-400" />
-                  Artes (eixo esquerdo)
-                </span>
-              </div>
+                    ))}
+                  </Bar>
+                  <Line
+                    yAxisId="demandas"
+                    type="monotone"
+                    dataKey="Demandas"
+                    stroke="var(--tone-lime)"
+                    strokeWidth={2.5}
+                    isAnimationActive
+                    animationDuration={1100}
+                    dot={{ r: 3, fill: "var(--card)", stroke: "var(--tone-lime)", strokeWidth: 2 }}
+                    activeDot={{ r: 5, fill: "var(--tone-lime)", stroke: "var(--card)", strokeWidth: 2 }}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4 text-xs text-muted-foreground">
+            <div className="flex items-center gap-4">
+              <span className="flex items-center gap-1.5">
+                <span className="h-0.5 w-4 rounded-full bg-tone-lime" />
+                Demandas (eixo direito)
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="size-2.5 rounded-[3px] bg-tone-violet" />
+                Artes (eixo esquerdo)
+              </span>
             </div>
-
-            {/* Status distribution + productivity */}
-            <div className="xl:col-span-2 space-y-5">
-              <div className="space-y-3">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Demandas por status
-                </p>
-                <div className="space-y-2.5">
-                  {data.statusCounts.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Sem demandas</p>
-                  ) : (
-                    data.statusCounts.map((s) => {
-                      const pct = totalStatus > 0 ? Math.round((s.count / totalStatus) * 100) : 0;
-                      const color = statusColor(s.status);
-                      return (
-                        <div key={s.status} className="space-y-1">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="flex items-center gap-2 text-foreground/80">
-                              <span
-                                className="size-2 rounded-full"
-                                style={{ background: color, boxShadow: `0 0 8px ${color}66` }}
-                              />
-                              {s.status}
-                            </span>
-                            <span className="tabular-nums text-muted-foreground">
-                              {s.count} · {pct}%
-                            </span>
-                          </div>
-                          <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
-                            <div
-                              className="h-full rounded-full transition-all duration-700"
-                              style={{ width: `${pct}%`, background: color, boxShadow: `0 0 10px ${color}55` }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2.5">
-                <MiniPanel icon={Layers} label="Ativas" value={data.activeDemands} accent="cyan" />
-                <MiniPanel icon={CheckCircle2} label="Concluídas no mês" value={data.completedThisMonth} accent="emerald" />
-                <MiniPanel
-                  icon={Timer}
-                  label="Turnaround médio"
-                  value={data.avgTurnaroundMinutes != null ? formatDesignerDuration(data.avgTurnaroundMinutes) : "—"}
-                  accent="violet"
-                />
-              </div>
+            <div className="flex items-center gap-4 tabular-nums">
+              <span>
+                <b className="font-semibold text-foreground">{data.totalDemands}</b> demandas
+              </span>
+              <span>
+                <b className="font-semibold text-foreground">{data.totalArtes}</b> artes
+              </span>
+              <span>
+                <b className="font-semibold text-foreground">
+                  {data.totalDemands > 0 ? (data.totalArtes / data.totalDemands).toFixed(1) : "—"}
+                </b>{" "}
+                artes/demanda
+              </span>
             </div>
           </div>
-        </div>
+        </section>
+
+        {/* Status + produtividade */}
+        <section className="surface-panel animate-in-soft stagger-1 flex flex-col p-5 sm:p-6">
+          <SectionHeader
+            title="Demandas por status"
+            description={`${totalStatus} no total`}
+            icon={PieChart}
+            tone="cyan"
+          />
+
+          {/* Barra empilhada */}
+          {totalStatus > 0 && (
+            <div className="mt-5 flex h-2.5 overflow-hidden rounded-full bg-muted">
+              {data.statusCounts.map((s) => (
+                <div
+                  key={s.status}
+                  className={cn("h-full first:rounded-l-full last:rounded-r-full", tones[statusTone(s.status)].solid)}
+                  style={{ width: `${(s.count / totalStatus) * 100}%` }}
+                  title={`${s.status}: ${s.count}`}
+                />
+              ))}
+            </div>
+          )}
+
+          <div className="mt-4 flex-1 space-y-1">
+            {data.statusCounts.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Sem demandas</p>
+            ) : (
+              data.statusCounts.map((s) => {
+                const pct = totalStatus > 0 ? Math.round((s.count / totalStatus) * 100) : 0;
+                const t = tones[statusTone(s.status)];
+                return (
+                  <div
+                    key={s.status}
+                    className="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-[0.8125rem] transition-colors hover:bg-accent/60"
+                  >
+                    <span className="flex min-w-0 items-center gap-2.5 text-foreground/90">
+                      <span className={cn("size-2 shrink-0 rounded-full", t.dot)} />
+                      <span className="truncate">{s.status}</span>
+                    </span>
+                    <span className="shrink-0 tabular-nums text-muted-foreground">
+                      <b className="font-semibold text-foreground">{s.count}</b> · {pct}%
+                    </span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <div className="mt-5 grid grid-cols-3 gap-2.5 border-t border-border pt-5">
+            <MiniPanel icon={Layers} label="Ativas" value={data.activeDemands} tone="cyan" />
+            <MiniPanel
+              icon={CheckCircle2}
+              label="Concluídas no mês"
+              value={data.completedThisMonth}
+              tone="green"
+            />
+            <MiniPanel
+              icon={Timer}
+              label="Turnaround"
+              value={
+                data.avgTurnaroundMinutes != null
+                  ? formatDesignerDuration(data.avgTurnaroundMinutes)
+                  : "—"
+              }
+              tone="violet"
+            />
+          </div>
+        </section>
       </div>
 
-      {/* ── Traditional vs hybrid ── */}
+      {/* ── Tradicional vs híbrido ── */}
       <div className="grid gap-4 md:grid-cols-2">
         <ComparisonCard
           title="Designer tradicional"
@@ -434,7 +401,7 @@ export function DashboardDemandsAnalytics({ data }: Props) {
           perDemand="1 hora / demanda"
           total={formatDesignerDuration(traditionalMinutesForDemands(data.totalDemands))}
           demandCount={data.totalDemands}
-          accent="amber"
+          variant="traditional"
         />
         <ComparisonCard
           title="Designer híbrido"
@@ -442,8 +409,7 @@ export function DashboardDemandsAnalytics({ data }: Props) {
           perDemand="5 minutos / demanda"
           total={formatDesignerDuration(hybridMinutesForDemands(data.totalDemands))}
           demandCount={data.totalDemands}
-          accent="cyan"
-          highlight
+          variant="hybrid"
         />
       </div>
     </div>
@@ -454,17 +420,17 @@ function DeltaBadge({ delta, suffix }: { delta: DashboardDelta; suffix?: string 
   if (delta.pct === null) {
     const isNew = delta.current > 0;
     return (
-      <span
-        className={cn(
-          "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.65rem] font-medium",
-          isNew
-            ? "bg-cyan-500/12 text-cyan-700 dark:text-cyan-300"
-            : "bg-white/5 text-muted-foreground"
-        )}
-      >
-        {isNew ? <Sparkles className="size-3" /> : <ArrowRight className="size-3" />}
-        {isNew ? "novo" : "—"}
-        {suffix ? <span className="opacity-70">· {suffix}</span> : null}
+      <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+        <span
+          className={cn(
+            "inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 font-semibold",
+            isNew ? tones.cyan.badge : "bg-muted text-muted-foreground"
+          )}
+        >
+          {isNew ? <Sparkles className="size-3" /> : <ArrowRight className="size-3" />}
+          {isNew ? "novo" : "—"}
+        </span>
+        {suffix}
       </span>
     );
   }
@@ -472,20 +438,18 @@ function DeltaBadge({ delta, suffix }: { delta: DashboardDelta; suffix?: string 
   const flat = delta.pct === 0;
   const Icon = flat ? ArrowRight : up ? ArrowUpRight : ArrowDownRight;
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.65rem] font-medium tabular-nums",
-        flat
-          ? "bg-white/5 text-muted-foreground"
-          : up
-            ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300"
-            : "bg-rose-500/12 text-rose-600 dark:text-rose-300"
-      )}
-    >
-      <Icon className="size-3" />
-      {up ? "+" : ""}
-      {delta.pct}%
-      {suffix ? <span className="opacity-70">· {suffix}</span> : null}
+    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+      <span
+        className={cn(
+          "inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 font-semibold tabular-nums",
+          flat ? "bg-muted text-muted-foreground" : up ? tones.green.badge : tones.red.badge
+        )}
+      >
+        <Icon className="size-3" />
+        {up ? "+" : ""}
+        {delta.pct}%
+      </span>
+      {suffix}
     </span>
   );
 }
@@ -495,63 +459,56 @@ function DeltaCard({
   value,
   delta,
   deltaSuffix,
-  accent,
+  tone,
   icon: Icon,
 }: {
   label: string;
   value: number;
   delta: DashboardDelta;
   deltaSuffix?: string;
-  accent: Accent;
+  tone: Tone;
   icon: ElementType;
 }) {
-  const ring: Record<Accent, string> = {
-    cyan: "border-cyan-500/25 dark:shadow-[0_0_24px_rgba(34,211,238,0.06)]",
-    violet: "border-violet-500/25 dark:shadow-[0_0_24px_rgba(167,139,250,0.06)]",
-    emerald: "border-emerald-500/25 dark:shadow-[0_0_24px_rgba(52,211,153,0.06)]",
-    amber: "border-amber-500/25 dark:shadow-[0_0_24px_rgba(251,191,36,0.06)]",
-  };
-  const iconColor: Record<Accent, string> = {
-    cyan: "text-cyan-600 dark:text-cyan-300",
-    violet: "text-violet-600 dark:text-violet-300",
-    emerald: "text-emerald-600 dark:text-emerald-300",
-    amber: "text-amber-600 dark:text-amber-300",
-  };
+  const t = tones[tone];
   return (
-    <div className={cn("surface-panel hover-lift flex flex-col gap-4 p-5", ring[accent])}>
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground/80">
-          {label}
-        </p>
-        <Icon className={cn("size-4 shrink-0", iconColor[accent])} strokeWidth={1.75} />
+    <div className="surface-panel hover-lift group relative flex flex-col gap-4 overflow-hidden p-5">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -top-16 -right-16 size-40 rounded-full opacity-[0.10] blur-2xl transition-opacity group-hover:opacity-[0.16]"
+        style={{ background: t.cssVar }}
+      />
+      <div className="relative flex items-center gap-3">
+        <span className={cn("flex size-9 items-center justify-center rounded-xl", t.iconTile)}>
+          <Icon className="size-4" strokeWidth={2} />
+        </span>
+        <p className="text-[0.8125rem] font-semibold text-muted-foreground">{label}</p>
       </div>
-      <div className="space-y-2">
-        <p className="text-3xl font-semibold tracking-tight tabular-nums text-foreground">{value}</p>
+      <div className="relative space-y-2.5">
+        <p className="text-[2rem] leading-none font-bold tracking-[-0.03em] tabular-nums text-foreground">
+          {value}
+        </p>
         <DeltaBadge delta={delta} suffix={deltaSuffix ?? "vs. mês passado"} />
       </div>
     </div>
   );
 }
 
-function MiniStat({
+function MonthFigure({
   label,
   value,
-  accent,
+  tone,
 }: {
   label: string;
   value: string | number;
-  accent: Accent;
+  tone: Tone;
 }) {
-  const color: Record<Accent, string> = {
-    cyan: "text-cyan-700 dark:text-cyan-300",
-    violet: "text-violet-700 dark:text-violet-300",
-    emerald: "text-emerald-700 dark:text-emerald-300",
-    amber: "text-amber-700 dark:text-amber-300",
-  };
   return (
-    <div className="rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2 text-center">
-      <p className={cn("text-lg font-semibold tabular-nums leading-none", color[accent])}>{value}</p>
-      <p className="mt-1 text-[0.6rem] uppercase tracking-wide text-muted-foreground/70">{label}</p>
+    <div className="rounded-xl border border-border bg-surface px-3.5 py-3">
+      <p className="flex items-center gap-1.5 text-[0.6875rem] font-semibold text-muted-foreground">
+        <span className={cn("size-1.5 rounded-full", tones[tone].dot)} />
+        {label}
+      </p>
+      <p className="mt-1.5 text-xl leading-none font-bold tabular-nums text-foreground">{value}</p>
     </div>
   );
 }
@@ -560,24 +517,18 @@ function MiniPanel({
   icon: Icon,
   label,
   value,
-  accent,
+  tone,
 }: {
   icon: ElementType;
   label: string;
   value: string | number;
-  accent: Accent;
+  tone: Tone;
 }) {
-  const color: Record<Accent, string> = {
-    cyan: "text-cyan-600 dark:text-cyan-300",
-    violet: "text-violet-600 dark:text-violet-300",
-    emerald: "text-emerald-600 dark:text-emerald-300",
-    amber: "text-amber-600 dark:text-amber-300",
-  };
   return (
-    <div className="rounded-xl border border-white/8 bg-white/[0.03] p-3">
-      <Icon className={cn("size-4", color[accent])} strokeWidth={1.75} />
-      <p className="mt-2 text-base font-semibold tabular-nums leading-none text-foreground">{value}</p>
-      <p className="mt-1 text-[0.6rem] leading-tight text-muted-foreground/70">{label}</p>
+    <div className="rounded-xl border border-border bg-surface p-3">
+      <Icon className={cn("size-4", tones[tone].text)} strokeWidth={2} />
+      <p className="mt-2 text-base leading-none font-bold tabular-nums text-foreground">{value}</p>
+      <p className="mt-1 text-[0.6875rem] leading-tight text-muted-foreground">{label}</p>
     </div>
   );
 }
@@ -588,84 +539,76 @@ function ComparisonCard({
   perDemand,
   total,
   demandCount,
-  accent,
-  highlight = false,
+  variant,
 }: {
   title: string;
   subtitle: string;
   perDemand: string;
   total: string;
   demandCount: number;
-  accent: "amber" | "cyan";
-  highlight?: boolean;
+  variant: "traditional" | "hybrid";
 }) {
-  const isAmber = accent === "amber";
+  const isTraditional = variant === "traditional";
+  const tone: Tone = isTraditional ? "orange" : "lime";
+  const t = tones[tone];
   const barPercent =
     demandCount === 0
       ? 0
-      : isAmber
+      : isTraditional
         ? 100
         : Math.max(4, Math.round((HYBRID_DESIGNER_MINUTES / TRADITIONAL_DESIGNER_MINUTES) * 100));
+  const Icon = isTraditional ? Clock : Sparkles;
 
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-xl border p-5 transition-premium",
-        highlight
-          ? "border-cyan-500/35 bg-gradient-to-br from-cyan-500/10 to-violet-500/10 shadow-[0_0_30px_rgba(34,211,238,0.12)]"
-          : "border-amber-500/25 bg-amber-500/5"
+        "surface-panel relative overflow-hidden p-5",
+        !isTraditional && "ring-brand"
       )}
     >
-      <div className="space-y-4">
-        <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className={cn("flex size-9 items-center justify-center rounded-xl", t.iconTile)}>
+            <Icon className="size-4" strokeWidth={2} />
+          </span>
           <div>
-            <h3 className="font-medium text-foreground">{title}</h3>
-            <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
-          </div>
-          {isAmber ? (
-            <Clock className="size-5 shrink-0 text-amber-600/70 dark:text-amber-300/70" strokeWidth={1.5} />
-          ) : (
-            <Sparkles className="size-5 shrink-0 text-cyan-600/70 dark:text-cyan-300/70" strokeWidth={1.5} />
-          )}
-        </div>
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Tempo total</p>
-            <p
-              className={cn(
-                "mt-1 text-3xl font-semibold tabular-nums tracking-heading",
-                isAmber ? "text-amber-700 dark:text-amber-300" : "text-cyan-700 dark:text-cyan-300"
-              )}
-            >
-              {total}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground">{perDemand}</p>
-            <p className="mt-1 text-sm tabular-nums text-foreground">
-              {demandCount} demanda{demandCount === 1 ? "" : "s"}
-            </p>
+            <h3 className="text-sm font-bold text-foreground">{title}</h3>
+            <p className="text-xs text-muted-foreground">{subtitle}</p>
           </div>
         </div>
-        <div className="space-y-2">
-          <div className="h-2 overflow-hidden rounded-full bg-black/5 dark:bg-white/5">
-            <div
-              className={cn(
-                "h-full rounded-full transition-all duration-1000 ease-out",
-                isAmber
-                  ? "bg-gradient-to-r from-amber-400 to-orange-500 shadow-[0_0_12px_rgba(251,191,36,0.5)]"
-                  : "bg-gradient-to-r from-violet-400 to-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.5)]"
-              )}
-              style={{ width: `${barPercent}%` }}
-            />
-          </div>
-          <p className="text-[0.65rem] text-muted-foreground">
-            {isAmber
-              ? "Baseline de referência para o mesmo volume"
-              : `${Math.round(TRADITIONAL_DESIGNER_MINUTES / HYBRID_DESIGNER_MINUTES)}x menos tempo por demanda`}
+        {!isTraditional && (
+          <span className="rounded-full bg-highlight px-2.5 py-1 text-[0.6875rem] font-bold text-highlight-foreground">
+            {Math.round(TRADITIONAL_DESIGNER_MINUTES / HYBRID_DESIGNER_MINUTES)}x mais rápido
+          </span>
+        )}
+      </div>
+
+      <div className="mt-5 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-xs text-muted-foreground">Tempo total</p>
+          <p className="mt-1 text-[1.75rem] leading-none font-bold tracking-[-0.03em] tabular-nums text-foreground">
+            {total}
+          </p>
+        </div>
+        <div className="text-right text-xs">
+          <p className="text-muted-foreground">{perDemand}</p>
+          <p className="mt-1 font-semibold tabular-nums text-foreground">
+            {demandCount} demanda{demandCount === 1 ? "" : "s"}
           </p>
         </div>
       </div>
+
+      <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
+        <div
+          className={cn("h-full rounded-full transition-all duration-1000 ease-out", t.solid)}
+          style={{ width: `${barPercent}%` }}
+        />
+      </div>
+      <p className="mt-2 text-[0.6875rem] text-muted-foreground">
+        {isTraditional
+          ? "Baseline de referência para o mesmo volume"
+          : "Mesmo volume com o fluxo Creative OS"}
+      </p>
     </div>
   );
 }

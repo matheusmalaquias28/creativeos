@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { ImagePlus, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { uploadMvpLogoAction } from "@/actions/mvp";
+import { Button } from "@/components/ui/button";
 
 type Props = {
   projectId: string;
@@ -29,8 +30,8 @@ export function MvpLogoUploader({ projectId, logoUrl, disabled }: Props) {
   }
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/15 px-4 py-3">
-      <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-white/5">
+    <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-[var(--surface-shadow),var(--inner-highlight)]">
+      <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-surface">
         {logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={logoUrl} alt="Logo do MVP" className="size-full object-contain" />
@@ -39,20 +40,22 @@ export function MvpLogoUploader({ projectId, logoUrl, disabled }: Props) {
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-foreground">Logo do MVP</p>
+        <p className="text-sm font-semibold text-foreground">Logo do MVP</p>
         <p className="truncate text-xs text-muted-foreground">
           {logoUrl ? "Será conectada em todas as páginas" : "Nenhuma logo enviada ainda"}
         </p>
       </div>
-      <button
+      <Button
         type="button"
+        variant="outline"
+        size="sm"
         onClick={() => inputRef.current?.click()}
         disabled={disabled || isUploading}
-        className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-white/10 bg-black/20 px-3 text-xs font-medium text-foreground/80 transition-premium hover:bg-black/30 disabled:opacity-50"
+        className="shrink-0"
       >
-        {isUploading ? <Loader2 className="size-3.5 animate-spin" /> : <ImagePlus className="size-3.5" />}
+        {isUploading ? <Loader2 className="animate-spin" /> : <ImagePlus />}
         {logoUrl ? "Trocar" : "Enviar logo"}
-      </button>
+      </Button>
       <input
         ref={inputRef}
         type="file"

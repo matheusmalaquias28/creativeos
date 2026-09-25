@@ -95,11 +95,11 @@ export function DemandReferenceManager({
       {showClientRefs && clientRefs.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <p className="text-xs font-medium text-muted-foreground">
+            <p className="text-[0.8125rem] font-semibold text-muted-foreground">
               Referências do cliente ({clientRefs.length})
             </p>
-            <span className="inline-flex items-center gap-1 rounded-full border border-border/50 px-2 py-0.5 text-[10px] text-muted-foreground">
-              <Info className="size-2.5" />
+            <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-[0.6875rem] text-muted-foreground">
+              <Info className="size-3" />
               herdadas do perfil — somente leitura
             </span>
           </div>
@@ -107,7 +107,7 @@ export function DemandReferenceManager({
             {clientRefs.map((ref, i) => (
               <div
                 key={ref.public_url}
-                className="relative size-16 overflow-hidden rounded-lg border border-border/50 opacity-70"
+                className="relative size-16 overflow-hidden rounded-lg border border-border bg-muted opacity-70"
                 title={ref.file_name}
               >
                 <Image
@@ -118,7 +118,7 @@ export function DemandReferenceManager({
                   className="object-cover"
                   sizes="64px"
                 />
-                <span className="absolute bottom-0 right-0 rounded-tl bg-black/60 px-1 text-[9px] text-white">
+                <span className="absolute bottom-0 right-0 rounded-tl-md bg-background/80 px-1 text-[0.625rem] font-semibold tabular-nums text-foreground">
                   {i + 1}
                 </span>
               </div>
@@ -129,15 +129,16 @@ export function DemandReferenceManager({
 
       {/* Referências pontuais da demanda */}
       <div className="space-y-2">
-        <p className="text-xs font-medium text-muted-foreground">
-          Referências desta demanda ({demandRefs.length})
+        <p className="text-[0.8125rem] font-semibold text-muted-foreground">
+          Referências desta demanda{" "}
+          <span className="tabular-nums text-muted-foreground/70">({demandRefs.length})</span>
         </p>
 
         {demandRefs.length > 0 && (
           <div className="flex flex-wrap gap-3">
             {demandRefs.map((ref, i) => (
               <div key={ref.id} className="flex flex-col gap-1">
-                <div className="relative size-16 overflow-hidden rounded-lg border">
+                <div className="relative size-16 overflow-hidden rounded-lg border border-border bg-muted">
                   <Image
                     src={ref.storage_url}
                     alt={ref.file_name}
@@ -146,13 +147,13 @@ export function DemandReferenceManager({
                     className="object-cover"
                     sizes="64px"
                   />
-                  <span className="absolute bottom-0 right-0 rounded-tl bg-black/60 px-1 text-[9px] text-white">
+                  <span className="absolute bottom-0 right-0 rounded-tl-md bg-background/80 px-1 text-[0.625rem] font-semibold tabular-nums text-foreground">
                     {(clientRefs.length) + i + 1}
                   </span>
                   <button
                     onClick={() => handleDelete(ref)}
                     disabled={isPending}
-                    className="absolute right-0.5 top-0.5 rounded-full bg-black/60 p-0.5 text-white hover:bg-red-600"
+                    className="absolute right-0.5 top-0.5 rounded-full bg-background/80 p-0.5 text-foreground transition-premium hover:bg-tone-red hover:text-background"
                     title="Remover"
                   >
                     <X className="size-2.5" />
@@ -161,7 +162,7 @@ export function DemandReferenceManager({
                 <select
                   defaultValue={ref.role ?? ""}
                   onChange={(e) => handleRoleChange(ref, e.target.value)}
-                  className="h-6 w-16 rounded border border-border bg-background px-1 text-[9px] text-foreground"
+                  className="h-6 w-16 rounded-md border border-border bg-input px-1 text-[0.625rem] text-foreground outline-none hover:border-border-strong focus-visible:border-primary/60"
                 >
                   {ROLE_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>

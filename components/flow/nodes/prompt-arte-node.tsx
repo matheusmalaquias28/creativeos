@@ -5,6 +5,13 @@ import { Handle, Position, useReactFlow, useEdges } from "@xyflow/react";
 import { FileText } from "lucide-react";
 import { useFlowCanvas } from "@/components/flow/flow-canvas-context";
 import {
+  FLOW_NODE_TONE,
+  NodeShell,
+  flowHandleClass,
+} from "@/components/flow/nodes/node-shell";
+import { tones } from "@/lib/design/tokens";
+import { cn } from "@/lib/utils";
+import {
   formatPromptArteData,
   getPromptArteEditorText,
   parsePromptArteText,
@@ -140,32 +147,32 @@ export function PromptArteNode({ id, data, selected }: Props) {
   }, [commit]);
 
   return (
-    <div
-      className={`w-64 rounded-xl border bg-amber-500/5 p-3 backdrop-blur-sm transition-colors ${
-        selected
-          ? "border-amber-500/50 shadow-[0_0_0_2px_oklch(0.7_0.18_85/15%)]"
-          : "border-amber-500/20"
-      }`}
+    <NodeShell
+      tone={FLOW_NODE_TONE.promptArte}
+      icon={FileText}
+      title={`Prompt · Arte #${data.artIndex + 1}`}
+      selected={selected}
+      className="w-64"
+      meta={
+        connectedImages.length > 0 && (
+          <span
+            className={cn(
+              "rounded-md border px-1.5 py-px text-[0.625rem] font-bold tabular-nums",
+              tones[FLOW_NODE_TONE.referenciaImagem].badge
+            )}
+            title="Referências mencionáveis com @"
+          >
+            @{connectedImages.length}
+          </span>
+        )
+      }
     >
-      <Handle
-        type="target"
-        position={Position.Left}
-        className="!size-2.5 !border-amber-500/50 !bg-amber-500/30"
-      />
-
-      <div className="mb-2 flex items-center gap-1.5">
-        <div className="flex size-5 items-center justify-center rounded-md border border-amber-500/30 bg-amber-500/15">
-          <FileText className="size-3 text-amber-400" strokeWidth={1.5} />
-        </div>
-        <span className="text-[0.6875rem] font-semibold uppercase tracking-widest text-amber-400">
-          Arte #{data.artIndex + 1}
-        </span>
-      </div>
+      <Handle type="target" position={Position.Left} className={flowHandleClass} />
 
       <div className="relative">
         <textarea
           ref={textareaRef}
-          className="nodrag w-full resize-none rounded-lg border border-amber-500/20 bg-amber-500/5 p-2 font-mono text-[0.6875rem] leading-relaxed text-foreground/80 placeholder:text-muted-foreground/30 focus:border-amber-500/40 focus:outline-none"
+          className="nodrag w-full resize-none rounded-xl border border-border bg-input p-2.5 font-mono text-[0.6875rem] leading-relaxed text-foreground placeholder:text-muted-foreground/60 transition-premium hover:border-border-strong focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-ring/20"
           rows={5}
           value={draft}
           placeholder={"Headline: texto\nSubheadline: texto\nCTA: texto\nExtras: @referencia"}
@@ -215,8 +222,8 @@ export function PromptArteNode({ id, data, selected }: Props) {
         />
 
         {showMention && (
-          <div className="nodrag nopan absolute bottom-full left-0 z-50 mb-1 w-full overflow-hidden rounded-lg border border-rose-500/30 bg-[oklch(0.09_0.007_265/96%)] shadow-xl backdrop-blur-md">
-            <p className="px-2.5 pb-1 pt-1.5 text-[0.5rem] uppercase tracking-widest text-muted-foreground/40">
+          <div className="nodrag nopan absolute bottom-full left-0 z-50 mb-1 w-full overflow-hidden rounded-xl border border-border bg-popover p-1 shadow-[var(--surface-shadow-elevated)]">
+            <p className="px-2 pb-1 pt-1 text-[0.625rem] font-semibold text-muted-foreground">
               Referências conectadas
             </p>
             {mentionOptions.map(({ label, token }, idx) => (
@@ -227,16 +234,17 @@ export function PromptArteNode({ id, data, selected }: Props) {
                   e.preventDefault();
                   if (mention) selectMention(token, mention.query, mention.start);
                 }}
-                className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-left transition-colors ${
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors",
                   idx === mentionIdx
-                    ? "bg-rose-500/15 text-rose-300"
-                    : "text-muted-foreground/60 hover:bg-white/5"
-                }`}
+                    ? "bg-accent text-accent-foreground"
+                    : "text-muted-foreground hover:bg-accent/60"
+                )}
               >
-                <span className="font-mono text-[0.625rem] text-rose-400/90">
+                <span className="font-mono text-[0.625rem] font-semibold text-tone-orange">
                   {token}
                 </span>
-                <span className="ml-auto text-[0.5625rem] text-muted-foreground/40">
+                <span className="ml-auto truncate text-[0.625rem] text-muted-foreground">
                   {label}
                 </span>
               </button>
@@ -245,15 +253,11 @@ export function PromptArteNode({ id, data, selected }: Props) {
         )}
       </div>
 
-      <p className="mt-1.5 text-[0.5625rem] text-muted-foreground/35">
+      <p className="mt-2 text-[0.625rem] leading-snug text-muted-foreground">
         Edite direto · @ para referências · salva ao sair do campo
       </p>
 
-      <Handle
-        type="source"
-        position={Position.Right}
-        className="!size-2.5 !border-amber-500/50 !bg-amber-500/30"
-      />
-    </div>
+      <Handle type="source" position={Position.Right} className={flowHandleClass} />
+    </NodeShell>
   );
 }

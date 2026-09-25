@@ -9,7 +9,10 @@ import {
   generateMvpAction,
   getMvpStatusAction,
 } from "@/actions/mvp";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
+import { tones } from "@/lib/design/tokens";
+import { cn } from "@/lib/utils";
 import { mvpTotalBatches, type MvpStatus } from "@/types/mvp";
 
 const POLL_INTERVAL_MS = 5000;
@@ -145,19 +148,29 @@ export function MvpGenerateButton({
   if (localStatus === "generating") {
     const currentBatch = Math.min(localBatches + 1, totalBatches);
     return (
-      <span className="inline-flex h-10 items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-4 text-sm text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" />
-        Gerando MVP — lote {currentBatch} de {totalBatches}
-        <button
+      <span
+        aria-live="polite"
+        className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card pr-1.5 pl-3.5 text-sm font-medium text-foreground shadow-[var(--surface-shadow)]"
+      >
+        <Loader2 className={cn("size-4 animate-spin", tones.pink.text)} />
+        <span>
+          Gerando MVP — lote{" "}
+          <span className="font-bold tabular-nums">
+            {currentBatch} de {totalBatches}
+          </span>
+        </span>
+        <Button
           type="button"
+          variant="destructive"
+          size="xs"
           onClick={handleCancel}
           disabled={isPending}
           title="Pausa a geração — os lotes já prontos ficam salvos e você continua depois"
-          className="ml-1 inline-flex items-center gap-1 rounded-md border border-red-500/40 bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-300 transition-premium hover:bg-red-500/20 disabled:opacity-60"
+          className="ml-1"
         >
-          <Pause className="size-3" />
+          <Pause />
           Pausar
-        </button>
+        </Button>
       </span>
     );
   }
@@ -169,21 +182,22 @@ export function MvpGenerateButton({
           href={localSpaceUrl}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex h-10 items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 text-sm font-medium text-emerald-300 transition-premium hover:bg-emerald-500/20"
+          className={buttonVariants({ variant: "positive", className: "h-10" })}
         >
           <ExternalLink className="size-4" />
           Abrir MVP no Spaces
         </a>
-        <button
+        <Button
           type="button"
+          variant="outline"
           disabled={isPending}
           onClick={handleGenerate}
           title="Gera o MVP do zero em um Space novo"
-          className="inline-flex h-10 items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-4 text-sm font-medium text-foreground/80 transition-premium hover:bg-black/30 disabled:opacity-60"
+          className="h-10"
         >
-          <RefreshCw className="size-4" />
+          <RefreshCw />
           Regenerar
-        </button>
+        </Button>
       </span>
     );
   }
@@ -197,51 +211,59 @@ export function MvpGenerateButton({
             href={localSpaceUrl}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex h-10 items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3 text-sm text-foreground/80 transition-premium hover:bg-black/30"
+            className={buttonVariants({ variant: "outline", size: "icon", className: "size-10" })}
             title="Abre o Space com os lotes já gerados"
           >
             <ExternalLink className="size-4" />
           </a>
         )}
-        <button
+        <Button
           type="button"
+          variant="outline"
           disabled={isPending}
           onClick={handleGenerate}
           title={localError ?? undefined}
-          className="inline-flex h-10 items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 text-sm font-medium text-amber-300 transition-premium hover:bg-amber-500/20 disabled:opacity-60"
+          className={cn("h-10", tones.amber.badge, "hover:border-tone-amber/50 hover:bg-tone-amber/18")}
         >
-          <Play className="size-4" />
+          <Play />
           Continuar — lote {localBatches + 1} de {totalBatches}
-        </button>
+        </Button>
       </span>
     );
   }
 
   if (localStatus === "failed") {
     return (
-      <button
+      <Button
         type="button"
+        variant="destructive"
         disabled={isPending}
         onClick={handleGenerate}
         title={localError ?? undefined}
-        className="inline-flex h-10 items-center gap-2 rounded-lg border border-red-500/40 bg-red-500/10 px-4 text-sm font-medium text-red-300 transition-premium hover:bg-red-500/20 disabled:opacity-60"
+        className="h-10"
       >
-        <RefreshCw className="size-4" />
+        <RefreshCw />
         Falha — tentar de novo
-      </button>
+      </Button>
     );
   }
 
   return (
-    <button
+    <Button
       type="button"
+      variant="highlight"
       disabled={isPending || !canGenerate}
       onClick={handleGenerate}
       title={canGenerate ? undefined : "Aguarde a organização das páginas terminar"}
-      className="inline-flex h-10 items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-5 text-sm font-semibold text-emerald-200 transition-premium hover:bg-emerald-500/25 disabled:opacity-50"
+      className="h-10 px-5"
     >
-      <Wand2 className="size-4" />
-      GERAR MVP{totalBatches > 1 ? ` (${totalBatches} lotes de 10 págs)` : ""}
-    </button>
+      <Wand2 />
+      Gerar MVP
+      {totalBatches > 1 && (
+        <span className="font-medium opacity-75">
+          ({totalBatches} lotes de 10 págs)
+        </span>
+      )}
+    </Button>
   );
 }

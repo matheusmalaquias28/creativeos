@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Pipette } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Pipette } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { FONT_OPTIONS } from "@/lib/design/fonts";
@@ -79,30 +79,57 @@ function usePopoverPosition(
   return pos;
 }
 
+/** Rótulo padrão dos controles do editor (sentence case, legível). */
+export const controlLabelClass = "text-xs font-medium text-muted-foreground";
+
 export function SidebarSection({
   title,
   open,
   onToggle,
   children,
+  icon,
+  badge,
 }: {
   title: string;
   open: boolean;
   onToggle: () => void;
   children: React.ReactNode;
+  /** Ícone opcional exibido antes do título. */
+  icon?: React.ReactNode;
+  /** Conteúdo opcional à direita do título (ex.: "Slide 2"). */
+  badge?: React.ReactNode;
 }) {
   return (
-    <div className="border-b border-white/6 last:border-0">
+    <section
+      className={cn(
+        "rounded-2xl border bg-card transition-premium",
+        open ? "border-border shadow-[var(--surface-shadow)]" : "border-border/70 hover:border-border"
+      )}
+    >
       <button
+        type="button"
         onClick={onToggle}
-        className="flex w-full items-center justify-between px-5 py-3.5 text-left text-[0.625rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+        aria-expanded={open}
+        className="flex w-full items-center gap-2.5 rounded-2xl px-4 py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
       >
-        {title}
-        <span className={cn("text-muted-foreground/40 transition-transform duration-200", open && "rotate-90")}>
-          ›
+        {icon && (
+          <span className="flex size-6 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground [&_svg]:size-3.5">
+            {icon}
+          </span>
+        )}
+        <span className="min-w-0 flex-1 truncate text-[0.8125rem] font-semibold text-foreground">
+          {title}
         </span>
+        {badge}
+        <ChevronRight
+          className={cn(
+            "size-4 shrink-0 text-muted-foreground transition-transform duration-200",
+            open && "rotate-90"
+          )}
+        />
       </button>
-      {open && <div className="px-5 pb-5 space-y-4">{children}</div>}
-    </div>
+      {open && <div className="space-y-4 border-t border-border px-4 pt-4 pb-4">{children}</div>}
+    </section>
   );
 }
 
@@ -126,8 +153,10 @@ export function RangeControl({
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <label className="text-[0.625rem] text-muted-foreground/70">{label}</label>
-        <span className="text-[0.625rem] font-mono text-muted-foreground">{value}{unit}</span>
+        <label className={controlLabelClass}>{label}</label>
+        <span className="rounded-md bg-muted px-1.5 py-0.5 text-[0.6875rem] font-semibold tabular-nums text-foreground">
+          {value}{unit}
+        </span>
       </div>
       <input
         type="range"
@@ -188,15 +217,16 @@ export function ModernColorPicker({
       <div className="flex items-center gap-2.5">
         <button
           onClick={() => setOpen((o) => !o)}
+          aria-label={`Escolher cor: ${label}`}
           className={cn(
-            "size-9 shrink-0 rounded-lg border-2 border-border shadow-sm transition-transform hover:scale-110",
-            isNone && "bg-[repeating-conic-gradient(#64748b_0deg_90deg,transparent_90deg_180deg)] bg-[length:12px_12px]"
+            "size-9 shrink-0 rounded-lg border-2 border-border-strong shadow-[var(--surface-shadow)] transition-transform outline-none hover:scale-105 focus-visible:ring-2 focus-visible:ring-ring/50",
+            isNone && "bg-[repeating-conic-gradient(var(--border-strong)_0deg_90deg,transparent_90deg_180deg)] bg-[length:12px_12px]"
           )}
           style={isNone ? undefined : { backgroundColor: value }}
           title={label}
         />
         <div className="flex-1 min-w-0">
-          <p className="text-[0.625rem] text-muted-foreground/70 mb-1">{label}</p>
+          <p className={cn(controlLabelClass, "mb-1")}>{label}</p>
           <Input
             value={isNone ? "" : hex}
             placeholder={isNone ? "Sem cor" : undefined}
@@ -222,16 +252,17 @@ export function ModernColorPicker({
             overflowY: "auto",
             zIndex: 10000,
           }}
-          className="rounded-xl border border-border bg-card p-3 shadow-2xl dark:border-white/10 dark:bg-surface-elevated"
+          className="rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-[var(--surface-shadow-elevated)]"
         >
-          <div className="grid grid-cols-9 gap-1 mb-3">
+          {/* Paleta de presets = valores de conteúdo do slide (não são cores de interface) */}
+          <div className="mb-3 grid grid-cols-9 gap-1">
             {PRESET_COLORS.map((c) => (
               <button
                 key={c}
                 onClick={() => { onChange(c); setHex(c); setOpen(false); }}
                 className={cn(
                   "size-6 rounded-md border transition-transform hover:scale-110",
-                  value === c ? "border-primary ring-1 ring-primary" : "border-white/10"
+                  value === c ? "border-primary ring-2 ring-primary/60" : "border-border-strong"
                 )}
                 style={{ backgroundColor: c }}
                 title={c}
@@ -251,10 +282,10 @@ export function ModernColorPicker({
             />
             <button
               onClick={() => nativeRef.current?.click()}
-              className="flex items-center gap-1 rounded-lg border border-border px-2 py-1.5 text-[0.625rem] text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
+              className="flex h-7 items-center gap-1 rounded-lg border border-border bg-card px-2 text-[0.6875rem] font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
               <Pipette className="size-3" />
-              Custom
+              Personalizar
             </button>
             <input
               ref={nativeRef}
@@ -268,7 +299,7 @@ export function ModernColorPicker({
           {allowNone && (
             <button
               onClick={() => { onChange(""); setOpen(false); }}
-              className="mt-2 w-full rounded-lg border border-border px-2 py-1.5 text-[0.625rem] text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
+              className="mt-2 w-full rounded-lg border border-border bg-card px-2 py-1.5 text-[0.6875rem] font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
               Remover cor
             </button>
@@ -292,7 +323,7 @@ export function FontPicker({
 }) {
   return (
     <div className="space-y-1.5">
-      {label && <label className="text-[0.625rem] text-muted-foreground/70">{label}</label>}
+      {label && <label className={controlLabelClass}>{label}</label>}
       <FontSelect value={value} onChange={onChange} />
     </div>
   );
@@ -320,11 +351,11 @@ function FontSelect({ value, onChange }: { value: string; onChange: (family: str
     <div ref={wrapRef} className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between rounded-lg border border-border bg-background/40 px-3 py-2 text-left text-xs hover:border-border/80 transition-colors"
+        className="flex h-9 w-full items-center justify-between gap-2 rounded-xl border border-border bg-input px-3 text-left text-[0.8125rem] text-foreground transition-premium outline-none hover:border-border-strong focus-visible:ring-2 focus-visible:ring-ring/50"
         style={{ fontFamily: current.family }}
       >
         <span className="truncate">{current.label}</span>
-        <span className="text-muted-foreground/50 text-[0.6rem]">▾</span>
+        <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
       </button>
       {open && pos && createPortal(
         <div
@@ -338,20 +369,23 @@ function FontSelect({ value, onChange }: { value: string; onChange: (family: str
             maxHeight: pos.maxHeight,
             zIndex: 10000,
           }}
-          className="overflow-y-auto rounded-xl border border-border bg-card p-1 shadow-2xl dark:border-white/10 dark:bg-surface-elevated"
+          className="overflow-y-auto rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-[var(--surface-shadow-elevated)]"
         >
           {FONT_OPTIONS.map((f) => (
             <button
               key={f.id}
               onClick={() => { onChange(f.family); setOpen(false); }}
               className={cn(
-                "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-muted/60",
+                "flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-accent",
                 f.family === value && "bg-primary/10 text-primary"
               )}
               style={{ fontFamily: f.family }}
             >
-              {f.label}
-              <span className="text-[0.55rem] uppercase tracking-wider text-muted-foreground/40">{f.category}</span>
+              <span className="flex items-center gap-2">
+                {f.label}
+                {f.family === value && <Check className="size-3.5" />}
+              </span>
+              <span className="font-sans text-[0.6875rem] text-muted-foreground">{f.category}</span>
             </button>
           ))}
         </div>,

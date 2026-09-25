@@ -55,9 +55,9 @@ export function ClientPhotosPanel({
 
   if (!logoUrl && photos.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">
+      <p className="rounded-2xl border border-dashed border-border-strong bg-surface/50 px-5 py-8 text-center text-sm text-muted-foreground">
         Nenhuma foto do cliente adicionada ainda. Acesse o{" "}
-        <strong className="font-medium">Onboarding</strong> para enviar.
+        <strong className="font-semibold text-foreground">Onboarding</strong> para enviar.
       </p>
     );
   }
@@ -66,8 +66,8 @@ export function ClientPhotosPanel({
     <div className="space-y-6">
       {logoUrl && (
         <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Logo</p>
-          <div className="group relative inline-flex overflow-hidden rounded-lg border border-border/50 bg-card/30 p-3">
+          <p className="text-[0.8125rem] font-semibold text-muted-foreground">Logo</p>
+          <div className="group relative inline-flex overflow-hidden rounded-xl border border-border bg-surface p-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={logoUrl}
@@ -76,11 +76,11 @@ export function ClientPhotosPanel({
               loading="lazy"
               decoding="async"
             />
-            <div className="absolute inset-0 flex items-end justify-start gap-1 bg-gradient-to-t from-black/50 to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100">
+            <div className="absolute inset-0 flex items-end justify-start gap-1 bg-gradient-to-t from-background/70 to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
               <button
                 type="button"
                 onClick={() => handleCopyImage("logo", logoUrl)}
-                className="flex size-7 items-center justify-center rounded-md bg-white/20 text-white backdrop-blur-sm transition-colors hover:bg-white/30"
+                className="flex size-7 items-center justify-center rounded-lg border border-border bg-popover/95 text-foreground shadow-[var(--surface-shadow)] transition-colors hover:bg-accent"
                 aria-label="Copiar logo"
               >
                 {copiedId === "logo" ? (
@@ -93,7 +93,7 @@ export function ClientPhotosPanel({
                 href={logoUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex size-7 items-center justify-center rounded-md bg-white/20 text-white backdrop-blur-sm transition-colors hover:bg-white/30"
+                className="flex size-7 items-center justify-center rounded-lg border border-border bg-popover/95 text-foreground shadow-[var(--surface-shadow)] transition-colors hover:bg-accent"
                 aria-label="Abrir em nova aba"
               >
                 <ExternalLink className="size-3.5" />
@@ -105,14 +105,14 @@ export function ClientPhotosPanel({
 
       {photos.length > 0 && (
         <div className="space-y-3">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          <p className="text-[0.8125rem] font-semibold text-muted-foreground">
             Fotos — clique em <Copy className="inline size-3" /> para copiar e colar no Spaces
           </p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
         {photos.map((photo) => (
           <div
             key={photo.id}
-            className="group relative aspect-square overflow-hidden rounded-lg border border-border/50 bg-card/30"
+            className="group relative aspect-square overflow-hidden rounded-xl border border-border bg-surface"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -122,12 +122,12 @@ export function ClientPhotosPanel({
               loading="lazy"
               decoding="async"
             />
-            <div className="absolute inset-0 flex items-end justify-between gap-1 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100">
+            <div className="absolute inset-0 flex items-end justify-between gap-1 bg-gradient-to-t from-background/80 to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
               <div className="flex gap-1">
                 <button
                   type="button"
                   onClick={() => handleCopyImage(photo.id, photo.public_url)}
-                  className="flex size-7 items-center justify-center rounded-md bg-white/20 text-white backdrop-blur-sm transition-colors hover:bg-white/30"
+                  className="flex size-7 items-center justify-center rounded-lg border border-border bg-popover/95 text-foreground shadow-[var(--surface-shadow)] transition-colors hover:bg-accent"
                   aria-label="Copiar imagem"
                 >
                   {copiedId === photo.id ? (
@@ -140,7 +140,7 @@ export function ClientPhotosPanel({
                   href={photo.public_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex size-7 items-center justify-center rounded-md bg-white/20 text-white backdrop-blur-sm transition-colors hover:bg-white/30"
+                  className="flex size-7 items-center justify-center rounded-lg border border-border bg-popover/95 text-foreground shadow-[var(--surface-shadow)] transition-colors hover:bg-accent"
                   aria-label="Abrir em nova aba"
                 >
                   <ExternalLink className="size-3.5" />

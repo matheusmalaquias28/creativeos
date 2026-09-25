@@ -8,6 +8,7 @@ import {
   approveCreativeBrainAction,
 } from "@/actions/creative-brain";
 import { GenerateBrainButton } from "@/components/creative-brain/generate-brain-button";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { CreativeBrainStatus } from "@/types";
 
@@ -39,29 +40,29 @@ export function BrainActions({
   };
 
   return (
-    <div className="flex flex-wrap gap-3">
-      {status === "draft" && (
-        <Button
-          type="button"
-          onClick={handleApprove}
-          disabled={isPending}
-          className="gap-2"
-        >
-          <Check className="size-4" />
-          Aprovar Brand DNA
-        </Button>
-      )}
+    <div className="flex flex-wrap items-center gap-2">
       {status === "approved" && (
-        <span className="flex items-center gap-2 rounded-lg border border-border/50 bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-          <Check className="size-4 text-foreground/70" />
+        <Badge variant="green" className="h-8 gap-1.5 px-3 text-[0.8125rem]">
+          <Check className="size-3.5" strokeWidth={2.5} />
           Aprovado
-        </span>
+        </Badge>
       )}
       <GenerateBrainButton
         clientId={clientId}
         disabled={!canGenerate}
         label="Reprocessar Creative Brain"
+        variant="outline"
       />
+      {status === "draft" && (
+        <Button
+          type="button"
+          onClick={handleApprove}
+          disabled={isPending}
+        >
+          <Check className="size-4" />
+          Aprovar Brand DNA
+        </Button>
+      )}
     </div>
   );
 }

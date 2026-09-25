@@ -46,6 +46,10 @@ import { SaidaArteNode } from "@/components/flow/nodes/saida-arte-node";
 import { ReferenciaImagemNode } from "@/components/flow/nodes/referencia-imagem-node";
 import { DeletableEdge } from "@/components/flow/edges/deletable-edge";
 import { FlowCanvasContext } from "@/components/flow/flow-canvas-context";
+import { FLOW_NODE_TONE } from "@/components/flow/nodes/node-shell";
+import { Button } from "@/components/ui/button";
+import { tones } from "@/lib/design/tokens";
+import { cn } from "@/lib/utils";
 import { gerarFluxoDaDemanda, gerarSubfluxoDaDemanda, ROW_H } from "@/lib/flow/generator";
 import { IMAGE_GEN_DEFAULTS } from "@/lib/ai/imagegen/defaults";
 import type { FlowGraph, SaidaArteData } from "@/lib/flow/types";
@@ -71,8 +75,37 @@ const edgeTypes: EdgeTypes = {
 const EDGE_DEFAULTS: Partial<Edge> = {
   type: "default",
   animated: false,
-  style: { stroke: "oklch(1 0 0 / 15%)", strokeWidth: 1.5 },
+  style: { stroke: "var(--border-strong)", strokeWidth: 1.5 },
 };
+
+/**
+ * Tema do React Flow via variáveis CSS do próprio xyflow apontando para os
+ * tokens do design system — acompanha claro/escuro sem cores fixas.
+ */
+const FLOW_THEME_VARS = {
+  "--xy-background-color": "var(--background)",
+  "--xy-background-pattern-color": "var(--border-strong)",
+  "--xy-edge-stroke": "var(--border-strong)",
+  "--xy-edge-stroke-selected": "var(--primary)",
+  "--xy-connectionline-stroke": "var(--primary)",
+  "--xy-connectionline-stroke-width": "2",
+  "--xy-handle-background-color": "var(--primary)",
+  "--xy-handle-border-color": "var(--card)",
+  "--xy-selection-background-color": "color-mix(in oklch, var(--primary) 8%, transparent)",
+  "--xy-selection-border": "1px dashed color-mix(in oklch, var(--primary) 60%, transparent)",
+  "--xy-controls-button-background-color": "var(--card)",
+  "--xy-controls-button-background-color-hover": "var(--accent)",
+  "--xy-controls-button-color": "var(--muted-foreground)",
+  "--xy-controls-button-color-hover": "var(--foreground)",
+  "--xy-controls-button-border-color": "var(--border)",
+  "--xy-controls-box-shadow": "var(--surface-shadow-elevated)",
+  "--xy-minimap-background-color": "var(--card)",
+  "--xy-minimap-mask-background-color": "color-mix(in oklch, var(--background) 65%, transparent)",
+  "--xy-minimap-node-background-color": "var(--muted)",
+  "--xy-attribution-background-color": "transparent",
+  "--xy-edge-label-background-color": "var(--popover)",
+  "--xy-edge-label-color": "var(--foreground)",
+} as React.CSSProperties;
 
 function graphToRF(graph: FlowGraph): { nodes: Node[]; edges: Edge[] } {
   return {
@@ -106,13 +139,20 @@ function rfToGraph(nodes: Node[], edges: Edge[]): FlowGraph {
 // ─── Node palette ─────────────────────────────────────────────────────────
 
 const PALETTE_ITEMS = [
-  { type: "clienteLogo", label: "Logo", icon: ImageIcon, color: "text-blue-400 border-blue-500/30 bg-blue-500/10" },
-  { type: "clienteReferencias", label: "Refs", icon: Layers, color: "text-violet-400 border-violet-500/30 bg-violet-500/10" },
-  { type: "promptArte", label: "Prompt", icon: FileText, color: "text-amber-400 border-amber-500/30 bg-amber-500/10" },
-  { type: "gerarImagem", label: "Gerar", icon: Sparkles, color: "text-cyan-400 border-cyan-500/30 bg-cyan-500/10" },
-  { type: "saidaArte", label: "Saída", icon: GitBranch, color: "text-emerald-400 border-emerald-500/30 bg-emerald-500/10" },
-  { type: "referenciaImagem", label: "Imagem", icon: ImageIcon, color: "text-rose-400 border-rose-500/30 bg-rose-500/10" },
+  { type: "clienteLogo", label: "Logo", icon: ImageIcon },
+  { type: "clienteReferencias", label: "Refs", icon: Layers },
+  { type: "promptArte", label: "Prompt", icon: FileText },
+  { type: "gerarImagem", label: "Gerar", icon: Sparkles },
+  { type: "saidaArte", label: "Saída", icon: GitBranch },
+  { type: "referenciaImagem", label: "Imagem", icon: ImageIcon },
 ] as const;
+
+function minimapNodeColor(type: string | undefined): string {
+  if (type && type in FLOW_NODE_TONE) {
+    return tones[FLOW_NODE_TONE[type as keyof typeof FLOW_NODE_TONE]].cssVar;
+  }
+  return "var(--muted-foreground)";
+}
 
 // ─── Inner canvas ─────────────────────────────────────────────────────────
 
@@ -473,57 +513,56 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
   return (
     <div className="flex h-full flex-col">
       {/* Toolbar */}
-      <div className="flex shrink-0 items-center justify-between border-b border-white/6 px-4 py-2">
-        <span className="text-[0.6875rem] text-muted-foreground/40">
-          Drag &amp; drop imagens · clique numa linha para deletar
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-border bg-card px-4 py-2.5 sm:px-6">
+        <span className="hidden text-xs text-muted-foreground md:inline">
+          Arraste imagens para o canvas · clique numa conexão para removê-la
         </span>
-        <div className="flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2">
           {/* Auto-save indicator */}
           <span
-            className={`text-[0.5625rem] text-muted-foreground/40 transition-opacity duration-500 ${
-              saving ? "opacity-100" : autoSavedFlash ? "opacity-80" : "opacity-0"
-            }`}
+            aria-live="polite"
+            className={cn(
+              "inline-flex items-center gap-1 text-[0.6875rem] font-medium transition-opacity duration-500",
+              saving ? "text-muted-foreground" : tones.green.text,
+              saving || autoSavedFlash ? "opacity-100" : "opacity-0"
+            )}
           >
-            {saving ? "salvando…" : "✓ salvo"}
+            {saving ? (
+              <>
+                <Loader2 className="size-3 animate-spin" /> Salvando…
+              </>
+            ) : (
+              <>
+                <Check className="size-3" /> Salvo
+              </>
+            )}
           </span>
 
-          <button onClick={reset} disabled={busy} className="flow-btn">
-            <RotateCcw className="size-3" /> Resetar
-          </button>
-          <button onClick={() => save(false)} disabled={busy} className="flow-btn">
-            {saving ? (
-              <Loader2 className="size-3 animate-spin" />
-            ) : (
-              <Save className="size-3" />
-            )}
+          <Button variant="outline" size="sm" onClick={reset} disabled={busy}>
+            <RotateCcw /> Resetar
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => save(false)} disabled={busy}>
+            {saving ? <Loader2 className="animate-spin" /> : <Save />}
             Salvar
-          </button>
-          <button
-            onClick={execute}
-            disabled={busy}
-            className="flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/12 px-3 py-1.5 text-[0.6875rem] font-medium text-emerald-400 transition-colors hover:border-emerald-500/60 hover:bg-emerald-500/20 disabled:pointer-events-none disabled:opacity-40"
-          >
-            {running ? (
-              <Loader2 className="size-3 animate-spin" />
-            ) : (
-              <Play className="size-3 fill-current" />
-            )}
-            Executar
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
             onClick={pause}
             disabled={!hasActiveJobs}
             title="Cancela as gerações em andamento desta demanda"
-            className="flex items-center gap-1.5 rounded-lg border border-red-500/40 bg-red-500/12 px-3 py-1.5 text-[0.6875rem] font-medium text-red-400 transition-colors hover:border-red-500/60 hover:bg-red-500/20 disabled:pointer-events-none disabled:opacity-40"
           >
-            <Pause className="size-3" />
-            Pausar
-          </button>
+            <Pause /> Pausar
+          </Button>
+          <Button size="sm" onClick={execute} disabled={busy}>
+            {running ? <Loader2 className="animate-spin" /> : <Play className="fill-current" />}
+            Executar
+          </Button>
         </div>
       </div>
 
       {/* Canvas */}
-      <div ref={wrapperRef} className="relative min-h-0 flex-1">
+      <div ref={wrapperRef} className="relative min-h-0 flex-1 bg-background">
         <FlowCanvasContext.Provider value={{ scheduleAutoSave, saveNow }}>
           <ReactFlow
             nodes={nodes}
@@ -540,42 +579,49 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
             minZoom={0.25}
             maxZoom={2}
             deleteKeyCode="Backspace"
-            colorMode="dark"
             defaultEdgeOptions={EDGE_DEFAULTS}
+            style={FLOW_THEME_VARS}
           >
-            <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="oklch(1 0 0 / 5%)" />
-            <Controls className="[&>button]:border-white/8 [&>button]:bg-white/4 [&>button]:text-muted-foreground [&>button:hover]:bg-white/8" />
+            <Background
+              variant={BackgroundVariant.Dots}
+              gap={20}
+              size={1.2}
+              color="var(--border-strong)"
+            />
+            <Controls className="overflow-hidden rounded-xl border border-border [&>button]:size-8 [&>button]:border-border" />
             <MiniMap
-              nodeColor={(n) => {
-                if (n.type === "clienteLogo") return "oklch(0.6 0.18 250)";
-                if (n.type === "clienteReferencias") return "oklch(0.6 0.18 290)";
-                if (n.type === "promptArte") return "oklch(0.7 0.18 85)";
-                if (n.type === "gerarImagem") return "oklch(0.7 0.15 200)";
-                if (n.type === "saidaArte") return "oklch(0.7 0.18 145)";
-                if (n.type === "referenciaImagem") return "oklch(0.65 0.18 10)";
-                return "oklch(0.4 0 0)";
-              }}
-              maskColor="oklch(0.06 0.005 265 / 80%)"
-              className="rounded-xl border border-white/6 bg-card"
+              nodeColor={(n) => minimapNodeColor(n.type)}
+              nodeBorderRadius={6}
+              maskColor="color-mix(in oklch, var(--background) 65%, transparent)"
+              className="overflow-hidden rounded-xl border border-border shadow-[var(--surface-shadow-elevated)]"
             />
           </ReactFlow>
         </FlowCanvasContext.Provider>
 
         {/* Node palette — floating bottom center */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-16 flex justify-center">
-          <div className="pointer-events-auto flex items-center gap-1.5 rounded-xl border border-white/8 bg-[oklch(0.09_0.007_265/90%)] p-1.5 backdrop-blur-md shadow-lg">
-            <span className="pl-1 text-[0.5625rem] uppercase tracking-wider text-muted-foreground/40">
+        <div className="pointer-events-none absolute inset-x-0 bottom-6 z-10 flex justify-center px-4">
+          <div className="pointer-events-auto flex max-w-full items-center gap-1 overflow-x-auto rounded-2xl border border-border bg-popover p-1.5 shadow-[var(--surface-shadow-elevated),var(--inner-highlight)]">
+            <span className="flex shrink-0 items-center gap-1 px-2 text-xs font-semibold text-muted-foreground">
+              <Plus className="size-3.5" />
               Adicionar
             </span>
-            {PALETTE_ITEMS.map(({ type, label, icon: Icon, color }) => (
+            <span aria-hidden className="h-5 w-px shrink-0 bg-border" />
+            {PALETTE_ITEMS.map(({ type, label, icon: Icon }) => (
               <button
                 key={type}
+                type="button"
                 onClick={() => addNode(type)}
-                className={`flex items-center gap-1 rounded-lg border px-2 py-1 text-[0.5625rem] font-medium transition-colors hover:opacity-80 ${color}`}
+                className="flex shrink-0 items-center gap-1.5 rounded-xl px-2 py-1.5 text-xs font-semibold text-muted-foreground transition-premium hover:bg-accent hover:text-foreground"
                 title={`Adicionar nó ${label}`}
               >
-                <Plus className="size-2.5" />
-                <Icon className="size-2.5" strokeWidth={1.5} />
+                <span
+                  className={cn(
+                    "flex size-6 items-center justify-center rounded-lg",
+                    tones[FLOW_NODE_TONE[type]].iconTile
+                  )}
+                >
+                  <Icon className="size-3.5" strokeWidth={2} />
+                </span>
                 {label}
               </button>
             ))}

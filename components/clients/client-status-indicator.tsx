@@ -1,29 +1,34 @@
 import { cn } from "@/lib/utils";
+import { tones, type Tone } from "@/lib/design/tokens";
 import type { ClientStatus } from "@/types";
 
 const statusConfig: Record<
   ClientStatus,
-  { label: string; dotClass: string; title: string }
+  { label: string; dotClass: string; title: string; tone: Tone }
 > = {
   active: {
     label: "Ativo",
     title: "Cliente ativo",
-    dotClass: "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.45)]",
+    tone: "green",
+    dotClass: tones.green.dot,
   },
   onboarding: {
     label: "Onboarding",
     title: "Em processo de onboarding",
-    dotClass: "bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.4)]",
+    tone: "blue",
+    dotClass: tones.blue.dot,
   },
   draft: {
     label: "Falta Materiais",
     title: "Aguardando materiais do cliente",
-    dotClass: "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.4)]",
+    tone: "amber",
+    dotClass: tones.amber.dot,
   },
   archived: {
     label: "Finalizado",
     title: "Contrato encerrado",
-    dotClass: "bg-zinc-400 shadow-[0_0_8px_rgba(161,161,170,0.35)]",
+    tone: "slate",
+    dotClass: tones.slate.dot,
   },
 };
 

@@ -100,7 +100,7 @@ export function ImageGridControls({
   return (
     <div className="space-y-4">
       <label className="flex items-center justify-between gap-2 cursor-pointer">
-        <span className="text-xs font-medium text-foreground">Exibir grade de imagens</span>
+        <span className="text-[0.8125rem] font-semibold text-foreground">Exibir grade de imagens</span>
         <input
           type="checkbox"
           checked={grid.enabled}
@@ -113,7 +113,7 @@ export function ImageGridControls({
         <>
           {/* Layout */}
           <div className="space-y-1.5">
-            <label className="text-[0.625rem] text-muted-foreground/70">Layout</label>
+            <label className="text-xs font-medium text-muted-foreground">Layout</label>
             <div className="grid grid-cols-3 gap-1.5">
               {LAYOUTS.map((l) => (
                 <button
@@ -122,14 +122,14 @@ export function ImageGridControls({
                   className={cn(
                     "flex flex-col items-center gap-1.5 rounded-lg border p-2 transition-colors",
                     grid.layout === l.id
-                      ? "border-primary bg-primary/8 text-primary"
-                      : "border-border text-muted-foreground/50 hover:bg-muted/40"
+                      ? "border-primary/50 bg-primary/12 text-primary"
+                      : "border-border bg-surface text-muted-foreground/60 hover:border-border-strong hover:bg-accent hover:text-muted-foreground"
                   )}
                 >
                   <div className="h-8 w-full">
                     <LayoutDiagram layout={l.id} />
                   </div>
-                  <span className="text-[0.5625rem] font-medium">{l.label}</span>
+                  <span className="text-[0.6875rem] font-semibold">{l.label}</span>
                 </button>
               ))}
             </div>
@@ -137,7 +137,7 @@ export function ImageGridControls({
 
           {/* Slots */}
           <div className="space-y-2">
-            <label className="text-[0.625rem] text-muted-foreground/70">
+            <label className="text-xs font-medium text-muted-foreground">
               Imagens ({slots})
             </label>
             <div className="grid grid-cols-3 gap-2">
@@ -150,8 +150,8 @@ export function ImageGridControls({
                       className={cn(
                         "flex aspect-square cursor-pointer items-center justify-center overflow-hidden rounded-lg border transition-colors",
                         url
-                          ? "border-primary/40"
-                          : "border-dashed border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                          ? "border-border-strong"
+                          : "border-dashed border-border-strong bg-surface text-muted-foreground hover:border-primary/50 hover:bg-primary/5 hover:text-primary"
                       )}
                     >
                       <input
@@ -172,8 +172,9 @@ export function ImageGridControls({
                     {url && (
                       <button
                         onClick={() => setImage(i, null)}
-                        className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full bg-negative text-white shadow"
+                        className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full border border-border bg-popover text-tone-red shadow-[var(--surface-shadow)] transition-colors hover:bg-tone-red/15"
                         title="Remover"
+                        aria-label="Remover imagem"
                       >
                         <X className="size-3" />
                       </button>
@@ -191,7 +192,7 @@ export function ImageGridControls({
                 );
               })}
             </div>
-            <p className="text-[0.5625rem] leading-relaxed text-muted-foreground/50">
+            <p className="text-[0.6875rem] leading-relaxed text-muted-foreground">
               A grade aparece no lado oposto ao texto: texto embaixo → imagens em
               cima, e vice-versa.
             </p>

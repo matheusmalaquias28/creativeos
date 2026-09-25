@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Check } from "lucide-react";
+import { Copy, Check, Ruler, ScanSearch } from "lucide-react";
 import { toast } from "sonner";
 import type { BrandDna } from "@/types";
 import { Button } from "@/components/ui/button";
+import { SectionHeader } from "@/components/layout/section-header";
 import { cn } from "@/lib/utils";
 
 type CoreBrandDnaKey =
@@ -98,7 +99,7 @@ function SectionCard({
         fullWidth && "md:col-span-2"
       )}
     >
-      <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+      <h3 className="text-[0.8125rem] font-semibold text-muted-foreground">
         {title}
       </h3>
       {type === "text" ? (
@@ -111,7 +112,7 @@ function SectionCard({
             value.map((item) => (
               <li
                 key={item}
-                className="rounded-md border border-border/50 bg-muted/30 px-2.5 py-1 text-xs text-foreground/90"
+                className="rounded-lg border border-border bg-muted px-2.5 py-1 text-xs text-foreground/90"
               >
                 {item}
               </li>
@@ -146,19 +147,17 @@ export function BrainViewer({ brandDna }: { brandDna: BrandDna }) {
 
       {hasReferenceInsights && brandDna.referenceInsights && (
         <section className="space-y-4">
-          <div>
-            <h2 className="text-lg font-medium tracking-heading">
-              Análise das referências
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Sinais extraídos das imagens enviadas (usados no Brand DNA)
-            </p>
-          </div>
+          <SectionHeader
+            title="Análise das referências"
+            description="Sinais extraídos das imagens enviadas (usados no Brand DNA)"
+            icon={ScanSearch}
+            tone="cyan"
+          />
           <div className="grid gap-4 md:grid-cols-2">
             {brandDna.referenceInsights.map((insight) => (
               <div key={insight.source} className="surface-panel space-y-3 p-5">
                 <div>
-                  <p className="text-sm font-medium">{insight.source}</p>
+                  <p className="text-sm font-semibold text-foreground">{insight.source}</p>
                   <p className="text-xs text-muted-foreground capitalize">
                     {insight.visualRole}
                   </p>
@@ -167,7 +166,7 @@ export function BrainViewer({ brandDna }: { brandDna: BrandDna }) {
                   {insight.signals.map((signal) => (
                     <li
                       key={signal}
-                      className="rounded-md border border-border/50 bg-muted/30 px-2.5 py-1 text-xs text-foreground/90"
+                      className="rounded-lg border border-border bg-muted px-2.5 py-1 text-xs text-foreground/90"
                     >
                       {signal}
                     </li>
@@ -181,14 +180,12 @@ export function BrainViewer({ brandDna }: { brandDna: BrandDna }) {
 
       {hasProduction && (
         <section className="space-y-4">
-          <div>
-            <h2 className="text-lg font-medium tracking-heading">
-              Regras de produção gráfica
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Espaçamento, respiros, tipografia e hierarquia — referência para toda arte
-            </p>
-          </div>
+          <SectionHeader
+            title="Regras de produção gráfica"
+            description="Espaçamento, respiros, tipografia e hierarquia — referência para toda arte"
+            icon={Ruler}
+            tone="orange"
+          />
           <div className="grid gap-4 md:grid-cols-2">
             {productionSections.map((section) => (
               <SectionCard

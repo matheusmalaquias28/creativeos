@@ -3,10 +3,15 @@
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  AlertTriangle,
   Download,
   Expand,
+  History,
   ImageIcon,
   Loader2,
+  Palette,
+  PenLine,
+  SlidersHorizontal,
   Sparkles,
   Trash2,
   Upload,
@@ -15,6 +20,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { SectionHeader } from "@/components/layout/section-header";
+import { tones, type Tone } from "@/lib/design/tokens";
 import { cn } from "@/lib/utils";
 import {
   loadGeradorImagesAction,
@@ -206,31 +216,85 @@ function AspectRatioIcon({ ratio }: { ratio: string }) {
   );
 }
 
+const chipBase =
+  "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-premium outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-45";
+const chipActive = "border-primary/50 bg-primary/12 text-primary";
+const chipIdle =
+  "border-border bg-surface text-muted-foreground hover:border-border-strong hover:bg-accent hover:text-foreground";
+
 function OptionChip({
   active,
   onClick,
   children,
   className,
+  disabled,
 }: {
   active: boolean;
   onClick: () => void;
   children: React.ReactNode;
   className?: string;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={cn(
-        "rounded-lg border px-2.5 py-1.5 text-xs transition-colors",
-        active
-          ? "border-primary bg-primary/12 text-primary font-medium"
-          : "border-border/50 text-muted-foreground hover:border-border hover:text-foreground dark:border-white/10",
-        className
-      )}
+      disabled={disabled}
+      aria-pressed={active}
+      className={cn(chipBase, active ? chipActive : chipIdle, className)}
     >
       {children}
     </button>
+  );
+}
+
+/** Rótulo de campo — sentence case, com dica opcional à direita. */
+function FieldLabel({
+  children,
+  hint,
+  htmlFor,
+}: {
+  children: React.ReactNode;
+  hint?: React.ReactNode;
+  htmlFor?: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <label htmlFor={htmlFor} className="text-[0.8125rem] font-semibold text-foreground">
+        {children}
+      </label>
+      {hint && <span className="text-[0.6875rem] text-muted-foreground">{hint}</span>}
+    </div>
+  );
+}
+
+/** Bloco do painel de controles (seção com título e divisória). */
+function ControlGroup({
+  title,
+  icon: Icon,
+  tone,
+  children,
+}: {
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+  tone: Tone;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-4 border-b border-border p-5 last:border-b-0">
+      <div className="flex items-center gap-2.5">
+        <span
+          className={cn(
+            "flex size-7 items-center justify-center rounded-lg",
+            tones[tone].iconTile
+          )}
+        >
+          <Icon className="size-3.5" />
+        </span>
+        <h3 className="text-sm font-bold tracking-tight text-foreground">{title}</h3>
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -259,15 +323,16 @@ function ImageDropArea({
 
   if (preview) {
     return (
-      <div className="relative overflow-hidden rounded-xl border border-border/50 dark:border-white/10">
+      <div className="relative overflow-hidden rounded-xl border border-border bg-surface">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={preview} alt={label} className="w-full object-cover max-h-40" />
+        <img src={preview} alt={label} className="max-h-40 w-full object-cover" />
         <button
           type="button"
           onClick={onRemove}
-          className="absolute right-2 top-2 flex size-6 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
+          aria-label="Remover imagem"
+          className="absolute top-2 right-2 flex size-7 items-center justify-center rounded-lg border border-border bg-popover/90 text-foreground shadow-[var(--surface-shadow)] transition-colors hover:bg-accent"
         >
-          <X className="size-3" />
+          <X className="size-3.5" />
         </button>
       </div>
     );
@@ -280,16 +345,20 @@ function ImageDropArea({
         disabled={disabled}
         onClick={() => inputRef.current?.click()}
         className={cn(
-          "flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border/60 bg-muted/20 py-5 text-center transition-colors dark:border-white/10",
-          "hover:border-primary/40 hover:bg-primary/[0.03]",
-          disabled && "opacity-50 pointer-events-none"
+          "group flex w-full items-center gap-3 rounded-xl border border-dashed border-border-strong bg-surface px-3.5 py-3 text-left transition-premium outline-none",
+          "hover:border-primary/50 hover:bg-primary/5 focus-visible:ring-2 focus-visible:ring-ring/50",
+          disabled && "pointer-events-none opacity-50"
         )}
       >
-        <Upload className="size-4 text-muted-foreground/60" />
-        <div>
-          <p className="text-xs font-medium text-muted-foreground">{label}</p>
-          {sublabel && <p className="text-[0.6rem] text-muted-foreground/50 mt-0.5">{sublabel}</p>}
-        </div>
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors group-hover:bg-primary/12 group-hover:text-primary">
+          <Upload className="size-4" />
+        </span>
+        <span className="min-w-0">
+          <span className="block text-[0.8125rem] font-semibold text-foreground">{label}</span>
+          {sublabel && (
+            <span className="mt-0.5 block text-[0.6875rem] text-muted-foreground">{sublabel}</span>
+          )}
+        </span>
       </button>
       <input
         ref={inputRef}
@@ -306,60 +375,47 @@ function GeneratingCard({ aspectRatio }: { aspectRatio: string }) {
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-xl bg-gradient-to-br from-card to-muted/50",
+        "relative overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--surface-shadow)]",
         getAspectClass(aspectRatio)
       )}
       style={{ maxHeight: aspectRatio === "9:16" ? 400 : undefined }}
     >
-      {/* Animated gradient layers */}
-      <div className="absolute inset-0 bg-gradient-to-tr from-primary/8 via-transparent to-purple-500/8 animate-pulse" style={{ animationDuration: "3s" }} />
-      <div className="absolute inset-0 bg-gradient-to-bl from-transparent via-primary/5 to-transparent animate-pulse" style={{ animationDuration: "2s", animationDelay: "1s" }} />
+      {/* Leve pulso do tom de geração (IA) */}
+      <div
+        className="absolute inset-0 animate-pulse bg-gradient-to-tr from-primary/8 via-transparent to-tone-pink/8"
+        style={{ animationDuration: "3s" }}
+      />
 
       {/* Shimmer sweep */}
       <div className="absolute inset-0 overflow-hidden">
         <div
-          className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/8 to-transparent"
+          className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-foreground/5 to-transparent"
           style={{
             animation: "shimmer-sweep 2.2s ease-in-out infinite",
           }}
         />
       </div>
 
-      {/* Border ring pulse */}
-      <div className="absolute inset-0 rounded-xl ring-1 ring-primary/20 animate-pulse" />
-
       {/* Center content */}
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-        {/* Spinning ring + icon */}
-        <div className="relative size-14">
+        <div className="relative size-12">
           <div className="absolute inset-0 rounded-full border-2 border-primary/15" />
           <div
-            className="absolute inset-0 rounded-full border-2 border-transparent border-t-primary/70"
+            className="absolute inset-0 rounded-full border-2 border-transparent border-t-primary"
             style={{ animation: "spin 1.4s linear infinite" }}
           />
           <div className="absolute inset-0 flex items-center justify-center">
-            <Sparkles className="size-5 text-primary/60 animate-pulse" />
+            <Sparkles className="size-4 animate-pulse text-primary" />
           </div>
         </div>
-
-        {/* Bouncing dots */}
-        <div className="flex gap-1.5">
-          {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className="size-1.5 rounded-full bg-primary/40 animate-bounce"
-              style={{ animationDelay: `${i * 0.15}s`, animationDuration: "0.9s" }}
-            />
-          ))}
-        </div>
-
-        <p className="text-[0.6rem] font-medium tracking-wide text-muted-foreground/60 uppercase">
-          Gerando
-        </p>
+        <p className="text-xs font-semibold text-muted-foreground">Gerando…</p>
       </div>
     </div>
   );
 }
+
+const overlayButton =
+  "flex size-8 items-center justify-center rounded-lg border border-border bg-popover/90 text-foreground shadow-[var(--surface-shadow)] transition-colors hover:bg-accent";
 
 function ResultCard({
   result,
@@ -396,35 +452,30 @@ function ResultCard({
   return (
     <div
       className={cn(
-        "group relative overflow-hidden rounded-xl border border-border/50 bg-muted/10 dark:border-white/8",
+        "group relative overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--surface-shadow)] transition-premium hover:border-border-strong hover:shadow-[var(--surface-shadow-hover)]",
         getAspectClass(result.aspectRatio),
-        deleting && "opacity-50 pointer-events-none"
+        deleting && "pointer-events-none opacity-50"
       )}
       style={{ maxHeight: result.aspectRatio === "9:16" ? 400 : undefined }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={result.url} alt="Imagem gerada" className="h-full w-full object-cover" />
 
-      {/* Overlay */}
-      <div className="absolute inset-0 flex flex-col items-end justify-start gap-1.5 bg-gradient-to-b from-black/50 to-transparent p-2.5 opacity-0 transition-opacity group-hover:opacity-100">
+      {/* Overlay (scrim para legibilidade sobre a foto) */}
+      <div className="absolute inset-0 flex flex-col items-end justify-start gap-1.5 bg-gradient-to-b from-background/60 to-transparent p-2.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
         <div className="flex gap-1.5">
-          <button
-            onClick={onFullscreen}
-            className="flex size-7 items-center justify-center rounded-lg bg-black/60 text-white backdrop-blur-sm hover:bg-black/80"
-          >
+          <button onClick={onFullscreen} aria-label="Ver em tela cheia" className={overlayButton}>
             <Expand className="size-3.5" />
           </button>
-          <button
-            onClick={handleDownload}
-            className="flex size-7 items-center justify-center rounded-lg bg-black/60 text-white backdrop-blur-sm hover:bg-black/80"
-          >
+          <button onClick={handleDownload} aria-label="Baixar imagem" className={overlayButton}>
             <Download className="size-3.5" />
           </button>
           {result.id && (
             <button
               onClick={handleDelete}
               disabled={deleting}
-              className="flex size-7 items-center justify-center rounded-lg bg-red-600/70 text-white backdrop-blur-sm hover:bg-red-600/90"
+              aria-label="Excluir imagem"
+              className="flex size-8 items-center justify-center rounded-lg border border-tone-red/25 bg-popover/90 text-tone-red shadow-[var(--surface-shadow)] transition-colors hover:bg-tone-red/15"
             >
               {deleting ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
             </button>
@@ -454,22 +505,27 @@ function FullscreenViewer({ url, onClose }: { url: string; onClose: () => void }
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/92 backdrop-blur-sm p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Imagem em tela cheia"
+      className="animate-in-soft fixed inset-0 z-[9999] flex items-center justify-center bg-background/95 p-4 backdrop-blur-xl"
+    >
       <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 flex max-h-[95vh] max-w-[95vw] flex-col items-center gap-3">
+      <div className="relative z-10 flex max-h-[95vh] max-w-[95vw] flex-col items-center gap-4">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={url}
           alt="Imagem em tela cheia"
-          className="max-h-[85vh] max-w-full rounded-xl object-contain shadow-2xl"
+          className="max-h-[85vh] max-w-full rounded-2xl object-contain shadow-[var(--surface-shadow-elevated)] ring-1 ring-border"
         />
         <div className="flex gap-2">
-          <Button size="sm" variant="secondary" onClick={handleDownload} className="gap-1.5 bg-white/10 hover:bg-white/20 text-white border-white/20">
-            <Download className="size-3.5" />
+          <Button size="sm" variant="outline" onClick={handleDownload}>
+            <Download />
             Baixar
           </Button>
-          <Button size="sm" variant="secondary" onClick={onClose} className="gap-1.5 bg-white/10 hover:bg-white/20 text-white border-white/20">
-            <X className="size-3.5" />
+          <Button size="sm" variant="ghost" onClick={onClose}>
+            <X />
             Fechar
           </Button>
         </div>
@@ -758,297 +814,330 @@ export function ImageGenerator() {
   // ---------------------------------------------------------------------------
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[420px_1fr]">
-      {/* ── LEFT: Controls ── */}
-      <div className="space-y-5">
+    <div className="grid items-start gap-6 lg:grid-cols-[400px_minmax(0,1fr)]">
+      {/* ── LEFT: Controls panel ── */}
+      <div className="surface-panel overflow-hidden">
         {/* Prompt */}
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">Prompt</label>
-          <textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Descreva a cena, ambiente, personagem e estilo que deseja gerar..."
-            rows={5}
-            maxLength={3000}
-            disabled={isGenerating}
-            className={cn(
-              "w-full resize-none rounded-xl border border-border/60 bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/40",
-              "focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50",
-              "transition-colors dark:border-white/10 dark:bg-white/[0.03]",
-              isGenerating && "opacity-60"
-            )}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleGenerate();
-            }}
-          />
-          <p className="text-right text-[0.6rem] text-muted-foreground/40">{prompt.length}/3000</p>
-        </div>
-
-        {/* Character */}
-        <div className="space-y-2">
-          <label className="text-xs font-medium text-muted-foreground">Personagem</label>
-          <ImageDropArea
-            label="Enviar foto do personagem"
-            sublabel="PNG, JPG ou WebP"
-            preview={characterPreview}
-            onFile={handleCharacterFile}
-            onRemove={handleRemoveCharacter}
-            disabled={isGenerating}
-          />
-          {characterPreview && (
-            <div className="flex gap-1.5">
-              <span className="flex items-center text-[0.6rem] text-muted-foreground/60 mr-1">Sexo:</span>
-              {(["male", "female"] as const).map((g) => (
-                <OptionChip
-                  key={g}
-                  active={characterGender === g}
-                  onClick={() => setCharacterGender((prev) => (prev === g ? null : g))}
-                >
-                  {g === "male" ? "Masculino" : "Feminino"}
-                </OptionChip>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Reference */}
-        <div className="space-y-2">
-          <label className="text-xs font-medium text-muted-foreground">Referência visual</label>
-          <ImageDropArea
-            label="Enviar imagem de referência"
-            sublabel="A IA extrai a composição, cores e estilo"
-            preview={referencePreview}
-            onFile={handleReferenceFile}
-            onRemove={handleRemoveReference}
-            disabled={isGenerating}
-          />
-
-          {referencePreview && (
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2">
-                <span className="text-[0.6rem] font-semibold uppercase tracking-widest text-muted-foreground/50">
-                  DNA extraído
-                </span>
-                {isDnaExtracting && <Loader2 className="size-3 animate-spin text-primary" />}
-              </div>
-              {isDnaExtracting ? (
-                <div className="rounded-lg border border-dashed border-border/40 px-3 py-2 text-xs text-muted-foreground animate-pulse">
-                  Analisando composição e estilo...
-                </div>
-              ) : (
-                <textarea
-                  value={referenceDna}
-                  onChange={(e) => setReferenceDna(e.target.value)}
-                  rows={3}
-                  placeholder="DNA visual (editável)"
-                  className="w-full resize-none rounded-lg border border-border/40 bg-muted/20 px-2.5 py-2 text-xs text-foreground/80 placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/30 dark:border-white/8"
-                />
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Format */}
-        <div className="space-y-2">
-          <label className="text-xs font-medium text-muted-foreground">Formato</label>
-          <div className="flex flex-wrap gap-1.5">
-            {ASPECT_RATIOS.map((ar) => (
-              <button
-                key={ar.value}
-                type="button"
-                disabled={isGenerating}
-                onClick={() => setAspectRatio(ar.value)}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-colors",
-                  aspectRatio === ar.value
-                    ? "border-primary bg-primary/12 text-primary"
-                    : "border-border/50 text-muted-foreground hover:border-border hover:text-foreground dark:border-white/10"
-                )}
-              >
-                <AspectRatioIcon ratio={ar.value} />
-                <span className="font-medium">{ar.label}</span>
-                <span className="opacity-50">{ar.hint}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Shot type */}
-        <div className="space-y-2">
-          <label className="text-xs font-medium text-muted-foreground">Plano</label>
-          <div className="flex flex-wrap gap-1.5">
-            {SHOT_TYPES.map((s) => (
-              <OptionChip key={s.value} active={shotType === s.value} onClick={() => setShotType(s.value)}>
-                {s.label}
-              </OptionChip>
-            ))}
-          </div>
-        </div>
-
-        {/* Lighting */}
-        <div className="space-y-2">
-          <label className="text-xs font-medium text-muted-foreground">Iluminação</label>
-          <div className="flex flex-wrap gap-1.5">
-            {LIGHTING_OPTIONS.map((l) => (
-              <OptionChip key={l.value} active={lighting === l.value} onClick={() => setLighting(l.value)}>
-                {l.label}
-              </OptionChip>
-            ))}
-          </div>
-        </div>
-
-        {/* Color mood */}
-        <div className="space-y-2">
-          <label className="text-xs font-medium text-muted-foreground">Cor / Mood</label>
-          <div className="flex flex-wrap gap-1.5">
-            {COLOR_MOODS.map((c) => (
-              <button
-                key={c.value}
-                type="button"
-                onClick={() => setColorMood(c.value)}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-colors",
-                  colorMood === c.value
-                    ? "border-primary bg-primary/12 text-primary"
-                    : "border-border/50 text-muted-foreground hover:border-border hover:text-foreground dark:border-white/10"
-                )}
-              >
-                <span
-                  className="size-2.5 rounded-full border border-white/20 shrink-0"
-                  style={{ backgroundColor: c.swatch }}
-                />
-                {c.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Resolution + Image count */}
-        <div className="flex flex-wrap gap-5">
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground">Resolução</label>
-            <div className="flex gap-1.5">
-              {(["1K", "2K", "4K"] as const).map((r) => (
-                <OptionChip key={r} active={resolution === r} onClick={() => setResolution(r)}>
-                  {r}
-                </OptionChip>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground">Quantidade</label>
-            <div className="flex gap-1.5">
-              {IMAGE_COUNTS.map((n) => (
-                <OptionChip key={n} active={imageCount === n} onClick={() => setImageCount(n)}>
-                  {n}
-                </OptionChip>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {globalError && (
-          <p className="rounded-lg border border-negative/30 bg-negative/10 px-3 py-2 text-sm text-negative">
-            {globalError}
-          </p>
-        )}
-
-        <Button
-          onClick={handleGenerate}
-          disabled={!prompt.trim() || isGenerating || isDnaExtracting}
-          className="w-full gap-2"
-          size="lg"
-        >
-          {isGenerating ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <Wand2 className="size-4" />
-          )}
-          {isGenerating
-            ? "Gerando..."
-            : `Gerar ${imageCount > 1 ? `${imageCount} imagens` : "imagem"}`}
-        </Button>
-        <p className="text-center text-[0.6rem] text-muted-foreground/40">Ctrl+Enter para gerar</p>
-      </div>
-
-      {/* ── RIGHT: Results ── */}
-      <div className="space-y-4">
-        {tasks.length > 0 && (
-          <div
-            className={cn(
-              "grid gap-3",
-              tasks.length === 1 ? "grid-cols-1 max-w-sm" : "grid-cols-2"
-            )}
-          >
-            {tasks.map((task) => {
-              if (task.status === "completed" && task.imageUrl) {
-                const matchedResult = results.find((r) => r.url === task.imageUrl);
-                return (
-                  <ResultCard
-                    key={task.localId}
-                    result={matchedResult ?? { id: null, url: task.imageUrl, aspectRatio, resolution, prompt }}
-                    onFullscreen={() => setFullscreenUrl(task.imageUrl)}
-                    onDelete={() => setResults((prev) => prev.filter((r) => r.url !== task.imageUrl))}
-                  />
-                );
-              }
-              if (task.status === "failed") {
-                return (
-                  <div
-                    key={task.localId}
-                    className={cn(
-                      "flex items-center justify-center rounded-xl border border-negative/30 bg-negative/5 text-xs text-negative",
-                      getAspectClass(aspectRatio)
-                    )}
-                    style={{ maxHeight: aspectRatio === "9:16" ? 400 : undefined }}
-                  >
-                    {task.error ?? "Falhou"}
-                  </div>
-                );
-              }
-              return <GeneratingCard key={task.localId} aspectRatio={aspectRatio} />;
-            })}
-          </div>
-        )}
-
-        {/* History */}
-        {(results.length > 0 || loadingHistory) && (
-          <div>
-            <p className="mb-3 text-xs text-muted-foreground/60">
-              {loadingHistory
-                ? "Carregando histórico..."
-                : `${results.length} imagem${results.length !== 1 ? "ns" : ""} salva${results.length !== 1 ? "s" : ""}`}
+        <ControlGroup title="Descreva a imagem" icon={PenLine} tone="violet">
+          <div className="space-y-1.5">
+            <Textarea
+              id="gerador-prompt"
+              aria-label="Prompt"
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="Descreva a cena, ambiente, personagem e estilo que deseja gerar..."
+              rows={5}
+              maxLength={3000}
+              disabled={isGenerating}
+              className="min-h-[120px] resize-none"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleGenerate();
+              }}
+            />
+            <p className="text-right text-[0.6875rem] tabular-nums text-muted-foreground">
+              {prompt.length}/3000
             </p>
-            {loadingHistory ? (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground/50">
-                <Loader2 className="size-3 animate-spin" />
-                Carregando...
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {results.map((r) => (
-                  <ResultCard
-                    key={r.url}
-                    result={r}
-                    onFullscreen={() => setFullscreenUrl(r.url)}
-                    onDelete={() => setResults((prev) => prev.filter((img) => img.url !== r.url))}
-                  />
+          </div>
+        </ControlGroup>
+
+        {/* References */}
+        <ControlGroup title="Referências" icon={ImageIcon} tone="cyan">
+          <div className="space-y-2">
+            <FieldLabel hint="Opcional">Personagem</FieldLabel>
+            <ImageDropArea
+              label="Enviar foto do personagem"
+              sublabel="PNG, JPG ou WebP"
+              preview={characterPreview}
+              onFile={handleCharacterFile}
+              onRemove={handleRemoveCharacter}
+              disabled={isGenerating}
+            />
+            {characterPreview && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="mr-1 text-xs text-muted-foreground">Sexo</span>
+                {(["male", "female"] as const).map((g) => (
+                  <OptionChip
+                    key={g}
+                    active={characterGender === g}
+                    onClick={() => setCharacterGender((prev) => (prev === g ? null : g))}
+                  >
+                    {g === "male" ? "Masculino" : "Feminino"}
+                  </OptionChip>
                 ))}
               </div>
             )}
           </div>
-        )}
 
-        {tasks.length === 0 && results.length === 0 && !loadingHistory && (
-          <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border/40 py-20 text-center dark:border-white/8">
-            <ImageIcon className="size-8 text-muted-foreground/20" strokeWidth={1.25} />
-            <div>
-              <p className="text-sm text-muted-foreground/60">Configure e clique em Gerar</p>
-              <p className="mt-0.5 text-xs text-muted-foreground/40">As imagens aparecerão aqui</p>
+          <div className="space-y-2">
+            <FieldLabel hint="Opcional">Referência visual</FieldLabel>
+            <ImageDropArea
+              label="Enviar imagem de referência"
+              sublabel="A IA extrai a composição, cores e estilo"
+              preview={referencePreview}
+              onFile={handleReferenceFile}
+              onRemove={handleRemoveReference}
+              disabled={isGenerating}
+            />
+
+            {referencePreview && (
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-muted-foreground">DNA extraído</span>
+                  {isDnaExtracting && <Loader2 className="size-3 animate-spin text-primary" />}
+                </div>
+                {isDnaExtracting ? (
+                  <div className="animate-pulse rounded-xl border border-dashed border-border-strong bg-surface px-3 py-2 text-xs text-muted-foreground">
+                    Analisando composição e estilo...
+                  </div>
+                ) : (
+                  <Textarea
+                    value={referenceDna}
+                    onChange={(e) => setReferenceDna(e.target.value)}
+                    rows={3}
+                    placeholder="DNA visual (editável)"
+                    aria-label="DNA visual"
+                    className="min-h-0 resize-none px-3 py-2 text-xs"
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        </ControlGroup>
+
+        {/* Style */}
+        <ControlGroup title="Estilo" icon={Palette} tone="pink">
+          <div className="space-y-2">
+            <FieldLabel>Plano</FieldLabel>
+            <div className="flex flex-wrap gap-1.5">
+              {SHOT_TYPES.map((s) => (
+                <OptionChip key={s.value} active={shotType === s.value} onClick={() => setShotType(s.value)}>
+                  {s.label}
+                </OptionChip>
+              ))}
             </div>
           </div>
-        )}
+
+          <div className="space-y-2">
+            <FieldLabel>Iluminação</FieldLabel>
+            <div className="flex flex-wrap gap-1.5">
+              {LIGHTING_OPTIONS.map((l) => (
+                <OptionChip key={l.value} active={lighting === l.value} onClick={() => setLighting(l.value)}>
+                  {l.label}
+                </OptionChip>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <FieldLabel>Cor e mood</FieldLabel>
+            <div className="flex flex-wrap gap-1.5">
+              {COLOR_MOODS.map((c) => (
+                <OptionChip
+                  key={c.value}
+                  active={colorMood === c.value}
+                  onClick={() => setColorMood(c.value)}
+                >
+                  {/* Swatch = prévia do mood (valor de conteúdo, não cor de interface) */}
+                  <span
+                    className="size-2.5 shrink-0 rounded-full ring-1 ring-border-strong"
+                    style={{ backgroundColor: c.swatch }}
+                  />
+                  {c.label}
+                </OptionChip>
+              ))}
+            </div>
+          </div>
+        </ControlGroup>
+
+        {/* Output */}
+        <ControlGroup title="Saída" icon={SlidersHorizontal} tone="slate">
+          <div className="space-y-2">
+            <FieldLabel>Formato</FieldLabel>
+            <div className="flex flex-wrap gap-1.5">
+              {ASPECT_RATIOS.map((ar) => (
+                <OptionChip
+                  key={ar.value}
+                  disabled={isGenerating}
+                  active={aspectRatio === ar.value}
+                  onClick={() => setAspectRatio(ar.value)}
+                >
+                  <AspectRatioIcon ratio={ar.value} />
+                  <span>{ar.label}</span>
+                  <span className="font-medium opacity-60">{ar.hint}</span>
+                </OptionChip>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-5">
+            <div className="space-y-2">
+              <FieldLabel>Resolução</FieldLabel>
+              <div className="flex gap-1.5">
+                {(["1K", "2K", "4K"] as const).map((r) => (
+                  <OptionChip key={r} active={resolution === r} onClick={() => setResolution(r)}>
+                    {r}
+                  </OptionChip>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <FieldLabel>Quantidade</FieldLabel>
+              <div className="flex gap-1.5">
+                {IMAGE_COUNTS.map((n) => (
+                  <OptionChip
+                    key={n}
+                    active={imageCount === n}
+                    onClick={() => setImageCount(n)}
+                    className="min-w-8 justify-center tabular-nums"
+                  >
+                    {n}
+                  </OptionChip>
+                ))}
+              </div>
+            </div>
+          </div>
+        </ControlGroup>
+
+        {/* Generate */}
+        <div className="space-y-2.5 border-t border-border bg-surface/60 p-5">
+          {globalError && (
+            <p className="rounded-xl border border-tone-red/25 bg-tone-red/12 px-3 py-2 text-sm text-tone-red">
+              {globalError}
+            </p>
+          )}
+
+          <Button
+            onClick={handleGenerate}
+            disabled={!prompt.trim() || isGenerating || isDnaExtracting}
+            className="w-full"
+            size="lg"
+          >
+            {isGenerating ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Wand2 className="size-4" />
+            )}
+            {isGenerating
+              ? "Gerando..."
+              : `Gerar ${imageCount > 1 ? `${imageCount} imagens` : "imagem"}`}
+          </Button>
+          <p className="text-center text-[0.6875rem] text-muted-foreground">
+            <kbd className="rounded-md border border-border bg-muted px-1.5 py-0.5 font-sans text-[0.625rem] font-semibold text-foreground">
+              Ctrl
+            </kbd>{" "}
+            +{" "}
+            <kbd className="rounded-md border border-border bg-muted px-1.5 py-0.5 font-sans text-[0.625rem] font-semibold text-foreground">
+              Enter
+            </kbd>{" "}
+            para gerar
+          </p>
+        </div>
+      </div>
+
+      {/* ── RIGHT: Result canvas ── */}
+      <div className="relative min-h-[32rem] overflow-hidden rounded-2xl border border-border bg-surface">
+        <div
+          aria-hidden
+          className="bg-dot-grid pointer-events-none absolute inset-0 opacity-70"
+        />
+
+        <div className="relative space-y-8 p-4 sm:p-6">
+          {tasks.length > 0 && (
+            <section className="space-y-4">
+              <SectionHeader
+                icon={Sparkles}
+                tone="pink"
+                title="Geração atual"
+                description={
+                  isGenerating
+                    ? `Gerando ${tasks.length} ${tasks.length > 1 ? "imagens" : "imagem"}…`
+                    : `${tasks.length} ${tasks.length > 1 ? "imagens" : "imagem"} · ${aspectRatio}`
+                }
+              />
+              <div
+                className={cn(
+                  "grid gap-4",
+                  tasks.length === 1 ? "max-w-sm grid-cols-1" : "grid-cols-2"
+                )}
+              >
+                {tasks.map((task) => {
+                  if (task.status === "completed" && task.imageUrl) {
+                    const matchedResult = results.find((r) => r.url === task.imageUrl);
+                    return (
+                      <ResultCard
+                        key={task.localId}
+                        result={matchedResult ?? { id: null, url: task.imageUrl, aspectRatio, resolution, prompt }}
+                        onFullscreen={() => setFullscreenUrl(task.imageUrl)}
+                        onDelete={() => setResults((prev) => prev.filter((r) => r.url !== task.imageUrl))}
+                      />
+                    );
+                  }
+                  if (task.status === "failed") {
+                    return (
+                      <div
+                        key={task.localId}
+                        className={cn(
+                          "flex flex-col items-center justify-center gap-2 rounded-2xl border border-tone-red/25 bg-tone-red/8 p-4 text-center text-xs font-medium text-tone-red",
+                          getAspectClass(aspectRatio)
+                        )}
+                        style={{ maxHeight: aspectRatio === "9:16" ? 400 : undefined }}
+                      >
+                        <AlertTriangle className="size-4" />
+                        {task.error ?? "Falhou"}
+                      </div>
+                    );
+                  }
+                  return <GeneratingCard key={task.localId} aspectRatio={aspectRatio} />;
+                })}
+              </div>
+            </section>
+          )}
+
+          {/* History */}
+          {(results.length > 0 || loadingHistory) && (
+            <section className="space-y-4">
+              <SectionHeader
+                icon={History}
+                tone="violet"
+                title="Histórico"
+                description={
+                  loadingHistory
+                    ? "Carregando histórico..."
+                    : `${results.length} imagem${results.length !== 1 ? "ns" : ""} salva${results.length !== 1 ? "s" : ""}`
+                }
+              />
+              {loadingHistory ? (
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                  {[0, 1, 2].map((i) => (
+                    <Skeleton key={i} className="aspect-[4/5] rounded-2xl" />
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 2xl:grid-cols-4">
+                  {results.map((r) => (
+                    <ResultCard
+                      key={r.url}
+                      result={r}
+                      onFullscreen={() => setFullscreenUrl(r.url)}
+                      onDelete={() => setResults((prev) => prev.filter((img) => img.url !== r.url))}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
+          {tasks.length === 0 && results.length === 0 && !loadingHistory && (
+            <EmptyState
+              icon={Wand2}
+              tone="pink"
+              title="Configure e clique em Gerar"
+              description="Escreva um prompt no painel ao lado. As imagens geradas aparecem aqui e ficam salvas no histórico."
+              className="min-h-[28rem] border-0 bg-transparent"
+            />
+          )}
+        </div>
       </div>
 
       {/* Fullscreen viewer */}

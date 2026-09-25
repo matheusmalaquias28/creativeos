@@ -24,19 +24,19 @@ export function GenerationProgress({ counts, label }: Props) {
   const pct = Math.round((done / total) * 100);
 
   return (
-    <div className="space-y-2 rounded-xl border border-border/60 bg-muted/40 p-4 dark:border-white/6 dark:bg-white/3">
+    <div className="surface-panel space-y-2.5 p-4">
       <div className="flex items-center justify-between gap-3 text-sm">
-        <span className="flex items-center gap-2 text-foreground">
-          <Loader2 className="size-4 animate-spin text-muted-foreground" />
+        <span className="flex items-center gap-2 font-semibold text-foreground">
+          <Loader2 className="size-4 animate-spin text-tone-blue" />
           {label}
         </span>
-        <span className="font-mono text-xs text-muted-foreground">
+        <span className="text-xs font-semibold tabular-nums text-muted-foreground">
           {done}/{total}
-          {failed > 0 && <span className="ml-2 text-negative">{failed} falhou</span>}
+          {failed > 0 && <span className="ml-2 text-tone-red">{failed} falhou</span>}
         </span>
       </div>
 
-      <div className="h-1.5 overflow-hidden rounded-full bg-border/60 dark:bg-white/8">
+      <div className="h-1.5 overflow-hidden rounded-full bg-muted">
         <div
           className={cn(
             "h-full rounded-full bg-primary transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",

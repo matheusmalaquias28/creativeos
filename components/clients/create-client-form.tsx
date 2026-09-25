@@ -6,10 +6,18 @@ import { toast } from "sonner";
 import { createClientAction, type ClientActionState } from "@/actions/clients";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 
 const initialState: ClientActionState = {};
 
-export function CreateClientForm() {
+type CreateClientFormProps = {
+  /** "inline": campo e botão lado a lado; "stacked": empilhado (dialogs). */
+  layout?: "inline" | "stacked";
+  autoFocus?: boolean;
+};
+
+export function CreateClientForm({ layout = "inline", autoFocus }: CreateClientFormProps) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(
     createClientAction,
@@ -27,24 +35,30 @@ export function CreateClientForm() {
   }, [state, router]);
 
   return (
-    <form action={formAction} className="flex flex-col gap-4 sm:flex-row sm:items-end">
+    <form
+      action={formAction}
+      className={cn(
+        "flex flex-col gap-4",
+        layout === "inline" && "sm:flex-row sm:items-end"
+      )}
+    >
       <div className="flex-1 space-y-2">
-        <label
-          htmlFor="client-name"
-          className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
-        >
-          Nome do cliente
-        </label>
+        <Label htmlFor="client-name">Nome do cliente</Label>
         <Input
           id="client-name"
           name="name"
           placeholder="Marca ou cliente"
           required
+          autoFocus={autoFocus}
           className="h-11"
         />
       </div>
-      <Button type="submit" disabled={pending} className="shrink-0 sm:h-11">
-        {pending ? "Criando..." : "Novo cliente"}
+      <Button
+        type="submit"
+        disabled={pending}
+        className={cn("shrink-0", layout === "inline" ? "sm:h-11" : "h-11 w-full")}
+      >
+        {pending ? "Criando..." : "Criar cliente"}
       </Button>
     </form>
   );

@@ -5,20 +5,39 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import {
-  ArrowLeft,
+  CaseSensitive,
+  Check,
   Copy,
   Download,
+  Image as ImageIcon,
+  LayoutGrid,
+  LayoutTemplate,
   Loader2,
+  MousePointerClick,
+  Palette,
   Plus,
   Save,
   Sparkles,
+  Stamp,
   Trash2,
+  Type,
   ImagePlus,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import {
   SlidePreview,
@@ -30,6 +49,7 @@ import {
   RangeControl,
   ModernColorPicker,
   FontPicker,
+  controlLabelClass,
 } from "@/components/carousel/controls/pickers";
 import { RichTextField } from "@/components/carousel/rich-text-field";
 import { CtaControls } from "@/components/carousel/controls/cta-controls";
@@ -176,7 +196,7 @@ function ViaImagemExtractor({
     <div className="space-y-3">
       <label className={cn(
         "flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed py-3",
-        "border-border text-xs text-muted-foreground transition-colors",
+        "border-border-strong bg-surface text-xs font-semibold text-muted-foreground transition-colors",
         "hover:border-primary/50 hover:bg-primary/5 hover:text-foreground"
       )}>
         <input type="file" accept="image/*" className="sr-only" onChange={handleFile} />
@@ -190,7 +210,7 @@ function ViaImagemExtractor({
 
       {colors.length > 0 && (
         <div className="space-y-2">
-          <p className="text-[0.625rem] text-muted-foreground/60 uppercase tracking-widest">
+          <p className="text-xs font-medium text-muted-foreground">
             Cores extraídas — clique para aplicar
           </p>
           <div className="flex flex-wrap gap-1.5">
@@ -199,14 +219,14 @@ function ViaImagemExtractor({
                 <button
                   onClick={() => onApply(c, c, c)}
                   title={`Aplicar ${c}`}
-                  className="size-8 rounded-lg border-2 border-white/10 shadow-sm transition-transform hover:scale-110"
+                  className="size-8 rounded-lg border-2 border-border-strong shadow-[var(--surface-shadow)] transition-transform hover:scale-110"
                   style={{ backgroundColor: c }}
                 />
-                <span className="text-[0.5rem] font-mono text-muted-foreground/50">{c}</span>
+                <span className="font-mono text-[0.625rem] text-muted-foreground">{c}</span>
               </div>
             ))}
           </div>
-          <p className="text-[0.5625rem] text-muted-foreground/50 leading-relaxed">
+          <p className="text-[0.6875rem] leading-relaxed text-muted-foreground">
             As cores mais escura, clara e média foram aplicadas automaticamente como Fundo, Título e Subtítulo.
           </p>
         </div>
@@ -592,57 +612,89 @@ export function CarouselEditor({
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
+  const slideBadge = (
+    <Badge variant="outline" className="shrink-0 tabular-nums">
+      Slide {currentIdx + 1}
+    </Badge>
+  );
+  const applyAllClass =
+    "text-[0.6875rem] font-semibold text-muted-foreground transition-colors hover:text-primary";
+
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
 
       {/* ── Header bar ── */}
-      <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border/50 bg-sidebar px-4 dark:border-white/7 dark:bg-sidebar">
+      <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border bg-sidebar px-4">
         {/* Left */}
-        <div className="flex items-center gap-3 min-w-0">
-          <Link href="/carousel" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0">
-            <ArrowLeft className="size-3.5" />
+        <div className="flex min-w-0 items-center gap-2">
+          <Link
+            href="/carousel"
+            className="group inline-flex h-8 shrink-0 items-center gap-1 rounded-lg px-2 text-[0.8125rem] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <ChevronLeft className="size-4 transition-transform group-hover:-translate-x-0.5" />
             Carrosséis
           </Link>
-          <span className="text-muted-foreground/30 shrink-0">|</span>
+          <span aria-hidden className="h-5 w-px shrink-0 bg-border" />
           <input
             value={carousel.name}
             onChange={(e) => updateCarousel({ name: e.target.value })}
-            className="min-w-0 max-w-[200px] bg-transparent text-sm font-medium text-foreground outline-none placeholder:text-muted-foreground/40"
+            aria-label="Nome do carrossel"
+            className="h-8 min-w-0 max-w-[240px] rounded-lg border border-transparent bg-transparent px-2 text-sm font-bold tracking-tight text-foreground outline-none transition-premium placeholder:text-muted-foreground/70 hover:border-border focus:border-primary/60 focus:bg-input"
             placeholder="Nome do carrossel"
           />
         </div>
 
         {/* Center: slide nav */}
-        <div className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
-          <button onClick={() => selectSlide(Math.max(0, currentIdx - 1))} disabled={currentIdx === 0} className="rounded p-1 hover:bg-muted/60 disabled:opacity-30 transition-colors">
-            <ChevronLeft className="size-3.5" />
-          </button>
-          <span className="min-w-[5.5rem] text-center text-xs font-medium text-foreground/80">
+        <div className="flex shrink-0 items-center gap-0.5 rounded-xl border border-border bg-surface p-0.5">
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Slide anterior"
+            onClick={() => selectSlide(Math.max(0, currentIdx - 1))}
+            disabled={currentIdx === 0}
+          >
+            <ChevronLeft />
+          </Button>
+          <span className="min-w-[5.5rem] text-center text-xs font-semibold tabular-nums text-foreground">
             Slide {currentIdx + 1} / {carousel.slides.length}
           </span>
-          <button onClick={() => selectSlide(Math.min(carousel.slides.length - 1, currentIdx + 1))} disabled={currentIdx === carousel.slides.length - 1} className="rounded p-1 hover:bg-muted/60 disabled:opacity-30 transition-colors">
-            <ChevronRight className="size-3.5" />
-          </button>
-          <button onClick={addSlide} className="ml-1 rounded p-1 hover:bg-muted/60 transition-colors" title="Adicionar slide">
-            <Plus className="size-3.5" />
-          </button>
-          <button onClick={removeSlide} className="rounded p-1 hover:bg-negative/15 text-muted-foreground hover:text-negative transition-colors" title="Remover slide">
-            <Trash2 className="size-3.5" />
-          </button>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Próximo slide"
+            onClick={() => selectSlide(Math.min(carousel.slides.length - 1, currentIdx + 1))}
+            disabled={currentIdx === carousel.slides.length - 1}
+          >
+            <ChevronRight />
+          </Button>
+          <span aria-hidden className="mx-0.5 h-4 w-px bg-border" />
+          <Button variant="ghost" size="icon-xs" onClick={addSlide} title="Adicionar slide" aria-label="Adicionar slide">
+            <Plus />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            onClick={removeSlide}
+            title="Remover slide"
+            aria-label="Remover slide"
+            className="hover:bg-tone-red/12 hover:text-tone-red"
+          >
+            <Trash2 />
+          </Button>
         </div>
 
         {/* Right */}
-        <div className="flex items-center gap-2 shrink-0">
-          <Button variant="ghost" size="sm" className="gap-1.5 text-xs h-7" onClick={handleCaption} disabled={captionLoading}>
-            {captionLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+        <div className="flex shrink-0 items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={handleCaption} disabled={captionLoading}>
+            {captionLoading ? <Loader2 className="animate-spin" /> : <Sparkles />}
             Legenda
           </Button>
-          <Button variant="ghost" size="sm" className="gap-1.5 text-xs h-7" onClick={handleExport}>
-            <Download className="size-3.5" />
+          <Button variant="outline" size="sm" onClick={handleExport}>
+            <Download />
             Baixar
           </Button>
-          <Button size="sm" className="gap-1.5 text-xs h-7" onClick={handleSave} disabled={saving}>
-            {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
+          <Button size="sm" onClick={handleSave} disabled={saving}>
+            {saving ? <Loader2 className="animate-spin" /> : <Save />}
             Salvar
           </Button>
         </div>
@@ -652,19 +704,23 @@ export function CarouselEditor({
       <div className="flex flex-1 overflow-hidden">
 
         {/* ── Left sidebar ── */}
-        <aside className="w-72 shrink-0 flex flex-col overflow-y-auto border-r border-border/50 bg-sidebar dark:border-white/7 dark:bg-sidebar">
+        <aside className="flex w-80 shrink-0 flex-col gap-2 overflow-y-auto border-r border-border bg-surface p-3">
 
           {/* Format selector */}
-          <div className="px-5 py-3.5 border-b border-white/6">
-            <label className="block text-[0.625rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60 mb-2">Formato</label>
-            <div className="flex gap-1">
+          <div className="space-y-2 rounded-2xl border border-border bg-card p-4 shadow-[var(--surface-shadow)]">
+            <p className="text-[0.8125rem] font-semibold text-foreground">Formato</p>
+            <div role="tablist" aria-label="Formato do carrossel" className="grid grid-cols-3 gap-0.5 rounded-xl border border-border bg-surface p-1">
               {(["carousel", "square", "stories"] as CarouselFormat[]).map((f) => (
                 <button
                   key={f}
+                  role="tab"
+                  aria-selected={carousel.format === f}
                   onClick={() => updateCarousel({ format: f })}
                   className={cn(
-                    "flex-1 rounded-lg px-2 py-1.5 text-[0.625rem] font-medium transition-colors",
-                    carousel.format === f ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                    "h-7 rounded-lg px-2 text-xs font-semibold transition-premium outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                    carousel.format === f
+                      ? "bg-card text-foreground shadow-[var(--surface-shadow),var(--inner-highlight)] ring-1 ring-border"
+                      : "text-muted-foreground hover:text-foreground"
                   )}
                 >
                   {FORMAT_LABELS[f].split(" ")[0]}
@@ -674,81 +730,86 @@ export function CarouselEditor({
           </div>
 
           {/* Estilo do Post */}
-          <SidebarSection title="Estilo do Post" open={!!sections.estilo} onToggle={() => toggleSection("estilo")}>
+          <SidebarSection title="Estilo do post" icon={<LayoutTemplate />} open={!!sections.estilo} onToggle={() => toggleSection("estilo")}>
             <div className="grid grid-cols-1 gap-1.5">
-              {POST_STYLES.map((style) => (
-                <button
-                  key={style.id}
-                  onClick={() => updateCarousel({ post_style: style.id })}
-                  className={cn(
-                    "flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-premium",
-                    carousel.post_style === style.id
-                      ? "border-primary/40 bg-primary/8 text-foreground"
-                      : "border-border/40 hover:border-border/70 hover:bg-muted/30 text-muted-foreground"
-                  )}
-                >
-                  <div className={cn(
-                    "size-5 shrink-0 rounded-md border-2",
-                    carousel.post_style === style.id ? "border-primary bg-primary/20" : "border-muted-foreground/20 bg-muted/30"
-                  )} />
-                  <div className="min-w-0">
-                    <p className={cn("text-xs font-semibold", carousel.post_style === style.id ? "text-foreground" : "text-foreground/70")}>
-                      {style.label}
-                    </p>
-                    <p className="text-[0.6rem] text-muted-foreground/60 truncate">{style.desc}</p>
-                  </div>
-                  {carousel.post_style === style.id && (
-                    <span className="ml-auto text-[0.5rem] font-bold text-primary uppercase tracking-wider">Ativo</span>
-                  )}
-                </button>
-              ))}
+              {POST_STYLES.map((style) => {
+                const active = carousel.post_style === style.id;
+                return (
+                  <button
+                    key={style.id}
+                    onClick={() => updateCarousel({ post_style: style.id })}
+                    aria-pressed={active}
+                    className={cn(
+                      "flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-premium",
+                      active
+                        ? "border-primary/50 bg-primary/10 text-foreground"
+                        : "border-border bg-surface text-muted-foreground hover:border-border-strong hover:bg-accent"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "flex size-5 shrink-0 items-center justify-center rounded-md border-2",
+                        active ? "border-primary bg-primary text-primary-foreground" : "border-border-strong bg-card"
+                      )}
+                    >
+                      {active && <Check className="size-3" strokeWidth={3} />}
+                    </span>
+                    <div className="min-w-0">
+                      <p className={cn("text-xs font-semibold", active ? "text-foreground" : "text-foreground/80")}>
+                        {style.label}
+                      </p>
+                      <p className="truncate text-[0.6875rem] text-muted-foreground">{style.desc}</p>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
-            <p className="text-[0.5625rem] text-muted-foreground/40 leading-relaxed">
+            <p className="text-[0.6875rem] leading-relaxed text-muted-foreground">
               Os layouts de cada estilo serão construídos em breve.
             </p>
           </SidebarSection>
 
           {/* Gerar com IA */}
-          <SidebarSection title="Gerar com IA" open={!!sections.ai} onToggle={() => toggleSection("ai")}>
+          <SidebarSection title="Gerar com IA" icon={<Sparkles />} open={!!sections.ai} onToggle={() => toggleSection("ai")}>
             <div className="space-y-2">
-              <p className="text-[0.625rem] text-muted-foreground/60 font-medium uppercase tracking-widest">Do zero</p>
+              <p className="text-xs font-semibold text-foreground">Do zero</p>
               <Textarea
                 placeholder="Ex: Como dobrar suas vendas no Instagram em 30 dias"
                 value={aiPrompt}
                 onChange={(e) => setAiPrompt(e.target.value)}
-                className="text-xs resize-none"
+                className="min-h-0 resize-none text-xs"
                 rows={3}
               />
               <RangeControl label="Quantidade de slides" value={slideCount} min={1} max={20} unit="" onChange={setSlideCount} />
-              <Button size="sm" className="w-full gap-1.5 text-xs" onClick={handleGenerate} disabled={aiGenerating}>
-                {aiGenerating ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+              <Button size="sm" className="w-full" onClick={handleGenerate} disabled={aiGenerating}>
+                {aiGenerating ? <Loader2 className="animate-spin" /> : <Sparkles />}
                 {aiGenerating ? "Gerando..." : `Gerar ${slideCount} slides`}
               </Button>
             </div>
-            <div className="space-y-2 pt-2 border-t border-white/6">
-              <p className="text-[0.625rem] text-muted-foreground/60 font-medium uppercase tracking-widest">Melhorar atual</p>
+            <div className="space-y-2 border-t border-border pt-4">
+              <p className="text-xs font-semibold text-foreground">Melhorar atual</p>
               <Textarea
                 placeholder='Ex: "Deixe os títulos mais curtos e diretos"'
                 value={improveInstruction}
                 onChange={(e) => setImproveInstruction(e.target.value)}
-                className="text-xs resize-none"
+                className="min-h-0 resize-none text-xs"
                 rows={2}
               />
-              <Button variant="outline" size="sm" className="w-full gap-1.5 text-xs" onClick={handleImprove} disabled={aiGenerating}>
-                {aiGenerating ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+              <Button variant="outline" size="sm" className="w-full" onClick={handleImprove} disabled={aiGenerating}>
+                {aiGenerating ? <Loader2 className="animate-spin" /> : <Sparkles />}
                 Melhorar conteúdo
               </Button>
             </div>
           </SidebarSection>
 
           {/* Texto */}
-          <SidebarSection title={`Texto — Slide ${currentIdx + 1}`} open={!!sections.texto} onToggle={() => toggleSection("texto")}>
+          <SidebarSection title="Texto" icon={<Type />} badge={slideBadge} open={!!sections.texto} onToggle={() => toggleSection("texto")}>
             <FontPicker
               label="Fonte do slide"
               value={currentSlide?.fonteFamilia ?? DEFAULT_FONT_FAMILY}
               onChange={(family) => updateSlide({ fonteFamilia: family })}
             />
-            <div className="flex justify-end -mt-1">
+            <div className="-mt-2 flex justify-end">
               <button
                 onClick={() => {
                   const family = currentSlide?.fonteFamilia ?? DEFAULT_FONT_FAMILY;
@@ -758,7 +819,7 @@ export function CarouselEditor({
                   }));
                   toast.success("Fonte aplicada em todos os slides");
                 }}
-                className="text-[0.5625rem] text-muted-foreground/60 hover:text-primary transition-colors"
+                className={applyAllClass}
               >
                 Aplicar fonte em todos
               </button>
@@ -766,8 +827,8 @@ export function CarouselEditor({
 
             {/* Posição do bloco de texto */}
             <div className="space-y-1.5">
-              <label className="text-[0.625rem] text-muted-foreground/70">Posição do texto</label>
-              <div className="grid grid-cols-3 gap-1">
+              <label className={controlLabelClass}>Posição do texto</label>
+              <div className="grid grid-cols-3 gap-1 rounded-xl border border-border bg-surface p-1">
                 {TEXT_POSITIONS.map((p) => {
                   const active = (currentSlide?.textPos ?? "bottom-left") === p;
                   return (
@@ -775,15 +836,16 @@ export function CarouselEditor({
                       key={p}
                       onClick={() => updateSlide({ textPos: p })}
                       title={p}
+                      aria-pressed={active}
                       className={cn(
-                        "flex aspect-[4/3] rounded-md border p-1 transition-colors",
+                        "flex aspect-[4/3] rounded-lg border p-1.5 transition-colors",
                         POSITION_DOT[p],
                         active
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:bg-muted/40"
+                          ? "border-primary/50 bg-primary/12"
+                          : "border-transparent hover:bg-accent"
                       )}
                     >
-                      <span className={cn("size-1.5 rounded-full", active ? "bg-primary" : "bg-muted-foreground/40")} />
+                      <span className={cn("size-1.5 rounded-full", active ? "bg-primary" : "bg-muted-foreground/50")} />
                     </button>
                   );
                 })}
@@ -798,7 +860,7 @@ export function CarouselEditor({
                     }));
                     toast.success("Posição aplicada em todos os slides");
                   }}
-                  className="text-[0.5625rem] text-muted-foreground/60 hover:text-primary transition-colors"
+                  className={applyAllClass}
                 >
                   Aplicar posição em todos
                 </button>
@@ -806,18 +868,18 @@ export function CarouselEditor({
             </div>
 
             {/* Glassmorphism */}
-            <label className="flex items-center justify-between gap-2 cursor-pointer">
-              <span className="text-[0.625rem] text-muted-foreground/70">Retângulo glassmorphism</span>
+            <label className="flex cursor-pointer items-center justify-between gap-2 rounded-xl border border-border bg-surface px-3 py-2.5">
+              <span className="text-xs font-medium text-foreground">Retângulo glassmorphism</span>
               <input
                 type="checkbox"
                 checked={currentSlide?.textGlass ?? false}
                 onChange={(e) => updateSlide({ textGlass: e.target.checked })}
-                className="size-4 accent-primary cursor-pointer"
+                className="size-4 cursor-pointer accent-primary"
               />
             </label>
 
             <div className="space-y-1.5">
-              <label className="text-[0.625rem] text-muted-foreground/70">Título</label>
+              <label className={controlLabelClass}>Título</label>
               <RichTextField
                 key={`titulo-${currentSlide?.id}`}
                 html={currentSlide?.tituloHtml}
@@ -828,7 +890,7 @@ export function CarouselEditor({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[0.625rem] text-muted-foreground/70">Subtítulo</label>
+              <label className={controlLabelClass}>Subtítulo</label>
               <RichTextField
                 key={`subtitulo-${currentSlide?.id}`}
                 html={currentSlide?.subtituloHtml}
@@ -838,42 +900,39 @@ export function CarouselEditor({
                 onChange={({ html, plain }) => updateSlide({ subtituloHtml: html, subtitulo: plain })}
               />
             </div>
-            <div className="space-y-2 pt-2 border-t border-white/6">
-              <p className="text-[0.625rem] text-muted-foreground/60 font-medium uppercase tracking-widest">Refinar com IA</p>
+            <div className="space-y-2 border-t border-border pt-4">
+              <p className="text-xs font-semibold text-foreground">Refinar com IA</p>
               <Textarea
                 placeholder='Ex: "Torne mais direto e adicione dado estatístico"'
                 value={refineInstruction}
                 onChange={(e) => setRefineInstruction(e.target.value)}
-                className="text-xs resize-none"
+                className="min-h-0 resize-none text-xs"
                 rows={2}
               />
-              <Button variant="outline" size="sm" className="w-full gap-1.5 text-xs" onClick={handleRefine} disabled={refining}>
-                {refining ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+              <Button variant="outline" size="sm" className="w-full" onClick={handleRefine} disabled={refining}>
+                {refining ? <Loader2 className="animate-spin" /> : <Sparkles />}
                 Refinar este slide
               </Button>
             </div>
           </SidebarSection>
 
           {/* Cores */}
-          <SidebarSection title="Cores" open={!!sections.cores} onToggle={() => toggleSection("cores")}>
-            {/* Tab */}
-            <div className="flex gap-1 rounded-lg border border-border/40 bg-muted/20 p-0.5 mb-1">
-              {(["manual", "imagem"] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setColorTab(tab)}
-                  className={cn(
-                    "flex-1 rounded-md py-1 text-[0.625rem] font-medium transition-colors",
-                    colorTab === tab ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  {tab === "manual" ? "Manual" : "Via Imagem"}
-                </button>
-              ))}
-            </div>
+          <SidebarSection title="Cores" icon={<Palette />} badge={slideBadge} open={!!sections.cores} onToggle={() => toggleSection("cores")}>
+            <SegmentedControl
+              aria-label="Modo de cores"
+              size="sm"
+              value={colorTab}
+              onChange={setColorTab}
+              className="grid w-full grid-cols-2"
+              options={[
+                { value: "manual", label: "Manual" },
+                { value: "imagem", label: "Via imagem" },
+              ]}
+            />
 
             {colorTab === "manual" ? (
               <>
+                {/* Valores padrão abaixo = cores de conteúdo do slide */}
                 <ModernColorPicker
                   label="Fundo"
                   value={currentSlide?.corFundo ?? "#0a0a0a"}
@@ -892,7 +951,7 @@ export function CarouselEditor({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="w-full text-xs"
+                  className="w-full"
                   onClick={() => {
                     const { corFundo, corTitulo, corSubtitulo } = currentSlide;
                     setCarousel((c) => ({
@@ -915,7 +974,7 @@ export function CarouselEditor({
           </SidebarSection>
 
           {/* Tipografia */}
-          <SidebarSection title="Tipografia" open={!!sections.tipografia} onToggle={() => toggleSection("tipografia")}>
+          <SidebarSection title="Tipografia" icon={<CaseSensitive />} badge={slideBadge} open={!!sections.tipografia} onToggle={() => toggleSection("tipografia")}>
             <RangeControl
               label="Tamanho do título"
               value={currentSlide?.tamanhoTitulo ?? 96}
@@ -933,7 +992,7 @@ export function CarouselEditor({
           </SidebarSection>
 
           {/* CTA */}
-          <SidebarSection title={`Botão / CTA — Slide ${currentIdx + 1}`} open={!!sections.cta} onToggle={() => toggleSection("cta")}>
+          <SidebarSection title="Botão / CTA" icon={<MousePointerClick />} badge={slideBadge} open={!!sections.cta} onToggle={() => toggleSection("cta")}>
             <CtaControls cta={currentSlide?.cta ?? makeDefaultCta()} onChange={updateCta} />
             {currentSlide?.cta?.enabled && (
               <button
@@ -945,7 +1004,7 @@ export function CarouselEditor({
                   }));
                   toast.success("CTA aplicado em todos os slides");
                 }}
-                className="w-full text-[0.5625rem] text-muted-foreground/60 hover:text-primary transition-colors"
+                className={cn(applyAllClass, "w-full")}
               >
                 Aplicar este CTA em todos os slides
               </button>
@@ -953,7 +1012,7 @@ export function CarouselEditor({
           </SidebarSection>
 
           {/* Grade de imagens */}
-          <SidebarSection title={`Grade de Imagens — Slide ${currentIdx + 1}`} open={!!sections.grade} onToggle={() => toggleSection("grade")}>
+          <SidebarSection title="Grade de imagens" icon={<LayoutGrid />} badge={slideBadge} open={!!sections.grade} onToggle={() => toggleSection("grade")}>
             <ImageGridControls
               grid={currentSlide?.imageGrid ?? makeDefaultImageGrid()}
               onChange={updateImageGrid}
@@ -961,20 +1020,20 @@ export function CarouselEditor({
           </SidebarSection>
 
           {/* Marca & Layout (carousel-level) */}
-          <SidebarSection title="Marca & Layout" open={!!sections.marca} onToggle={() => toggleSection("marca")}>
-            <p className="text-[0.5625rem] text-muted-foreground/50 leading-relaxed -mt-1">
+          <SidebarSection title="Marca e layout" icon={<Stamp />} open={!!sections.marca} onToggle={() => toggleSection("marca")}>
+            <p className="-mt-1 text-[0.6875rem] leading-relaxed text-muted-foreground">
               Aplicado a todos os slides do carrossel.
             </p>
             <DesignControls design={design} onChange={updateDesign} />
           </SidebarSection>
 
           {/* Imagem de fundo */}
-          <SidebarSection title={`Imagem de Fundo — Slide ${currentIdx + 1}`} open={!!sections.imagem} onToggle={() => toggleSection("imagem")}>
+          <SidebarSection title="Imagem de fundo" icon={<ImageIcon />} badge={slideBadge} open={!!sections.imagem} onToggle={() => toggleSection("imagem")}>
             <label className={cn(
-              "flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed py-3 text-xs transition-colors",
+              "flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed py-3 text-xs font-semibold transition-colors",
               currentSlide?.imagemFundo
-                ? "border-primary/40 bg-primary/5 text-primary hover:bg-primary/8"
-                : "border-border text-muted-foreground hover:border-primary/40 hover:bg-muted/30 hover:text-foreground"
+                ? "border-primary/40 bg-primary/5 text-primary hover:bg-primary/10"
+                : "border-border-strong bg-surface text-muted-foreground hover:border-primary/50 hover:bg-primary/5 hover:text-foreground"
             )}>
               <input type="file" accept="image/*" className="sr-only" onChange={handleBgImageUpload} />
               <ImagePlus className="size-3.5" />
@@ -999,7 +1058,7 @@ export function CarouselEditor({
             {currentSlide?.imagemFundo && (
               <>
                 {/* Preview strip */}
-                <div className="relative w-full overflow-hidden rounded-lg" style={{ height: 70 }}>
+                <div className="relative w-full overflow-hidden rounded-xl border border-border" style={{ height: 70 }}>
                   <div
                     className="absolute inset-0"
                     style={{
@@ -1057,9 +1116,9 @@ export function CarouselEditor({
                   onChange={(v) => updateSlide({ overlayColor: v })}
                 />
                 <Button
-                  variant="ghost"
+                  variant="destructive"
                   size="sm"
-                  className="w-full text-xs text-negative hover:bg-negative/10"
+                  className="w-full"
                   onClick={() => updateSlide({ imagemFundo: null, overlayOpacidade: 0, overlayHeight: 60, overlayColor: "#000000", imagemPosX: 50, imagemPosY: 50, imagemZoom: 150 })}
                 >
                   Remover imagem
@@ -1070,11 +1129,13 @@ export function CarouselEditor({
         </aside>
 
         {/* ── Canvas: horizontal slide strip ── */}
-        <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="relative flex flex-1 flex-col overflow-hidden bg-background">
+          <div aria-hidden className="bg-dot-grid pointer-events-none absolute inset-0 opacity-60" />
+
           {/* Horizontal strip */}
           <div
             ref={stripRef}
-            className="flex flex-1 items-start gap-5 overflow-x-auto overflow-y-auto overscroll-contain px-6 pt-7 pb-8"
+            className="relative flex flex-1 items-start gap-5 overflow-x-auto overflow-y-auto overscroll-contain px-6 pt-7 pb-8"
             style={{ scrollbarWidth: "thin" }}
           >
             {carousel.slides.map((slide, i) => {
@@ -1082,18 +1143,20 @@ export function CarouselEditor({
               return (
                 <div
                   key={slide.id}
-                  className="shrink-0 flex flex-col gap-2"
+                  className="flex shrink-0 flex-col gap-2"
                   style={{ width: slideWidth }}
                 >
                   <button
                     // Evita o foco roubar o scroll do strip (a tela "descia" ao clicar).
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => selectSlide(i)}
+                    aria-label={`Selecionar slide ${i + 1}`}
+                    aria-current={isActive ? "true" : undefined}
                     className={cn(
                       "relative overflow-hidden rounded-2xl transition-all duration-200 focus:outline-none",
                       isActive
-                        ? "ring-2 ring-primary ring-offset-2 ring-offset-background shadow-2xl shadow-primary/20 scale-[1.02]"
-                        : "ring-1 ring-white/8 opacity-70 hover:opacity-100 hover:ring-white/20 hover:scale-[1.01]"
+                        ? "scale-[1.02] shadow-[var(--surface-shadow-elevated)] ring-2 ring-primary ring-offset-2 ring-offset-background"
+                        : "opacity-70 ring-1 ring-border hover:scale-[1.01] hover:opacity-100 hover:ring-border-strong"
                     )}
                   >
                     <SlidePreview
@@ -1108,13 +1171,11 @@ export function CarouselEditor({
                   </button>
                   {/* Slide number + label */}
                   <div className="flex items-center justify-between px-0.5">
-                    <span className={cn("text-[0.625rem] font-medium", isActive ? "text-primary" : "text-muted-foreground/50")}>
+                    <span className={cn("text-xs font-semibold tabular-nums", isActive ? "text-primary" : "text-muted-foreground")}>
                       Slide {i + 1}
                     </span>
                     {isActive && (
-                      <span className="text-[0.5rem] text-primary/70 font-semibold uppercase tracking-wider">
-                        Editando
-                      </span>
+                      <Badge variant="violet">Editando</Badge>
                     )}
                   </div>
                 </div>
@@ -1125,7 +1186,7 @@ export function CarouselEditor({
             <button
               onClick={addSlide}
               className={cn(
-                "shrink-0 flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border/40 transition-colors hover:border-primary/40 hover:bg-primary/5",
+                "flex shrink-0 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border-strong bg-surface/60 transition-colors hover:border-primary/50 hover:bg-primary/5",
                 "text-muted-foreground hover:text-primary"
               )}
               style={{
@@ -1135,16 +1196,16 @@ export function CarouselEditor({
               }}
             >
               <Plus className="size-5" />
-              <span className="text-[0.625rem] font-medium">Novo slide</span>
+              <span className="text-xs font-semibold">Novo slide</span>
             </button>
           </div>
 
           {/* Footer info bar */}
-          <div className="flex h-8 shrink-0 items-center justify-between border-t border-border/30 px-6 dark:border-white/5">
-            <span className="text-[0.625rem] text-muted-foreground/50">
+          <div className="relative flex h-9 shrink-0 items-center justify-between border-t border-border bg-sidebar px-6 text-[0.6875rem] text-muted-foreground">
+            <span className="tabular-nums">
               {FORMAT_LABELS[carousel.format]} · {FORMAT_DIMENSIONS[carousel.format].width}×{FORMAT_DIMENSIONS[carousel.format].height}px
             </span>
-            <span className="text-[0.625rem] text-muted-foreground/50">
+            <span className="tabular-nums">
               {carousel.slides.length} slide{carousel.slides.length !== 1 ? "s" : ""}
             </span>
           </div>
@@ -1171,52 +1232,56 @@ export function CarouselEditor({
 
       {/* ── Turbo background-generation banner ── */}
       {bgGenerating && (
-        <div className="fixed bottom-5 right-5 z-50 flex items-center gap-3 rounded-xl border border-positive/30 bg-card/95 px-4 py-3 shadow-2xl backdrop-blur dark:bg-surface-elevated/95">
+        <div className="animate-in-soft fixed right-5 bottom-5 z-50 flex items-center gap-3 rounded-2xl border border-tone-pink/25 bg-popover px-4 py-3 text-popover-foreground shadow-[var(--surface-shadow-elevated),var(--inner-highlight)]">
           <span className="relative flex size-2.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-positive opacity-75" />
-            <span className="relative inline-flex size-2.5 rounded-full bg-positive" />
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-tone-pink opacity-75" />
+            <span className="relative inline-flex size-2.5 rounded-full bg-tone-pink" />
           </span>
           <div>
-            <p className="text-xs font-medium text-foreground">Gerando imagens em segundo plano…</p>
-            <p className="text-[0.65rem] text-muted-foreground">
+            <p className="text-[0.8125rem] font-semibold text-foreground">Gerando imagens em segundo plano…</p>
+            <p className="text-xs text-muted-foreground">
               As artes aparecem nos cards conforme ficam prontas.
             </p>
           </div>
-          <Loader2 className="size-4 animate-spin text-positive" />
+          <Loader2 className="size-4 animate-spin text-tone-pink" />
         </div>
       )}
 
       {/* ── Caption modal ── */}
-      {caption && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setCaption(null)} />
-          <div className="relative z-10 w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-card shadow-2xl dark:border-white/10 dark:bg-surface-elevated">
-            <div className="px-6 pt-6 pb-4 flex items-start justify-between gap-2">
-              <div>
-                <h3 className="text-base font-semibold">Legenda gerada</h3>
-                <p className="mt-0.5 text-xs text-muted-foreground">Legenda e hashtags para o Instagram</p>
-              </div>
-              <button onClick={() => setCaption(null)} className="text-muted-foreground hover:text-foreground transition-colors">✕</button>
+      <Dialog open={!!caption} onOpenChange={(open) => { if (!open) setCaption(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Legenda gerada</DialogTitle>
+            <DialogDescription>Legenda e hashtags para o Instagram</DialogDescription>
+          </DialogHeader>
+          <DialogBody>
+            <Textarea
+              value={caption ?? ""}
+              onChange={(e) => setCaption(e.target.value)}
+              rows={10}
+              aria-label="Legenda"
+              className="font-mono text-sm"
+            />
+          </DialogBody>
+          <DialogFooter className="justify-between">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { navigator.clipboard.writeText(caption ?? ""); toast.success("Copiado!"); }}
+            >
+              <Copy />
+              Copiar
+            </Button>
+            <div className="flex gap-2">
+              <Button variant="ghost" size="sm" onClick={handleCaption} disabled={captionLoading}>
+                {captionLoading ? <Loader2 className="animate-spin" /> : <Sparkles />}
+                Regerar
+              </Button>
+              <Button size="sm" onClick={() => setCaption(null)}>Fechar</Button>
             </div>
-            <div className="px-6 pb-6 space-y-4">
-              <Textarea value={caption} onChange={(e) => setCaption(e.target.value)} rows={10} className="text-sm font-mono" />
-              <div className="flex justify-between gap-2">
-                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => { navigator.clipboard.writeText(caption); toast.success("Copiado!"); }}>
-                  <Copy className="size-3.5" />
-                  Copiar
-                </Button>
-                <div className="flex gap-2">
-                  <Button variant="ghost" size="sm" onClick={handleCaption} disabled={captionLoading}>
-                    {captionLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
-                    Regerar
-                  </Button>
-                  <Button size="sm" onClick={() => setCaption(null)}>Fechar</Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -3,20 +3,25 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const surfaceVariants = cva(
-  "transition-premium overflow-hidden rounded-2xl border backdrop-blur-xl",
+  "transition-premium overflow-hidden rounded-2xl border",
   {
     variants: {
       variant: {
         default:
-          "border-border bg-card shadow-sm dark:border-white/7 dark:bg-card dark:shadow-[0_0_0_1px_oklch(1_0_0/6%),0_4px_24px_oklch(0_0_0/45%)]",
+          "border-border bg-card shadow-[var(--surface-shadow),var(--inner-highlight)]",
         elevated:
-          "border-border bg-surface-elevated shadow-md dark:border-white/8 dark:bg-surface-elevated dark:shadow-[0_0_0_1px_oklch(1_0_0/8%),0_8px_32px_oklch(0_0_0/55%)]",
+          "border-border bg-surface-elevated shadow-[var(--surface-shadow-elevated),var(--inner-highlight)]",
+        /** Área rebaixada — agrupa conteúdo dentro de cards ou colunas. */
+        inset: "border-border/70 bg-surface",
         ghost:
-          "border-transparent bg-transparent hover:border-border hover:bg-muted/60 dark:hover:border-white/8 dark:hover:bg-white/4",
+          "border-transparent bg-transparent hover:border-border hover:bg-card",
         dashed:
-          "border-dashed border-border bg-transparent hover:border-border hover:bg-muted/50 dark:border-white/7 dark:hover:border-white/12 dark:hover:bg-white/3",
+          "border-dashed border-border-strong bg-transparent hover:bg-card/60",
+        /** Destaque de marca com borda gradiente violeta → lime. */
+        brand:
+          "ring-brand border-transparent bg-card shadow-[var(--surface-shadow-elevated),var(--inner-highlight)]",
         terminal:
-          "border-white/8 bg-[oklch(0.085_0.007_265/85%)] shadow-[0_0_0_1px_oklch(1_0_0/6%),0_8px_32px_oklch(0_0_0/50%)] backdrop-blur-2xl",
+          "border-border bg-surface-elevated shadow-[var(--surface-shadow-elevated),var(--inner-highlight)]",
       },
       padding: {
         none: "",
@@ -54,7 +59,7 @@ function SurfaceHeader({
   return (
     <div
       data-slot="surface-header"
-      className={cn("flex flex-col gap-1 px-6 pt-6 pb-6", className)}
+      className={cn("flex flex-col gap-1 px-6 pt-5 pb-5", className)}
       {...props}
     />
   );
@@ -68,7 +73,7 @@ function SurfaceTitle({
     <h3
       data-slot="surface-title"
       className={cn(
-        "font-heading text-[0.9375rem] font-medium tracking-heading text-foreground",
+        "font-heading text-[0.9375rem] font-semibold tracking-heading text-foreground",
         className
       )}
       {...props}

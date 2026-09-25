@@ -4,7 +4,7 @@ import type { ClientArtReadiness } from "@/services/reference-assets";
 
 function Chip({ ok, label }: { ok: boolean; label: string }) {
   return (
-    <Badge variant={ok ? "positive" : "outline"} className="gap-1">
+    <Badge variant={ok ? "green" : "amber"} className="gap-1">
       {ok ? <Check className="size-3" /> : <X className="size-3" />}
       {label}
     </Badge>
@@ -17,7 +17,12 @@ function Chip({ ok, label }: { ok: boolean; label: string }) {
  */
 export function ReadinessChips({ readiness }: { readiness: ClientArtReadiness | null }) {
   if (!readiness) {
-    return <Badge variant="outline">Perfil criativo não cadastrado</Badge>;
+    return (
+      <Badge variant="amber" className="gap-1">
+        <X className="size-3" />
+        Perfil criativo não cadastrado
+      </Badge>
+    );
   }
 
   return (

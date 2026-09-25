@@ -1,24 +1,70 @@
-type PageHeaderProps = {
+import Link from "next/link";
+import { ChevronLeft } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+export type PageHeaderProps = {
   title: string;
-  description?: string;
+  description?: React.ReactNode;
   action?: React.ReactNode;
+  /** Link de volta (páginas de detalhe). */
+  backHref?: string;
+  backLabel?: string;
+  /** Linha acima do título — contexto, status, badges. */
+  eyebrow?: React.ReactNode;
+  /** Conteúdo abaixo do título (abas, filtros, toolbar). */
+  children?: React.ReactNode;
+  className?: string;
 };
 
-export function PageHeader({ title, description, action }: PageHeaderProps) {
+export function PageHeader({
+  title,
+  description,
+  action,
+  backHref,
+  backLabel = "Voltar",
+  eyebrow,
+  children,
+  className,
+}: PageHeaderProps) {
   return (
-    <header className="flex min-h-[var(--header-height)] flex-col justify-center gap-4 border-b border-border/60 px-4 py-5 backdrop-blur-sm dark:border-white/6 dark:bg-transparent sm:px-6 sm:py-6 lg:flex-row lg:items-end lg:justify-between lg:px-10">
-      <div className="space-y-1">
-        <p className="text-[0.5625rem] font-semibold tracking-[0.14em] text-muted-foreground/60 uppercase">
-          Creative OS
-        </p>
-        <h1 className="text-[1.375rem] font-semibold tracking-tight text-foreground">
-          {title}
-        </h1>
-        {description && (
-          <p className="text-subtitle max-w-2xl">{description}</p>
+    <header
+      className={cn(
+        "px-4 pt-6 sm:px-6 lg:px-8 lg:pt-8 xl:px-10",
+        className
+      )}
+    >
+      {backHref && (
+        <Link
+          href={backHref}
+          className="group mb-4 inline-flex items-center gap-1 rounded-lg text-[0.8125rem] font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ChevronLeft className="size-4 transition-transform group-hover:-translate-x-0.5" />
+          {backLabel}
+        </Link>
+      )}
+
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="min-w-0 space-y-1.5">
+          {eyebrow && (
+            <div className="flex flex-wrap items-center gap-2 text-[0.8125rem] text-muted-foreground">
+              {eyebrow}
+            </div>
+          )}
+          <h1 className="text-[1.625rem] leading-tight font-bold tracking-[-0.03em] text-foreground sm:text-[1.875rem]">
+            {title}
+          </h1>
+          {description && (
+            <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+              {description}
+            </p>
+          )}
+        </div>
+        {action && (
+          <div className="flex shrink-0 flex-wrap items-center gap-2">{action}</div>
         )}
       </div>
-      {action && <div className="shrink-0">{action}</div>}
+
+      {children && <div className="mt-5">{children}</div>}
     </header>
   );
 }

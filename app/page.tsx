@@ -1,10 +1,39 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowRight, Brain, Layers, Zap } from "lucide-react";
+import { ArrowRight, Brain, ClipboardList, Layers, Wand2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { buttonVariants } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { BrandMark, BrandWordmark } from "@/components/layout/brand-mark";
+import { tones, type Tone } from "@/lib/design/tokens";
 import { cn } from "@/lib/utils";
+
+const features: { icon: typeof Brain; tone: Tone; label: string; desc: string }[] = [
+  {
+    icon: ClipboardList,
+    tone: "cyan",
+    label: "Demandas",
+    desc: "Briefings chegam do Make direto no kanban, com prazo, status e entrega no Drive.",
+  },
+  {
+    icon: Brain,
+    tone: "violet",
+    label: "Creative Brain",
+    desc: "Brand DNA de cada cliente gerado com IA e revisado pela equipe.",
+  },
+  {
+    icon: Wand2,
+    tone: "pink",
+    label: "Gerador",
+    desc: "Artes a partir do DNA visual e das referências do cliente.",
+  },
+  {
+    icon: Layers,
+    tone: "lime",
+    label: "Carrosséis",
+    desc: "Editor de carrosséis com perfis de design reutilizáveis.",
+  },
+];
 
 export default async function HomePage() {
   const supabase = await createClient();
@@ -18,104 +47,68 @@ export default async function HomePage() {
 
   return (
     <div className="relative flex min-h-screen flex-col">
-      {/* Header */}
-      <header className="flex items-center justify-between px-8 py-5 lg:px-12">
+      <header className="flex items-center justify-between px-6 py-5 lg:px-12">
         <div className="flex items-center gap-3">
-          <div className="relative flex size-9 items-center justify-center rounded-xl border border-white/10 bg-card/60 backdrop-blur-sm dark:bg-white/5">
-            <Brain className="size-4 text-foreground/90" strokeWidth={1.75} />
-            <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-positive animate-glow-pulse dark:shadow-[0_0_6px_var(--positive)]" />
-          </div>
-          <div>
-            <span className="block text-sm font-semibold tracking-tight text-foreground">Creative OS</span>
-            <span className="block text-[0.5625rem] font-medium tracking-[0.12em] uppercase text-muted-foreground/60">
-              Operating System
-            </span>
-          </div>
+          <BrandMark />
+          <BrandWordmark />
         </div>
         <div className="flex items-center gap-2">
           <ThemeToggle compact />
-          <Link
-            href="/login"
-            className={cn(
-              buttonVariants({ variant: "outline", size: "sm" }),
-              "rounded-full"
-            )}
-          >
+          <Link href="/login" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
             Entrar
           </Link>
         </div>
       </header>
 
-      {/* Hero */}
-      <main className="flex flex-1 flex-col items-center justify-center px-6 pb-24 pt-8">
-        <div className="mx-auto max-w-3xl text-center animate-in-soft">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-positive/20 bg-positive/8 px-3.5 py-1.5 dark:border-positive/15 dark:bg-positive/6">
-            <span className="size-1.5 rounded-full bg-positive animate-glow-pulse dark:shadow-[0_0_4px_var(--positive)]" />
-            <span className="text-[0.6875rem] font-medium tracking-[0.1em] uppercase text-positive">
+      <main className="flex flex-1 flex-col items-center justify-center px-6 pt-10 pb-24">
+        <div className="mx-auto max-w-3xl animate-in-soft text-center">
+          <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-1.5 shadow-[var(--surface-shadow)]">
+            <span className="size-1.5 rounded-full bg-highlight shadow-[0_0_8px_var(--highlight)]" />
+            <span className="text-xs font-semibold text-muted-foreground">
               Creative Operating System
             </span>
           </div>
 
           <h1 className="text-display text-foreground">
-            Brand intelligence para equipes criativas de elite
+            Brand intelligence para{" "}
+            <span className="bg-[linear-gradient(90deg,var(--tone-violet),var(--tone-pink)_55%,var(--tone-lime))] bg-clip-text text-transparent">
+              equipes criativas
+            </span>{" "}
+            de elite
           </h1>
           <p className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-muted-foreground">
-            Automatize onboarding, Brand DNA e direção visual com precisão.
-            Uma plataforma interna calma, estruturada e feita para agências
-            modernas.
+            Onboarding, Brand DNA, demandas e produção de artes em um workspace
+            calmo, organizado e feito para agências modernas.
           </p>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-            <Link
-              href="/login"
-              className={cn(
-                buttonVariants({ size: "lg" }),
-                "inline-flex gap-2 rounded-full"
-              )}
-            >
+            <Link href="/login" className={cn(buttonVariants({ size: "lg" }), "inline-flex")}>
               Acessar plataforma
-              <ArrowRight className="size-4" strokeWidth={2} />
+              <ArrowRight className="size-4" strokeWidth={2.25} />
             </Link>
           </div>
         </div>
 
-        {/* Feature cards */}
-        <div className="mx-auto mt-24 grid w-full max-w-4xl gap-4 sm:grid-cols-3">
-          {[
-            {
-              icon: Layers,
-              label: "Onboarding",
-              desc: "Contexto de marca estruturado desde o primeiro contato.",
-            },
-            {
-              icon: Brain,
-              label: "Creative Brain",
-              desc: "Brand DNA gerado com IA e revisado pela equipe.",
-            },
-            {
-              icon: Zap,
-              label: "Criativos",
-              desc: "Base preparada para geração automatizada de campanhas.",
-            },
-          ].map((item, i) => {
+        <div className="mx-auto mt-20 grid w-full max-w-5xl gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {features.map((item, i) => {
             const Icon = item.icon;
             return (
               <div
                 key={item.label}
                 className={cn(
-                  "surface-panel p-6 text-left animate-in-soft hover-lift",
-                  i === 1 && "stagger-1",
-                  i === 2 && "stagger-2"
+                  "surface-panel hover-lift animate-in-soft p-5 text-left",
+                  `stagger-${i + 1}`
                 )}
               >
-                <div className="mb-4 flex size-9 items-center justify-center rounded-xl border border-border/60 bg-muted/50 dark:border-white/8 dark:bg-white/5">
-                  <Icon className="size-4 text-foreground/80" strokeWidth={1.75} />
-                </div>
-                <p className="text-sm font-semibold tracking-tight text-foreground">
-                  {item.label}
-                </p>
-                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                  {item.desc}
-                </p>
+                <span
+                  className={cn(
+                    "mb-4 flex size-10 items-center justify-center rounded-xl",
+                    tones[item.tone].iconTile
+                  )}
+                >
+                  <Icon className="size-[1.125rem]" strokeWidth={2} />
+                </span>
+                <p className="text-sm font-bold tracking-tight text-foreground">{item.label}</p>
+                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{item.desc}</p>
               </div>
             );
           })}

@@ -2,33 +2,44 @@
 
 import { Handle, Position } from "@xyflow/react";
 import { Layers, ImageIcon } from "lucide-react";
+import {
+  FLOW_NODE_TONE,
+  NodeImagePlaceholder,
+  NodeShell,
+  flowHandleClass,
+} from "@/components/flow/nodes/node-shell";
 import type { ClienteReferenciasData } from "@/lib/flow/types";
 
-export function ClienteReferenciasNode({ data }: { data: ClienteReferenciasData }) {
+export function ClienteReferenciasNode({
+  data,
+  selected,
+}: {
+  data: ClienteReferenciasData;
+  selected?: boolean;
+}) {
   const refs = data.referenceUrls ?? [];
 
   return (
-    <div className="w-52 rounded-xl border border-violet-500/25 bg-violet-500/8 p-3 backdrop-blur-sm">
-      <div className="mb-2 flex items-center gap-2">
-        <div className="flex size-5 items-center justify-center rounded-md border border-violet-500/30 bg-violet-500/15">
-          <Layers className="size-3 text-violet-400" strokeWidth={1.5} />
-        </div>
-        <span className="text-[0.6875rem] font-semibold uppercase tracking-widest text-violet-400">
-          Referências
-        </span>
-        {refs.length > 0 && (
-          <span className="ml-auto text-[0.5625rem] tabular-nums text-violet-400/60">
+    <NodeShell
+      tone={FLOW_NODE_TONE.clienteReferencias}
+      icon={Layers}
+      title="Referências"
+      selected={selected}
+      className="w-52"
+      meta={
+        refs.length > 0 && (
+          <span className="rounded-md bg-muted px-1.5 py-px text-[0.625rem] font-bold tabular-nums text-muted-foreground">
             {refs.length}
           </span>
-        )}
-      </div>
-
+        )
+      }
+    >
       {refs.length > 0 ? (
         <div className="grid grid-cols-3 gap-1">
           {refs.slice(0, 6).map((url, i) => (
             <div
               key={i}
-              className="aspect-square overflow-hidden rounded-md border border-violet-500/15 bg-violet-500/5"
+              className="aspect-square overflow-hidden rounded-lg border border-border bg-surface"
             >
               <img
                 src={url}
@@ -38,22 +49,18 @@ export function ClienteReferenciasNode({ data }: { data: ClienteReferenciasData 
             </div>
           ))}
           {refs.length > 6 && (
-            <div className="flex aspect-square items-center justify-center rounded-md border border-violet-500/15 bg-violet-500/5 text-[0.5625rem] text-violet-400/60">
+            <div className="flex aspect-square items-center justify-center rounded-lg border border-border bg-muted text-[0.625rem] font-semibold text-muted-foreground">
               +{refs.length - 6}
             </div>
           )}
         </div>
       ) : (
-        <div className="flex aspect-video w-full items-center justify-center rounded-lg border border-violet-500/15 bg-violet-500/5">
-          <ImageIcon className="size-6 text-violet-500/20" strokeWidth={1} />
-        </div>
+        <NodeImagePlaceholder icon={ImageIcon} className="aspect-video">
+          <span className="text-[0.625rem] text-muted-foreground">Sem referências</span>
+        </NodeImagePlaceholder>
       )}
 
-      <Handle
-        type="source"
-        position={Position.Right}
-        className="!size-2.5 !border-violet-500/50 !bg-violet-500/30"
-      />
-    </div>
+      <Handle type="source" position={Position.Right} className={flowHandleClass} />
+    </NodeShell>
   );
 }

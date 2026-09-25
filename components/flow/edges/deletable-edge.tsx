@@ -39,7 +39,7 @@ export function DeletableEdge({
         markerEnd={markerEnd}
         style={{
           ...style,
-          stroke: selected ? "oklch(0.75 0.1 265)" : "oklch(1 0 0 / 15%)",
+          stroke: selected ? "var(--primary)" : "var(--border-strong)",
           strokeWidth: selected ? 2 : 1.5,
         }}
       />
@@ -50,13 +50,13 @@ export function DeletableEdge({
             style={{
               transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
             }}
-            className="pointer-events-auto absolute flex size-5 items-center justify-center rounded-full border border-red-500/40 bg-[oklch(0.09_0.007_265)] text-red-400 shadow-sm transition-colors hover:border-red-500/70 hover:bg-red-500/15"
+            className="nodrag nopan pointer-events-auto absolute flex size-6 items-center justify-center rounded-full border border-tone-red/40 bg-popover text-tone-red shadow-[var(--surface-shadow-elevated)] transition-premium hover:border-tone-red/70 hover:bg-tone-red hover:text-background"
             title="Remover conexão"
             onClick={() =>
               setEdges((eds) => eds.filter((e) => e.id !== id))
             }
           >
-            <X className="size-2.5" strokeWidth={2.5} />
+            <X className="size-3" strokeWidth={2.5} />
           </button>
         </EdgeLabelRenderer>
       )}

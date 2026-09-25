@@ -3,10 +3,11 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import { Loader2, Trash2, Upload } from "lucide-react";
+import { ImageIcon, Loader2, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { REFERENCE_KINDS, type ReferenceKind } from "@/lib/ai/art-director/types";
 import type { ReferenceAssetRow } from "@/services/reference-assets";
 import { cn } from "@/lib/utils";
@@ -108,14 +109,13 @@ export function ReferenceBank({ clientId, assets }: Props) {
     <div className="space-y-5">
       <div className="flex flex-wrap items-end gap-3">
         <label className="space-y-1.5">
-          <span className="block text-xs text-muted-foreground">Papel</span>
+          <span className="block text-[0.8125rem] font-semibold text-muted-foreground">Papel</span>
           <select
             value={kind}
             onChange={(e) => setKind(e.target.value as ReferenceKind)}
             className={cn(
-              "h-9 rounded-xl border border-border bg-card px-3 text-sm text-foreground",
-              "outline-none transition-premium focus-visible:ring-2 focus-visible:ring-ring/40",
-              "dark:border-white/8 dark:bg-white/5"
+              "h-9 rounded-xl border border-border bg-input px-3 text-sm text-foreground",
+              "outline-none transition-premium hover:border-border-strong focus-visible:border-primary/60 focus-visible:ring-2 focus-visible:ring-ring/20"
             )}
           >
             {REFERENCE_KINDS.map((k) => (
@@ -162,18 +162,21 @@ export function ReferenceBank({ clientId, assets }: Props) {
       )}
 
       {assets.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          Acervo vazio. São necessárias 4 referências (pelo menos 1 de estilo) para
-          gerar prompts com IA para este cliente.
-        </p>
+        <EmptyState
+          compact
+          icon={ImageIcon}
+          tone="violet"
+          title="Acervo vazio"
+          description="São necessárias 4 referências (pelo menos 1 de estilo) para gerar prompts com IA para este cliente."
+        />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {assets.map((asset) => (
             <figure
               key={asset.id}
-              className="group/asset space-y-2 rounded-2xl border border-border p-3 dark:border-white/8"
+              className="group/asset surface-panel space-y-2 p-3"
             >
-              <div className="relative aspect-video overflow-hidden rounded-xl">
+              <div className="relative aspect-video overflow-hidden rounded-xl bg-muted">
                 <Image
                   src={asset.storage_url}
                   alt={asset.ai_description ?? asset.file_name ?? "referência"}
@@ -187,7 +190,7 @@ export function ReferenceBank({ clientId, assets }: Props) {
                   onClick={() => void handleRemove(asset.id)}
                   disabled={removing === asset.id}
                   aria-label="Remover do acervo"
-                  className="transition-premium absolute right-2 top-2 rounded-lg bg-background/85 p-1.5 opacity-0 backdrop-blur group-hover/asset:opacity-100 disabled:opacity-40"
+                  className="transition-premium absolute right-2 top-2 rounded-lg bg-background/85 p-1.5 text-foreground opacity-0 hover:text-tone-red group-hover/asset:opacity-100 focus-visible:opacity-100 disabled:opacity-40"
                 >
                   <Trash2 className="size-3.5" />
                 </button>
@@ -196,13 +199,13 @@ export function ReferenceBank({ clientId, assets }: Props) {
               <figcaption className="space-y-2">
                 <div className="flex flex-wrap items-center gap-1.5">
                   <Badge variant="secondary">{asset.kind}</Badge>
-                  {asset.is_winner && <Badge variant="positive">arte aprovada</Badge>}
+                  {asset.is_winner && <Badge variant="green">arte aprovada</Badge>}
                   {asset.annotation_status === "failed" && (
                     <Badge variant="destructive">sem anotação</Badge>
                   )}
                 </div>
 
-                <p className="text-xs leading-snug text-foreground/90">
+                <p className="text-xs leading-snug text-foreground">
                   {asset.ai_description ?? "Sem descrição — o diretor de arte vai ignorar esta referência."}
                 </p>
 

@@ -65,10 +65,10 @@ export function BrandColorPicker({
           {value.map((hex) => (
             <div
               key={hex}
-              className="flex items-center gap-2 rounded-lg border border-border/50 bg-card/40 py-1.5 pr-2 pl-1.5"
+              className="flex items-center gap-2 rounded-xl border border-border bg-card py-1.5 pr-2 pl-1.5 shadow-[var(--surface-shadow)]"
             >
               <span
-                className="size-8 shrink-0 rounded-md border border-border/40"
+                className="size-8 shrink-0 rounded-lg border border-border"
                 style={{ backgroundColor: hex }}
                 title={hex}
               />
@@ -76,7 +76,7 @@ export function BrandColorPicker({
               <button
                 type="button"
                 onClick={() => removeColor(hex)}
-                className="rounded-md p-1 text-muted-foreground transition-premium hover:bg-muted/50 hover:text-foreground"
+                className="rounded-md p-1 text-muted-foreground transition-premium hover:bg-accent hover:text-foreground"
                 aria-label={`Remover ${hex}`}
               >
                 <X className="size-3.5" />
@@ -100,7 +100,7 @@ export function BrandColorPicker({
                 setHexInput(e.target.value.toUpperCase());
                 setInputError(null);
               }}
-              className="size-10 cursor-pointer rounded-lg border border-border/50 bg-transparent p-0.5"
+              className="size-10 cursor-pointer rounded-xl border border-border bg-surface p-0.5"
               aria-label="Seletor de cor"
             />
             <Input
@@ -123,7 +123,7 @@ export function BrandColorPicker({
             <Plus className="size-4" />
             Adicionar cor
           </Button>
-          <span className="text-xs text-muted-foreground">
+          <span className="text-xs tabular-nums text-muted-foreground">
             {value.length}/{MAX_COLORS}
           </span>
         </div>

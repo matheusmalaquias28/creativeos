@@ -49,7 +49,7 @@ export function NavigationProgress() {
         active ? "opacity-100" : "opacity-0"
       )}
     >
-      <div className="h-full w-1/3 animate-route-progress bg-gradient-to-r from-transparent via-foreground/70 to-transparent" />
+      <div className="h-full w-1/3 animate-route-progress bg-[linear-gradient(90deg,transparent,var(--primary),var(--highlight),transparent)]" />
     </div>
   );
 }

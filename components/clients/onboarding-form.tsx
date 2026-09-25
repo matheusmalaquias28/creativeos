@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { ImageIcon, Loader2, Sparkles } from "lucide-react";
+import { Check, Cloud, ImageIcon, Images, Loader2, Sparkles } from "lucide-react";
 import {
   completeOnboardingAction,
   saveOnboardingDraft,
@@ -19,6 +19,8 @@ import { LogoUploadField } from "@/components/clients/logo-upload-field";
 import { ClientPhotosField } from "@/components/clients/client-photos-field";
 import { VisualIdentityField } from "@/components/clients/visual-identity-field";
 import { Button } from "@/components/ui/button";
+import { tones, type Tone } from "@/lib/design/tokens";
+import { cn } from "@/lib/utils";
 
 type OnboardingFormProps = {
   clientId: string;
@@ -29,25 +31,35 @@ type OnboardingFormProps = {
 
 function BriefingColumn({
   icon: Icon,
+  step,
   title,
   description,
-  accent = "text-foreground/60",
+  tone = "violet",
   children,
 }: {
   icon: typeof ImageIcon;
+  step: number;
   title: string;
   description: string;
-  accent?: string;
+  tone?: Tone;
   children: ReactNode;
 }) {
   return (
-    <div className="flex min-h-[320px] flex-col gap-3 rounded-xl border border-white/8 bg-card/20 p-4 backdrop-blur-sm">
-      <div className="space-y-1">
-        <div className="flex items-center gap-2">
-          <Icon className={`size-4 ${accent}`} strokeWidth={1.5} />
-          <h2 className="text-sm font-semibold tracking-heading text-foreground">{title}</h2>
+    <div className="surface-panel flex min-h-[320px] flex-col gap-4 p-5">
+      <div className="flex items-start gap-3">
+        <span
+          className={cn(
+            "flex size-9 shrink-0 items-center justify-center rounded-xl",
+            tones[tone].iconTile
+          )}
+        >
+          <Icon className="size-4" strokeWidth={2} />
+        </span>
+        <div className="min-w-0 space-y-0.5">
+          <p className="text-[0.75rem] font-semibold text-muted-foreground">Passo {step}</p>
+          <h2 className="text-sm font-bold tracking-tight text-foreground">{title}</h2>
+          <p className="text-xs leading-relaxed text-muted-foreground">{description}</p>
         </div>
-        <p className="text-xs leading-relaxed text-muted-foreground">{description}</p>
       </div>
       <div className="flex flex-1 flex-col">{children}</div>
     </div>
@@ -130,11 +142,19 @@ export function OnboardingForm({
 
   return (
     <form action={onComplete} className="space-y-8">
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-xs text-muted-foreground">
-          {completedAt
-            ? `Concluído em ${new Date(completedAt).toLocaleDateString("pt-BR")}`
-            : "Salvamento automático ativo"}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-2.5">
+        <p className="flex items-center gap-2 text-[0.8125rem] text-muted-foreground">
+          {completedAt ? (
+            <>
+              <span className={cn("size-1.5 rounded-full", tones.green.dot)} />
+              Concluído em {new Date(completedAt).toLocaleDateString("pt-BR")}
+            </>
+          ) : (
+            <>
+              <Cloud className="size-3.5" strokeWidth={2} />
+              Salvamento automático ativo
+            </>
+          )}
         </p>
         {saveStatus === "saving" && (
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -143,13 +163,18 @@ export function OnboardingForm({
           </span>
         )}
         {saveStatus === "saved" && (
-          <span className="text-xs text-muted-foreground">Salvo</span>
+          <span className={cn("flex items-center gap-1.5 text-xs font-semibold", tones.green.text)}>
+            <Check className="size-3" strokeWidth={2.5} />
+            Salvo
+          </span>
         )}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <BriefingColumn
           icon={ImageIcon}
+          step={1}
+          tone="orange"
           title="Logo"
           description="Logo oficial para composição nas artes."
         >
@@ -166,7 +191,9 @@ export function OnboardingForm({
         </BriefingColumn>
 
         <BriefingColumn
-          icon={ImageIcon}
+          icon={Images}
+          step={2}
+          tone="cyan"
           title="Fotos"
           description="Produto, espaço ou contexto da marca — até 5 imagens."
         >
@@ -180,9 +207,10 @@ export function OnboardingForm({
 
         <BriefingColumn
           icon={Sparkles}
-          title="Extrator"
+          step={3}
+          tone="pink"
+          title="Extrator de identidade"
           description="Arte de referência para a IA extrair cores, tipografia e estilo."
-          accent="text-foreground/60"
         >
           <VisualIdentityField
             compact
@@ -196,7 +224,7 @@ export function OnboardingForm({
       <input type="hidden" name="logoUrl" value={logoUrl ?? ""} readOnly />
       <input type="hidden" name="logoStoragePath" value={logoStoragePath ?? ""} readOnly />
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap items-center gap-3 border-t border-border pt-6">
         <Button type="submit" disabled={isPending || !identityReady}>
           {isPending ? (
             <>

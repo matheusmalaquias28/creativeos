@@ -13,7 +13,7 @@ function TabsList({ className, ...props }: TabsPrimitive.List.Props) {
     <TabsPrimitive.List
       data-slot="tabs-list"
       className={cn(
-        "relative flex items-center gap-1 border-b border-border/50 pb-px",
+        "relative flex items-center gap-5 border-b border-border",
         className
       )}
       {...props}
@@ -26,7 +26,7 @@ function TabsTrigger({ className, ...props }: TabsPrimitive.Tab.Props) {
     <TabsPrimitive.Tab
       data-slot="tabs-trigger"
       className={cn(
-        "relative inline-flex items-center gap-1.5 px-1 pb-2.5 pt-0.5 text-sm font-medium text-muted-foreground transition-colors outline-none",
+        "relative inline-flex items-center gap-1.5 pb-3 pt-1 text-sm font-semibold text-muted-foreground transition-colors outline-none",
         "hover:text-foreground",
         "focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring/40",
         "data-selected:text-foreground",
@@ -43,7 +43,7 @@ function TabsIndicator({ className, ...props }: TabsPrimitive.Indicator.Props) {
     <TabsPrimitive.Indicator
       data-slot="tabs-indicator"
       className={cn(
-        "absolute bottom-0 left-0 h-0.5 w-(--active-tab-width) translate-x-(--active-tab-left) rounded-full bg-foreground transition-all duration-200 ease-out",
+        "absolute -bottom-px left-0 h-0.5 w-(--active-tab-width) translate-x-(--active-tab-left) rounded-full bg-primary transition-all duration-200 ease-out",
         className
       )}
       {...props}

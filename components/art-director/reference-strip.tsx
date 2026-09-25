@@ -54,7 +54,7 @@ export function ReferenceStrip({ jobId, references, editable, onRemoved }: Props
     <div className="flex flex-wrap gap-3">
       {references.map((ref, i) => (
         <figure key={ref.id} className="group/ref relative w-28">
-          <div className="relative aspect-square overflow-hidden rounded-xl border border-border dark:border-white/8">
+          <div className="relative aspect-square overflow-hidden rounded-xl border border-border bg-muted">
             <Image
               src={ref.storage_url}
               alt={ref.intent ?? ref.role}
@@ -63,7 +63,7 @@ export function ReferenceStrip({ jobId, references, editable, onRemoved }: Props
               className="object-cover"
               unoptimized
             />
-            <span className="absolute left-1 top-1 rounded-md bg-background/80 px-1.5 py-0.5 font-mono text-[0.625rem] text-muted-foreground backdrop-blur">
+            <span className="absolute left-1 top-1 rounded-md bg-background/80 px-1.5 py-0.5 text-[0.625rem] font-semibold tabular-nums text-foreground">
               {i + 1}
             </span>
             {editable && (
@@ -72,14 +72,14 @@ export function ReferenceStrip({ jobId, references, editable, onRemoved }: Props
                 onClick={() => void handleRemove(ref.id)}
                 disabled={removing === ref.id}
                 aria-label="Remover referência"
-                className="transition-premium absolute right-1 top-1 rounded-md bg-background/80 p-1 opacity-0 backdrop-blur group-hover/ref:opacity-100 disabled:opacity-40"
+                className="transition-premium absolute right-1 top-1 rounded-md bg-background/80 p-1 text-foreground opacity-0 hover:text-tone-red group-hover/ref:opacity-100 focus-visible:opacity-100 disabled:opacity-40"
               >
                 <X className="size-3" />
               </button>
             )}
           </div>
           <figcaption className="mt-1.5 space-y-1">
-            <Badge variant="ghost" className="px-0">
+            <Badge variant="secondary">
               {ref.role}
             </Badge>
             {ref.intent && (

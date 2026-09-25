@@ -64,7 +64,7 @@ function TagListEditor({
         {values.map((v, i) => (
           <span
             key={`${v}-${i}`}
-            className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-black/20 px-1.5 py-0.5 text-[0.625rem] text-foreground/80"
+            className="inline-flex items-center gap-1 rounded-md border border-border bg-muted px-1.5 py-0.5 text-[0.6875rem] text-foreground/90"
           >
             {v}
             <button
@@ -125,7 +125,7 @@ function PaletteEditor({
         {colors.map((color, i) => (
           <span
             key={`${color}-${i}`}
-            className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-black/20 px-1.5 py-0.5 text-[0.625rem] font-mono"
+            className="inline-flex items-center gap-1 rounded-md border border-border bg-muted px-1.5 py-0.5 text-[0.6875rem] font-mono"
           >
             <input
               type="color"
@@ -377,7 +377,7 @@ export function VisualIdentityField({
             {local.identitySampleUrls.map((url) => (
               <div
                 key={url}
-                className="group relative aspect-square overflow-hidden rounded-lg border border-white/10 bg-black/25"
+                className="group relative aspect-square overflow-hidden rounded-xl border border-border bg-surface"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -392,7 +392,7 @@ export function VisualIdentityField({
                   disabled={isPending}
                   onClick={() => handleRemove(url)}
                   aria-label="Remover amostra"
-                  className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-md bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                  className="absolute right-1 top-1 flex size-6 items-center justify-center rounded-md border border-tone-red/25 bg-popover/95 text-tone-red opacity-0 shadow-[var(--surface-shadow)] transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
                 >
                   <Trash2 className="size-3" />
                 </button>
@@ -408,7 +408,7 @@ export function VisualIdentityField({
               disabled={isPending}
               isUploading={isPending}
               onFiles={handleUpload}
-              icon={<Plus className="size-5 text-white/45" strokeWidth={1.25} />}
+              icon={<Plus className="size-5 text-muted-foreground/70" strokeWidth={1.25} />}
               title={`Adicionar mais artes (${local.identitySampleUrls.length}/${MAX_SAMPLES})`}
               subtitle="PNG, JPG ou WebP"
               minHeight="sm"
@@ -418,38 +418,38 @@ export function VisualIdentityField({
 
           <div className="flex flex-wrap gap-1.5">
             {extracting && (
-              <span className="inline-flex items-center gap-1 rounded-md border border-white/15 bg-white/5 px-2 py-1 text-[0.625rem] text-foreground/80">
+              <span className="inline-flex items-center gap-1 rounded-full border border-tone-blue/25 bg-tone-blue/12 px-2 py-0.5 text-[0.6875rem] font-semibold text-tone-blue">
                 <Loader2 className="size-3 animate-spin" />
                 Extraindo...
               </span>
             )}
             {ready && (
-              <span className="inline-flex items-center gap-1 rounded-md border border-white/15 bg-white/5 px-2 py-1 text-[0.625rem] text-foreground/80">
+              <span className="inline-flex items-center gap-1 rounded-full border border-tone-green/25 bg-tone-green/12 px-2 py-0.5 text-[0.6875rem] font-semibold text-tone-green">
                 <Sparkles className="size-3" />
                 DNA pronto
               </span>
             )}
             {failed && (
-              <span className="inline-flex items-center gap-1 rounded-md border border-red-500/30 bg-red-500/10 px-2 py-1 text-[0.625rem] text-red-300">
+              <span className="inline-flex items-center gap-1 rounded-full border border-tone-red/25 bg-tone-red/12 px-2 py-0.5 text-[0.6875rem] font-semibold text-tone-red">
                 Falhou
               </span>
             )}
             {failed && (
               <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={handleRetry} className="h-7 text-xs">
                 <RefreshCw className="size-3" />
-                Retry
+                Tentar novamente
               </Button>
             )}
           </div>
 
           {failed && local.identityExtractionError && (
-            <p className="text-[0.625rem] text-red-400/90">{local.identityExtractionError}</p>
+            <p className="text-[0.6875rem] text-tone-red">{local.identityExtractionError}</p>
           )}
 
           {showDnaDetails && ready && local.visualIdentityDna && !editingDna && (
-            <div className="space-y-2 rounded-lg border border-border/50 bg-muted/30 p-3">
+            <div className="space-y-2 rounded-xl border border-border bg-surface p-3">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[0.625rem] font-medium uppercase tracking-wide text-muted-foreground">
+                <span className="text-xs font-semibold text-foreground">
                   DNA visual
                 </span>
                 <div className="flex gap-1">
@@ -457,7 +457,7 @@ export function VisualIdentityField({
                     type="button"
                     size="sm"
                     variant="ghost"
-                    className="h-6 gap-1 px-2 text-[0.625rem]"
+                    className="h-6 gap-1 px-2 text-[0.6875rem]"
                     onClick={startEditingDna}
                   >
                     <Pencil className="size-3" />
@@ -467,7 +467,7 @@ export function VisualIdentityField({
                     type="button"
                     size="sm"
                     variant="ghost"
-                    className="h-6 gap-1 px-2 text-[0.625rem]"
+                    className="h-6 gap-1 px-2 text-[0.6875rem]"
                     onClick={handleCopyDna}
                   >
                     {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
@@ -484,10 +484,10 @@ export function VisualIdentityField({
                 {local.visualIdentityDna.palette.map((color) => (
                   <span
                     key={color}
-                    className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-black/20 px-1.5 py-0.5 text-[0.625rem] font-mono"
+                    className="inline-flex items-center gap-1 rounded-md border border-border bg-muted px-1.5 py-0.5 text-[0.6875rem] font-mono"
                   >
                     <span
-                      className="size-2.5 rounded-full border border-white/20"
+                      className="size-2.5 rounded-full border border-border-strong"
                       style={{ backgroundColor: color }}
                     />
                     {color}
@@ -495,7 +495,7 @@ export function VisualIdentityField({
                 ))}
               </div>
 
-              <div className="grid gap-1.5 text-[0.625rem] text-muted-foreground">
+              <div className="grid gap-1.5 text-[0.6875rem] text-muted-foreground">
                 <p className="flex items-start gap-1.5">
                   <Type className="mt-0.5 size-3 shrink-0" />
                   <span>
@@ -519,7 +519,7 @@ export function VisualIdentityField({
                   {local.visualIdentityDna.visualKeywords.map((kw) => (
                     <span
                       key={kw}
-                      className="rounded-md border border-white/8 bg-black/15 px-1.5 py-0.5 text-[0.625rem] text-muted-foreground"
+                      className="rounded-md border border-border bg-muted px-1.5 py-0.5 text-[0.6875rem] text-muted-foreground"
                     >
                       {kw}
                     </span>
@@ -530,9 +530,9 @@ export function VisualIdentityField({
           )}
 
           {showDnaDetails && editingDna && draftDna && (
-            <div className="space-y-3 rounded-lg border border-border/50 bg-muted/30 p-3">
+            <div className="space-y-3 rounded-xl border border-border bg-surface p-3">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[0.625rem] font-medium uppercase tracking-wide text-muted-foreground">
+                <span className="text-xs font-semibold text-foreground">
                   Editar DNA visual
                 </span>
                 <div className="flex gap-1">
@@ -541,7 +541,7 @@ export function VisualIdentityField({
                     size="sm"
                     disabled={isSavingDna}
                     onClick={handleSaveDna}
-                    className="h-6 gap-1 px-2 text-[0.625rem]"
+                    className="h-6 gap-1 px-2 text-[0.6875rem]"
                   >
                     {isSavingDna ? <Loader2 className="size-3 animate-spin" /> : <Check className="size-3" />}
                     Salvar
@@ -552,7 +552,7 @@ export function VisualIdentityField({
                     variant="ghost"
                     disabled={isSavingDna}
                     onClick={cancelEditingDna}
-                    className="h-6 gap-1 px-2 text-[0.625rem]"
+                    className="h-6 gap-1 px-2 text-[0.6875rem]"
                   >
                     Cancelar
                   </Button>
@@ -560,7 +560,7 @@ export function VisualIdentityField({
               </div>
 
               <div className="space-y-1">
-                <Label className="text-[0.5625rem]">Resumo</Label>
+                <Label className="text-xs">Resumo</Label>
                 <Input
                   value={draftDna.summary}
                   onChange={(e) => setDraftDna({ ...draftDna, summary: e.target.value })}
@@ -569,7 +569,7 @@ export function VisualIdentityField({
               </div>
 
               <div className="space-y-1">
-                <Label className="text-[0.5625rem]">Paleta</Label>
+                <Label className="text-xs">Paleta</Label>
                 <PaletteEditor
                   colors={draftDna.palette}
                   onChange={(palette) => setDraftDna({ ...draftDna, palette })}
@@ -578,7 +578,7 @@ export function VisualIdentityField({
 
               <div className="grid gap-2 sm:grid-cols-2">
                 <div className="space-y-1">
-                  <Label className="text-[0.5625rem]">Tipografia — headline</Label>
+                  <Label className="text-xs">Tipografia — headline</Label>
                   <Input
                     value={draftDna.typography.headlineStyle}
                     onChange={(e) =>
@@ -591,7 +591,7 @@ export function VisualIdentityField({
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[0.5625rem]">Tipografia — corpo</Label>
+                  <Label className="text-xs">Tipografia — corpo</Label>
                   <Input
                     value={draftDna.typography.bodyStyle}
                     onChange={(e) =>
@@ -607,7 +607,7 @@ export function VisualIdentityField({
 
               <div className="grid gap-2 sm:grid-cols-2">
                 <div className="space-y-1">
-                  <Label className="text-[0.5625rem]">Composição</Label>
+                  <Label className="text-xs">Composição</Label>
                   <Input
                     value={draftDna.compositionStyle}
                     onChange={(e) => setDraftDna({ ...draftDna, compositionStyle: e.target.value })}
@@ -615,7 +615,7 @@ export function VisualIdentityField({
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[0.5625rem]">Mood</Label>
+                  <Label className="text-xs">Mood</Label>
                   <Input
                     value={draftDna.mood}
                     onChange={(e) => setDraftDna({ ...draftDna, mood: e.target.value })}
@@ -625,7 +625,7 @@ export function VisualIdentityField({
               </div>
 
               <div className="space-y-1">
-                <Label className="text-[0.5625rem]">Palavras-chave</Label>
+                <Label className="text-xs">Palavras-chave</Label>
                 <TagListEditor
                   values={draftDna.visualKeywords}
                   onChange={(visualKeywords) => setDraftDna({ ...draftDna, visualKeywords })}
@@ -634,7 +634,7 @@ export function VisualIdentityField({
               </div>
 
               <div className="space-y-1">
-                <Label className="text-[0.5625rem]">Elementos fixos</Label>
+                <Label className="text-xs">Elementos fixos</Label>
                 <TagListEditor
                   values={draftDna.elementsToRepeat}
                   onChange={(elementsToRepeat) => setDraftDna({ ...draftDna, elementsToRepeat })}
@@ -643,7 +643,7 @@ export function VisualIdentityField({
               </div>
 
               <div className="space-y-1">
-                <Label className="text-[0.5625rem]">Evitar</Label>
+                <Label className="text-xs">Evitar</Label>
                 <TagListEditor
                   values={draftDna.avoid ?? []}
                   onChange={(avoid) => setDraftDna({ ...draftDna, avoid })}
@@ -661,7 +661,7 @@ export function VisualIdentityField({
           disabled={isPending}
           isUploading={isPending}
           onFiles={handleUpload}
-          icon={<Sparkles className="size-6 text-white/45" strokeWidth={1.25} />}
+          icon={<Sparkles className="size-6 text-muted-foreground/70" strokeWidth={1.25} />}
           title="Clique ou arraste uma ou mais artes"
           subtitle="PNG, JPG ou WebP"
           minHeight={compact ? "md" : "sm"}
@@ -678,20 +678,22 @@ export function VisualIdentityDnaPreview({ state }: { state: ClientVisualIdentit
   if (state.identityExtractionStatus !== "ready" || !dna) return null;
 
   return (
-    <div className="space-y-3 rounded-xl border border-white/10 bg-white/[0.03] p-5">
+    <div className="surface-panel space-y-3 p-5">
       <div className="flex items-center gap-2">
-        <Sparkles className="size-4 text-foreground/70" />
-        <h3 className="text-sm font-medium text-foreground">DNA visual extraído</h3>
+        <span className="flex size-8 items-center justify-center rounded-lg bg-tone-pink/14 text-tone-pink ring-1 ring-inset ring-tone-pink/20">
+          <Sparkles className="size-4" />
+        </span>
+        <h3 className="text-sm font-bold tracking-tight text-foreground">DNA visual extraído</h3>
       </div>
       <p className="text-sm leading-relaxed text-foreground/90">{dna.summary}</p>
       <div className="flex flex-wrap gap-1.5">
         {dna.palette.map((color) => (
           <span
             key={color}
-            className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-black/20 px-2 py-1 text-xs font-mono text-foreground/80"
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-xs font-mono text-foreground/90"
           >
             <span
-              className="size-3 rounded-full border border-white/20"
+              className="size-3 rounded-full border border-border-strong"
               style={{ backgroundColor: color }}
             />
             {color}

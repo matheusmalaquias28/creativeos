@@ -1,11 +1,9 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { DashboardPage } from "@/components/layout/dashboard-page";
 import { PromptReviewBoard } from "@/components/art-director/prompt-review-board";
 import { ReadinessChips } from "@/components/art-director/readiness-chips";
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 import { getDemandById } from "@/services/demands";
 import { getCurrentArtUrls, getPromptJobsForDemand } from "@/services/art-director";
 import { getClientArtReadiness, missingForReadiness } from "@/services/reference-assets";
@@ -35,33 +33,33 @@ export default async function PromptsPage({ params }: PageProps) {
 
   return (
     <DashboardPage
-      title={`Prompts: ${title}`}
+      title={title}
       description="Revise a direção de arte antes de gerar as imagens"
-    >
-      <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <Link
-            href={`/demands/${id}`}
-            className={cn(
-              buttonVariants({ variant: "ghost", size: "sm" }),
-              "gap-2 text-muted-foreground"
-            )}
-          >
-            <ArrowLeft className="size-4" />
-            Voltar para demanda
-          </Link>
+      backHref={`/demands/${id}`}
+      backLabel="Voltar para demanda"
+      eyebrow={
+        <Badge variant="pink" className="gap-1">
+          <Sparkles />
+          Prompts
+        </Badge>
+      }
+      headerContent={
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[0.8125rem] font-semibold text-muted-foreground">
+            Kit do cliente
+          </span>
           <ReadinessChips readiness={readiness} />
         </div>
-
-        <PromptReviewBoard
-          demandId={id}
-          initialJobs={jobs}
-          initialArts={arts}
-          ready={Boolean(readiness?.is_ready)}
-          missing={missing}
-          hasClientPhotos={clientPhotos.length > 0}
-        />
-      </div>
+      }
+    >
+      <PromptReviewBoard
+        demandId={id}
+        initialJobs={jobs}
+        initialArts={arts}
+        ready={Boolean(readiness?.is_ready)}
+        missing={missing}
+        hasClientPhotos={clientPhotos.length > 0}
+      />
     </DashboardPage>
   );
 }

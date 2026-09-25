@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { AlertTriangle, Images, Sparkles } from "lucide-react";
 import { DashboardPage } from "@/components/layout/dashboard-page";
 import { ArtCurationGrid } from "@/components/art-gen/art-curation-grid";
 import { GenerateArtsButton } from "@/components/art-gen/generate-arts-button";
+import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
+import { layout, tones } from "@/lib/design/tokens";
 import { cn } from "@/lib/utils";
 import { getDemandById } from "@/services/demands";
 import { getJobsForDemand } from "@/services/art-gen";
@@ -29,41 +31,39 @@ export default async function ArtCurationPage({ params }: PageProps) {
 
   return (
     <DashboardPage
-      title={`Curadoria: ${title}`}
+      title={title}
       description="Revise, ajuste e aprove as artes geradas"
-    >
-      <div className="space-y-6">
-        {/* Actions */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      backHref={`/demands/${id}`}
+      backLabel="Voltar para demanda"
+      eyebrow={
+        <Badge variant="pink" className="gap-1">
+          <Images />
+          Curadoria
+        </Badge>
+      }
+      headerAction={
+        <>
           <Link
-            href={`/demands/${id}`}
-            className={cn(
-              buttonVariants({ variant: "ghost", size: "sm" }),
-              "gap-2 text-muted-foreground"
-            )}
+            href={`/demands/${id}/prompts`}
+            className={cn(buttonVariants({ variant: "outline" }), "gap-2")}
           >
-            <ArrowLeft className="size-4" />
-            Voltar para demanda
+            <Sparkles className="size-4 text-tone-pink" />
+            Prompts com IA
           </Link>
 
-          <div className="flex items-center gap-2">
-            <Link
-              href={`/demands/${id}/prompts`}
-              className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "gap-2")}
-            >
-              <Sparkles className="size-4" />
-              Prompts com IA
-            </Link>
-
-            <GenerateArtsButton
-              demandId={id}
-              disabled={!hasClient}
-            />
-          </div>
-        </div>
-
+          <GenerateArtsButton demandId={id} disabled={!hasClient} />
+        </>
+      }
+    >
+      <div className={layout.sectionGap}>
         {!hasClient && (
-          <p className="text-sm text-amber-600">
+          <p
+            className={cn(
+              "flex items-center gap-2 rounded-xl border px-3.5 py-2.5 text-[0.8125rem] font-medium",
+              tones.amber.badge
+            )}
+          >
+            <AlertTriangle className="size-3.5 shrink-0" />
             Vincule um cliente à demanda antes de gerar artes.
           </p>
         )}

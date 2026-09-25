@@ -11,7 +11,7 @@ import {
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Building2, Loader2, Search } from "lucide-react";
+import { AlertTriangle, Building2, ChevronDown, Loader2, Search } from "lucide-react";
 import { toast } from "sonner";
 import { linkDemandToClientAction } from "@/actions/demands";
 import { CreateClientFromDemandButton } from "@/components/demands/create-client-from-demand-button";
@@ -19,6 +19,7 @@ import {
   displayExternalClientName,
   isUsableClientName,
 } from "@/lib/demands/normalize-client-name";
+import { tones } from "@/lib/design/tokens";
 import { cn } from "@/lib/utils";
 
 export type DemandClientOption = {
@@ -189,10 +190,10 @@ export function DemandClientLinker({
             />
             <div
               role="menu"
-              className="fixed z-50 w-[280px] overflow-hidden rounded-xl border border-border/60 bg-popover shadow-xl"
+              className="fixed z-50 w-[280px] overflow-hidden rounded-xl border border-border bg-popover shadow-[var(--surface-shadow-elevated),var(--inner-highlight)]"
               style={{ top: menuPos.top, left: menuPos.left }}
             >
-              <div className="flex items-center gap-2 border-b border-border/50 px-3 py-2">
+              <div className="flex items-center gap-2 border-b border-border px-3 py-2">
                 <Search className="size-3.5 text-muted-foreground" />
                 <input
                   ref={searchRef}
@@ -200,7 +201,7 @@ export function DemandClientLinker({
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Pesquisar cliente..."
-                  className="h-7 w-full bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
+                  className="h-8 w-full bg-transparent text-[0.8125rem] text-foreground outline-none placeholder:text-muted-foreground"
                 />
               </div>
 
@@ -218,13 +219,13 @@ export function DemandClientLinker({
                       disabled={isPending}
                       onClick={() => handleSelect(client)}
                       className={cn(
-                        "flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-xs transition-colors hover:bg-accent",
-                        client.id === linkedClientId && "bg-accent/60 font-medium"
+                        "flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-[0.8125rem] text-foreground transition-colors hover:bg-accent",
+                        client.id === linkedClientId && "bg-accent font-semibold"
                       )}
                     >
                       <span className="truncate">{client.name}</span>
                       {client.id === linkedClientId ? (
-                        <span className="shrink-0 text-[10px] text-muted-foreground">
+                        <span className="shrink-0 rounded-md bg-primary/15 px-1.5 text-[0.6875rem] font-semibold text-primary">
                           atual
                         </span>
                       ) : null}
@@ -233,7 +234,7 @@ export function DemandClientLinker({
                 )}
               </div>
 
-              <div className="space-y-2 border-t border-border/50 p-2">
+              <div className="space-y-2 border-t border-border bg-surface/60 p-2">
                 {isUnmatched && canCreateFromName ? (
                   <CreateClientFromDemandButton
                     demandId={demandId}
@@ -246,7 +247,7 @@ export function DemandClientLinker({
                   />
                 ) : null}
                 {isUnmatched && !canCreateFromName ? (
-                  <p className="px-1 py-1 text-[11px] leading-snug text-muted-foreground">
+                  <p className="px-1 py-1 text-xs leading-snug text-muted-foreground">
                     Sem nome válido para cadastro. Vincule a um cliente existente
                     ou cadastre o cliente depois.
                   </p>
@@ -274,11 +275,11 @@ export function DemandClientLinker({
       disabled={isPending}
       onClick={() => setOpen((value) => !value)}
       className={cn(
-        "relative z-50 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all outline-none disabled:opacity-60",
+        "relative z-50 inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-premium outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-60",
         compact ? "max-w-[180px]" : "max-w-[220px]",
         isUnmatched
-          ? "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300"
-          : "border-border/70 bg-muted/70 text-foreground/90 dark:border-white/10 dark:bg-white/5"
+          ? tones.amber.badge
+          : "border-border bg-card text-foreground hover:border-border-strong hover:bg-accent"
       )}
     >
       {isPending ? (
@@ -289,7 +290,7 @@ export function DemandClientLinker({
         <Building2 className="size-3.5 shrink-0" />
       )}
       <span className="truncate">{badgeLabel}</span>
-      <span className="ml-0.5 shrink-0 text-[0.6rem] opacity-60">▾</span>
+      <ChevronDown className="size-3 shrink-0 opacity-70" />
     </button>
   );
 

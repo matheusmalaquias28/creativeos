@@ -36,7 +36,7 @@ export function ReferenceGallery({ clientId, references }: ReferenceGalleryProps
       {references.map((ref) => (
         <div
           key={ref.id}
-          className="group relative aspect-square overflow-hidden rounded-lg border border-border/50 bg-card/30"
+          className="group relative aspect-square overflow-hidden rounded-xl border border-border bg-surface"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -46,7 +46,7 @@ export function ReferenceGallery({ clientId, references }: ReferenceGalleryProps
             loading="lazy"
             decoding="async"
           />
-          <div className="absolute inset-0 flex items-end justify-end bg-gradient-to-t from-black/50 to-transparent p-2 opacity-0 transition-premium group-hover:opacity-100">
+          <div className="absolute inset-0 flex items-end justify-end bg-gradient-to-t from-background/70 to-transparent p-2 opacity-0 transition-premium group-hover:opacity-100 focus-within:opacity-100">
             <Button
               type="button"
               size="icon-xs"

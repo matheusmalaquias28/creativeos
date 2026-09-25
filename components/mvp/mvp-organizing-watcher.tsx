@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { FileText, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { getMvpOrganizeSnapshotAction, retryMvpOrganizationAction } from "@/actions/mvp";
+import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
+import { tones } from "@/lib/design/tokens";
+import { cn } from "@/lib/utils";
 
 const POLL_INTERVAL_MS = 3000;
 
@@ -83,13 +86,28 @@ export function MvpOrganizingWatcher({
 
   if (status === "organizing") {
     return (
-      <div className="space-y-3 rounded-xl border border-sky-500/30 bg-sky-500/10 px-4 py-4">
-        <div className="flex items-center justify-between gap-3">
-          <span className="flex items-center gap-3 text-sm text-sky-200">
-            <Loader2 className="size-4 animate-spin" />
+      <div
+        aria-live="polite"
+        className="space-y-4 rounded-2xl border border-tone-blue/25 bg-tone-blue/6 p-4 sm:p-5"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span className="flex items-center gap-3 text-sm font-semibold text-foreground">
+            <span
+              className={cn(
+                "flex size-8 shrink-0 items-center justify-center rounded-xl",
+                tones.blue.iconTile
+              )}
+            >
+              <Loader2 className="size-4 animate-spin" />
+            </span>
             Organizando o conteúdo em páginas A4...
           </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/40 bg-sky-500/15 px-2.5 py-0.5 text-xs font-semibold text-sky-100">
+          <span
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold tabular-nums",
+              tones.blue.badge
+            )}
+          >
             <FileText className="size-3" />
             {pageCount} página{pageCount === 1 ? "" : "s"} criada{pageCount === 1 ? "" : "s"}
           </span>
@@ -98,27 +116,32 @@ export function MvpOrganizingWatcher({
           {Array.from({ length: pageCount }).map((_, i) => (
             <div
               key={i}
-              className="flex h-11 w-8 items-end justify-center rounded-[3px] border border-sky-400/40 bg-white/90 pb-0.5 text-[0.5rem] font-semibold text-sky-900 shadow-sm"
+              className="flex h-11 w-8 items-end justify-center rounded-[3px] border border-tone-blue/40 bg-card pb-0.5 text-[0.5rem] font-bold text-tone-blue tabular-nums shadow-[var(--surface-shadow)]"
               title={`Página ${i + 1}`}
             >
               {i + 1}
             </div>
           ))}
           {/* próxima página "chegando" */}
-          <div className="h-11 w-8 animate-pulse rounded-[3px] border border-dashed border-sky-400/50 bg-sky-400/10" />
+          <div className="h-11 w-8 animate-pulse rounded-[3px] border border-dashed border-tone-blue/50 bg-tone-blue/10" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-      <span>
+    <div
+      role="alert"
+      className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-tone-red/25 bg-tone-red/8 px-4 py-3 text-sm text-foreground"
+    >
+      <span className="min-w-0 flex-1">
         Falha ao organizar o conteúdo{errorMessage ? `: ${errorMessage}` : ""}
         {pageCount > 0 && ` — ${pageCount} página(s) já salvas serão aproveitadas no retry`}
       </span>
-      <button
+      <Button
         type="button"
+        variant="destructive"
+        size="sm"
         disabled={isPending}
         onClick={() =>
           startTransition(async () => {
@@ -127,11 +150,11 @@ export function MvpOrganizingWatcher({
             else router.refresh();
           })
         }
-        className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-red-500/40 bg-red-500/10 px-2.5 py-1 text-xs font-medium transition-premium hover:bg-red-500/20 disabled:opacity-60"
+        className="shrink-0"
       >
-        <RefreshCw className="size-3" />
+        <RefreshCw />
         Tentar de novo
-      </button>
+      </Button>
     </div>
   );
 }

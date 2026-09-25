@@ -77,7 +77,7 @@ export function ClientPhotosField({
           {photos.map((photo) => (
             <div
               key={photo.id}
-              className="group relative aspect-square overflow-hidden rounded-lg border border-white/10 bg-black/20"
+              className="group relative aspect-square overflow-hidden rounded-xl border border-border bg-surface"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -87,7 +87,7 @@ export function ClientPhotosField({
                 loading="lazy"
                 decoding="async"
               />
-              <div className="absolute inset-0 flex items-end justify-end bg-gradient-to-t from-black/50 to-transparent p-1 opacity-0 transition-opacity group-hover:opacity-100">
+              <div className="absolute inset-0 flex items-end justify-end bg-gradient-to-t from-background/70 to-transparent p-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
                 <Button
                   type="button"
                   size="icon-xs"
@@ -114,7 +114,7 @@ export function ClientPhotosField({
           onFiles={handleFiles}
           icon={
             <ImageIcon
-              className="size-6 text-white/45"
+              className="size-6 text-muted-foreground/70"
               strokeWidth={1.25}
             />
           }

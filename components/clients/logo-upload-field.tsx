@@ -99,7 +99,7 @@ export function LogoUploadField({
             className={cn("flex-1", isPending && "opacity-60")}
           >
             <div className="flex flex-col items-center gap-2">
-              <div className="relative flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black/30">
+              <div className="relative flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-surface">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={preview}
@@ -134,7 +134,7 @@ export function LogoUploadField({
           onFiles={(files) => handleUpload(files[0])}
           icon={
             <ImageIcon
-              className="size-6 text-white/45"
+              className="size-6 text-muted-foreground/70"
               strokeWidth={1.25}
             />
           }

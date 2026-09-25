@@ -1,14 +1,6 @@
 import { DashboardPage } from "@/components/layout/dashboard-page";
 import { ClientList } from "@/components/clients/client-list";
-import { CreateClientForm } from "@/components/clients/create-client-form";
-import {
-  Surface,
-  SurfaceContent,
-  SurfaceDescription,
-  SurfaceHeader,
-  SurfaceTitle,
-} from "@/components/ui/surface";
-import { layout } from "@/lib/design/tokens";
+import { NewClientDialog } from "@/components/clients/new-client-dialog";
 import { getAuthUser } from "@/lib/auth/session";
 import { getClientsForUser } from "@/services/clients";
 
@@ -22,22 +14,9 @@ export default async function ClientsPage() {
     <DashboardPage
       title="Clientes"
       description="Gerencie marcas, onboarding e Creative Brains"
+      headerAction={<NewClientDialog />}
     >
-      <div className={layout.sectionGap}>
-        <Surface variant="elevated">
-          <SurfaceHeader>
-            <SurfaceTitle>Adicionar cliente</SurfaceTitle>
-            <SurfaceDescription>
-              Registro manual ou via automação futura
-            </SurfaceDescription>
-          </SurfaceHeader>
-          <SurfaceContent>
-            <CreateClientForm />
-          </SurfaceContent>
-        </Surface>
-
-        <ClientList clients={clients} />
-      </div>
+      <ClientList clients={clients} />
     </DashboardPage>
   );
 }

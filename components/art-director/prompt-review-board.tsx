@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CheckCheck, Loader2, Wand2 } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCheck, Images, Loader2, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ImageLightbox, type LightboxItem } from "@/components/ui/image-lightbox";
+import { tones } from "@/lib/design/tokens";
 import { cn } from "@/lib/utils";
 import { PromptCard } from "./prompt-card";
 import { GenerationProgress } from "./generation-progress";
@@ -236,7 +238,7 @@ export function PromptReviewBoard({
 
           {awaiting > 0 && (
             <Button
-              variant="secondary"
+              variant="positive"
               onClick={() => void handleApproveAll()}
               disabled={approvingAll}
               className="gap-2"
@@ -253,9 +255,11 @@ export function PromptReviewBoard({
 
         <Link
           href={`/demands/${demandId}/curation`}
-          className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "text-muted-foreground")}
+          className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
         >
+          <Images className="size-3.5" />
           Ir para a curadoria
+          <ArrowRight className="size-3.5" />
         </Link>
       </div>
 
@@ -263,15 +267,24 @@ export function PromptReviewBoard({
       <GenerationProgress counts={renderCounts} label="Gerando as imagens" />
 
       {!ready && (
-        <p className="text-sm text-warning">
-          Cliente sem kit completo — falta: {missing.join(", ")}.
+        <p
+          className={cn(
+            "flex items-start gap-2 rounded-xl border px-3.5 py-2.5 text-[0.8125rem] font-medium",
+            tones.amber.badge
+          )}
+        >
+          <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+          <span>Cliente sem kit completo — falta: {missing.join(", ")}.</span>
         </p>
       )}
 
       {jobs.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          Nenhum prompt ainda. Gere os prompts para revisar antes de queimar crédito de imagem.
-        </p>
+        <EmptyState
+          icon={Wand2}
+          tone="pink"
+          title="Nenhum prompt ainda"
+          description="Gere os prompts para revisar antes de queimar crédito de imagem."
+        />
       ) : (
         <div className="space-y-5">
           {jobs.map((job) => (

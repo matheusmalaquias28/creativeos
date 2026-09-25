@@ -2,49 +2,52 @@
 
 import { Handle, Position } from "@xyflow/react";
 import { ImageIcon, Loader2, AlertCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  FLOW_NODE_TONE,
+  NodeImagePlaceholder,
+  NodeShell,
+  flowHandleClass,
+} from "@/components/flow/nodes/node-shell";
 import type { SaidaArteData } from "@/lib/flow/types";
 
-export function SaidaArteNode({ data }: { data: SaidaArteData }) {
+export function SaidaArteNode({
+  data,
+  selected,
+}: {
+  data: SaidaArteData;
+  selected?: boolean;
+}) {
   const label = data.label ?? `Arte ${data.artIndex + 1}`;
   const isProcessing =
     data.generatingStatus === "processing" || data.generatingStatus === "queued";
   const isFailed = data.generatingStatus === "failed";
 
   return (
-    <div className="w-44 rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-3 backdrop-blur-sm">
-      <Handle
-        type="target"
-        position={Position.Left}
-        className="!size-2.5 !border-emerald-500/50 !bg-emerald-500/30"
-      />
-
-      {/* Header */}
-      <div className="mb-2 flex items-center gap-1.5">
-        <div
-          className={`flex size-5 shrink-0 items-center justify-center rounded-md border bg-emerald-500/15 ${
-            isProcessing
-              ? "border-emerald-400/60"
-              : isFailed
-              ? "border-red-500/40"
-              : "border-emerald-500/30"
-          }`}
-        >
-          {isProcessing ? (
-            <Loader2 className="size-3 animate-spin text-emerald-400" />
-          ) : isFailed ? (
-            <AlertCircle className="size-3 text-red-400" />
-          ) : (
-            <ImageIcon className="size-3 text-emerald-400" strokeWidth={1.5} />
-          )}
-        </div>
-        <span className="truncate text-[0.6875rem] font-semibold uppercase tracking-widest text-emerald-400">
-          {label}
-        </span>
-      </div>
+    <NodeShell
+      tone={isFailed ? "red" : FLOW_NODE_TONE.saidaArte}
+      icon={isFailed ? AlertCircle : ImageIcon}
+      iconNode={isProcessing ? <Loader2 className="size-3.5 animate-spin" /> : undefined}
+      title={label}
+      selected={selected}
+      className="w-44"
+      meta={
+        isProcessing ? (
+          <Badge variant="blue" className="h-5 px-2 text-[0.625rem]">
+            {data.generatingStatus === "queued" ? "Na fila" : "Gerando"}
+          </Badge>
+        ) : isFailed ? (
+          <Badge variant="red" className="h-5 px-2 text-[0.625rem]">
+            Falhou
+          </Badge>
+        ) : null
+      }
+    >
+      <Handle type="target" position={Position.Left} className={flowHandleClass} />
 
       {/* Result area */}
       {data.resultUrl ? (
-        <div className="overflow-hidden rounded-lg border border-emerald-500/20">
+        <div className="overflow-hidden rounded-xl border border-border">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={data.resultUrl}
@@ -54,22 +57,22 @@ export function SaidaArteNode({ data }: { data: SaidaArteData }) {
           />
         </div>
       ) : isProcessing ? (
-        <div className="flex aspect-square w-full flex-col items-center justify-center gap-2 rounded-lg border border-emerald-400/15 bg-emerald-500/5">
-          <Loader2 className="size-5 animate-spin text-emerald-400/50" />
-          <span className="text-[0.5625rem] text-emerald-400/40">
+        <div className="flex aspect-square w-full flex-col items-center justify-center gap-2 rounded-xl border border-tone-blue/25 bg-tone-blue/8">
+          <Loader2 className="size-5 animate-spin text-tone-blue" />
+          <span className="text-[0.625rem] font-medium text-tone-blue">
             {data.generatingStatus === "queued" ? "na fila…" : "gerando…"}
           </span>
         </div>
       ) : isFailed ? (
-        <div className="flex aspect-square w-full flex-col items-center justify-center gap-1.5 rounded-lg border border-red-500/20 bg-red-500/5">
-          <AlertCircle className="size-5 text-red-400/50" />
-          <span className="text-[0.5625rem] text-red-400/50">falhou</span>
+        <div className="flex aspect-square w-full flex-col items-center justify-center gap-1.5 rounded-xl border border-tone-red/25 bg-tone-red/8">
+          <AlertCircle className="size-5 text-tone-red" />
+          <span className="text-[0.625rem] font-medium text-tone-red">falhou</span>
         </div>
       ) : (
-        <div className="flex aspect-square w-full items-center justify-center rounded-lg border border-emerald-500/10 bg-emerald-500/3">
-          <ImageIcon className="size-6 text-emerald-500/20" strokeWidth={1} />
-        </div>
+        <NodeImagePlaceholder icon={ImageIcon} className="aspect-square">
+          <span className="text-[0.625rem] text-muted-foreground">Aguardando geração</span>
+        </NodeImagePlaceholder>
       )}
-    </div>
+    </NodeShell>
   );
 }

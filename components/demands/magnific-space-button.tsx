@@ -11,6 +11,9 @@ import {
 } from "@/actions/magnific";
 import { createClient } from "@/lib/supabase/client";
 import type { MagnificSpaceStatus } from "@/types/database";
+import { buttonVariants } from "@/components/ui/button";
+import { tones } from "@/lib/design/tokens";
+import { cn } from "@/lib/utils";
 
 const POLL_INTERVAL_MS = 5000;
 
@@ -127,7 +130,7 @@ export function MagnificSpaceButton({ demandId, status, spaceUrl, errorMessage }
 
   if (localStatus === "generating") {
     return (
-      <span className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/10 bg-black/20 px-3 text-sm text-muted-foreground">
+      <span className={cn("inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-[0.8125rem] font-medium", tones.blue.badge)}>
         <Loader2 className="size-3.5 animate-spin" />
         Gerando Space...
         <button
@@ -135,7 +138,7 @@ export function MagnificSpaceButton({ demandId, status, spaceUrl, errorMessage }
           onClick={handleCancel}
           disabled={isPending}
           title="Cancela a geração em andamento (timeout automático em 2min)"
-          className="ml-1 inline-flex items-center gap-1 rounded-md border border-red-500/40 bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-300 transition-premium hover:bg-red-500/20 disabled:opacity-60"
+          className="ml-1 inline-flex items-center gap-1 rounded-md border border-tone-red/25 bg-tone-red/12 px-2 py-0.5 text-xs font-semibold text-tone-red transition-premium hover:bg-tone-red/18 disabled:opacity-60"
         >
           <Pause className="size-3" />
           Pausar
@@ -151,7 +154,7 @@ export function MagnificSpaceButton({ demandId, status, spaceUrl, errorMessage }
           href={localSpaceUrl}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 text-sm font-medium text-emerald-300 transition-premium hover:bg-emerald-500/20"
+          className={cn(buttonVariants({ variant: "positive", size: "sm" }))}
         >
           <ExternalLink className="size-3.5" />
           Abrir no Spaces
@@ -161,7 +164,7 @@ export function MagnificSpaceButton({ demandId, status, spaceUrl, errorMessage }
           disabled={isPending}
           onClick={handleGenerate}
           title="Gera o Space de novo, mesmo já estando pronto"
-          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/10 bg-black/20 px-3 text-sm font-medium text-foreground/80 transition-premium hover:bg-black/30 disabled:opacity-60"
+          className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
         >
           <RefreshCw className="size-3.5" />
           Regenerar
@@ -177,7 +180,7 @@ export function MagnificSpaceButton({ demandId, status, spaceUrl, errorMessage }
         disabled={isPending}
         onClick={handleGenerate}
         title={localError ?? undefined}
-        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-red-500/40 bg-red-500/10 px-3 text-sm font-medium text-red-300 transition-premium hover:bg-red-500/20 disabled:opacity-60"
+        className={cn(buttonVariants({ variant: "destructive", size: "sm" }))}
       >
         <RefreshCw className="size-3.5" />
         Falha — tentar de novo
@@ -190,9 +193,9 @@ export function MagnificSpaceButton({ demandId, status, spaceUrl, errorMessage }
       type="button"
       disabled={isPending}
       onClick={handleGenerate}
-      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/10 bg-black/20 px-3 text-sm font-medium text-foreground/80 transition-premium hover:bg-black/30 disabled:opacity-60"
+      className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
     >
-      <Wand2 className="size-3.5" />
+      <Wand2 className="size-3.5 text-tone-pink" />
       Gerar Space
     </button>
   );

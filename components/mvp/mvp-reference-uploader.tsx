@@ -1,9 +1,10 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { ImagePlus, Loader2, X } from "lucide-react";
+import { ImagePlus, Images, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import { removeMvpReferenceAction, uploadMvpReferencesAction } from "@/actions/mvp";
+import { SectionHeader } from "@/components/layout/section-header";
 import { MVP_MAX_REFERENCES, type MvpReference } from "@/types/mvp";
 
 type Props = {
@@ -47,18 +48,19 @@ export function MvpReferenceUploader({ projectId, references, disabled }: Props)
   }
 
   return (
-    <div className="rounded-xl border border-white/10 bg-black/15 px-4 py-3">
-      <div className="mb-2 flex items-center justify-between">
-        <div>
-          <p className="text-sm font-medium text-foreground">Referências visuais do MVP</p>
-          <p className="text-xs text-muted-foreground">
-            Conectadas em todos os nodes de geração — até {MVP_MAX_REFERENCES} imagens
-          </p>
-        </div>
-        <span className="text-xs text-muted-foreground/70">
-          {references.length}/{MVP_MAX_REFERENCES}
-        </span>
-      </div>
+    <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--surface-shadow),var(--inner-highlight)]">
+      <SectionHeader
+        className="mb-4"
+        icon={Images}
+        tone="violet"
+        title="Referências visuais do MVP"
+        description={`Conectadas em todos os nodes de geração — até ${MVP_MAX_REFERENCES} imagens`}
+        action={
+          <span className="rounded-md bg-muted px-1.5 py-0.5 text-[0.6875rem] font-bold text-muted-foreground tabular-nums">
+            {references.length}/{MVP_MAX_REFERENCES}
+          </span>
+        }
+      />
       <div className="flex flex-wrap gap-2">
         {references.map((ref) => (
           <div key={ref.url} className="group relative">
@@ -66,14 +68,14 @@ export function MvpReferenceUploader({ projectId, references, disabled }: Props)
             <img
               src={ref.url}
               alt={ref.fileName}
-              className="size-16 rounded-md border border-white/10 object-cover"
+              className="size-16 rounded-xl border border-border object-cover"
             />
             {!disabled && (
               <button
                 type="button"
                 onClick={() => handleRemove(ref.url)}
                 disabled={isPending}
-                className="absolute -top-1.5 -right-1.5 hidden size-4 items-center justify-center rounded-full bg-red-500 text-white group-hover:flex"
+                className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full border-2 border-card bg-tone-red text-background pointer-events-none opacity-0 shadow-[var(--surface-shadow)] transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 disabled:opacity-40"
                 title="Remover referência"
               >
                 <X className="size-3" />
@@ -86,7 +88,7 @@ export function MvpReferenceUploader({ projectId, references, disabled }: Props)
             type="button"
             onClick={() => inputRef.current?.click()}
             disabled={disabled || isUploading}
-            className="flex size-16 flex-col items-center justify-center gap-1 rounded-md border border-dashed border-white/20 text-[0.625rem] text-muted-foreground transition-premium hover:border-white/40 hover:text-foreground disabled:opacity-50"
+            className="flex size-16 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border-strong bg-surface text-[0.625rem] font-semibold text-muted-foreground transition-premium hover:border-primary/50 hover:bg-accent hover:text-foreground disabled:opacity-50"
             title="Adicionar referências"
           >
             {isUploading ? (

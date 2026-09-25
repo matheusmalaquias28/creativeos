@@ -52,20 +52,20 @@ export function CopySheet({
   return (
     <dl
       className={cn(
-        "rounded-xl border border-border/60 bg-muted/40 dark:border-white/6 dark:bg-white/3",
+        "rounded-xl border border-border/70 bg-surface",
         dense ? "space-y-1.5 p-3" : "space-y-2 p-3.5",
         className
       )}
     >
       {rows.map(({ key, label }) => (
         <div key={key} className="space-y-0.5">
-          <dt className="text-[0.625rem] font-medium uppercase tracking-wide text-muted-foreground">
+          <dt className="text-[0.6875rem] font-semibold text-muted-foreground">
             {label}
           </dt>
           <dd
             className={cn(
-              "leading-snug text-foreground/90",
-              key === "headline" ? "text-sm font-medium" : "text-xs"
+              "leading-snug text-foreground",
+              key === "headline" ? "text-sm font-semibold" : "text-xs"
             )}
           >
             {/* select-all: conferir é comparar caractere a caractere, e às vezes copiar */}

@@ -3,10 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Inbox } from "lucide-react";
 import { DemandCard } from "@/components/demands/demand-card";
-import {
-  Surface,
-  SurfaceContent,
-} from "@/components/ui/surface";
+import { EmptyState } from "@/components/ui/empty-state";
 import { groupDemands } from "@/lib/demands/group-demands";
 import {
   GROUP_HEADER_CLASSES,
@@ -80,20 +77,12 @@ export function DemandsActiveList({ initialDemands, clients }: Props) {
 
   if (demands.length === 0) {
     return (
-      <Surface variant="dashed" padding="lg">
-        <SurfaceContent className="flex flex-col items-center text-center">
-          <Inbox
-            className="mb-4 size-8 text-muted-foreground/50"
-            strokeWidth={1.25}
-          />
-          <p className="text-sm font-medium text-foreground">
-            Nenhuma demanda ativa
-          </p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Demandas concluídas aparecem na aba Arquivadas.
-          </p>
-        </SurfaceContent>
-      </Surface>
+      <EmptyState
+        icon={Inbox}
+        tone="cyan"
+        title="Nenhuma demanda ativa"
+        description="Demandas concluídas aparecem na aba Arquivadas."
+      />
     );
   }
 
@@ -106,11 +95,11 @@ export function DemandsActiveList({ initialDemands, clients }: Props) {
               className={cn("size-2 shrink-0 rounded-full", GROUP_DOT_CLASSES[group.key])}
             />
             <h2
-              className={cn("text-sm font-semibold tracking-heading", GROUP_HEADER_CLASSES[group.key])}
+              className={cn("text-sm font-bold tracking-tight", GROUP_HEADER_CLASSES[group.key])}
             >
               {group.label}
             </h2>
-            <span className="text-xs text-muted-foreground">
+            <span className="rounded-md bg-muted px-1.5 text-[0.6875rem] font-semibold tabular-nums text-muted-foreground">
               {group.demands.length}
             </span>
           </div>

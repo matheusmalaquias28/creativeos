@@ -3,10 +3,12 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Check, Loader2, Pencil, X } from "lucide-react";
+import { Check, ExternalLink, FileText, Loader2, Pencil, X } from "lucide-react";
 import { toast } from "sonner";
 import { CopyArteTextsButton } from "@/components/demands/copy-arte-texts-button";
 import { updateDemandArtesAction } from "@/actions/demands";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import type { DemandArte } from "@/types/demand";
 
@@ -17,9 +19,10 @@ function ExternalHref({ href, label }: { href: string; label: string }) {
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-[10px] font-medium text-zinc-500 underline-offset-2 hover:text-zinc-800 hover:underline"
+      className="inline-flex items-center gap-1 text-[0.6875rem] font-medium text-muted-foreground underline-offset-2 hover:text-primary hover:underline"
     >
       {label}
+      <ExternalLink className="size-3" />
     </a>
   );
 }
@@ -75,9 +78,12 @@ export function DemandArteFeed({
 
   if (artes.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">
-        Nenhuma arte no briefing desta demanda.
-      </p>
+      <EmptyState
+        compact
+        icon={FileText}
+        tone="slate"
+        title="Nenhuma arte no briefing desta demanda."
+      />
     );
   }
 
@@ -90,11 +96,11 @@ export function DemandArteFeed({
           return (
             <article
               key={`edit-${index}`}
-              className="relative flex flex-col gap-2 rounded-2xl border border-zinc-300 bg-white p-4 shadow-sm dark:border-zinc-500 dark:bg-zinc-100"
+              className="surface-panel-elevated relative flex flex-col gap-2.5 p-4 ring-1 ring-primary/30"
             >
-              <p className="text-[10px] font-medium tracking-[0.14em] text-zinc-400 uppercase">
-                Arte {index + 1}
-              </p>
+              <span className="inline-flex w-fit items-center rounded-md bg-primary/15 px-1.5 py-0.5 text-[0.6875rem] font-semibold text-primary">
+                Editando arte {index + 1}
+              </span>
 
               <ArteField
                 label="Headline"
@@ -131,24 +137,25 @@ export function DemandArteFeed({
               />
 
               <div className="mt-1 flex items-center justify-end gap-2">
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={cancel}
                   disabled={saving}
-                  className="inline-flex items-center gap-1 rounded-lg border border-zinc-300 px-2.5 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-50"
                 >
                   <X className="size-3.5" />
                   Cancelar
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  size="sm"
                   onClick={() => save(index)}
                   disabled={saving}
-                  className="inline-flex items-center gap-1 rounded-lg bg-zinc-950 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
                 >
                   {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
                   Salvar
-                </button>
+                </Button>
               </div>
             </article>
           );
@@ -157,14 +164,14 @@ export function DemandArteFeed({
         return (
           <article
             key={`${arte.headline}-${index}`}
-            className="group relative aspect-[3/4] overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-600 dark:bg-zinc-100"
+            className="surface-panel hover-lift group relative aspect-[3/4] overflow-hidden"
           >
             <div className="absolute right-2 top-2 z-10 flex gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
               <button
                 type="button"
                 onClick={() => startEdit(index)}
                 title="Editar textos"
-                className="inline-flex size-7 items-center justify-center rounded-lg border border-zinc-300 bg-white/90 text-zinc-900 shadow-sm backdrop-blur-sm hover:bg-white dark:border-zinc-400 dark:bg-zinc-50 dark:text-zinc-900"
+                className="inline-flex size-7 items-center justify-center rounded-lg border border-border bg-popover text-foreground shadow-[var(--surface-shadow)] transition-premium hover:border-border-strong hover:bg-accent"
               >
                 <Pencil className="size-3" />
                 <span className="sr-only">Editar textos</span>
@@ -173,30 +180,30 @@ export function DemandArteFeed({
                 arte={arte}
                 arteIndex={index}
                 iconOnly
-                className="border-zinc-300 bg-white/90 text-zinc-900 shadow-sm backdrop-blur-sm hover:bg-white dark:border-zinc-400 dark:bg-zinc-50 dark:text-zinc-900"
+                className="bg-popover"
               />
             </div>
 
             <div className="flex h-full flex-col px-4 pb-4 pt-5 sm:px-5">
-              <p className="text-[10px] font-medium tracking-[0.14em] text-zinc-400 uppercase">
+              <span className="inline-flex w-fit items-center rounded-md bg-muted px-1.5 py-0.5 text-[0.6875rem] font-semibold tabular-nums text-muted-foreground">
                 Arte {index + 1}
-              </p>
+              </span>
 
               <div className="mt-4 flex min-h-0 flex-1 flex-col items-center justify-center text-center">
                 {arte.headline ? (
-                  <h3 className="line-clamp-4 text-base font-semibold leading-snug tracking-tight text-zinc-950 sm:text-lg">
+                  <h3 className="line-clamp-4 text-base font-bold leading-snug tracking-tight text-foreground sm:text-lg">
                     {arte.headline}
                   </h3>
                 ) : (
-                  <h3 className="text-sm font-medium text-zinc-400">Sem headline</h3>
+                  <h3 className="text-sm font-medium text-muted-foreground/70">Sem headline</h3>
                 )}
                 {arte.subheadline ? (
-                  <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-zinc-600">
+                  <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-muted-foreground">
                     {arte.subheadline}
                   </p>
                 ) : null}
                 {arte.informacoesExtras ? (
-                  <p className="mt-2 line-clamp-3 text-[11px] leading-relaxed text-zinc-500">
+                  <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-muted-foreground/80">
                     {arte.informacoesExtras}
                   </p>
                 ) : null}
@@ -212,7 +219,7 @@ export function DemandArteFeed({
                         target="_blank"
                         rel="noopener noreferrer"
                         title={`Referência ${i + 1}`}
-                        className="relative size-8 overflow-hidden rounded-md border border-zinc-200"
+                        className="relative size-8 overflow-hidden rounded-md border border-border bg-muted"
                       >
                         <Image
                           src={url}
@@ -227,7 +234,7 @@ export function DemandArteFeed({
                   </div>
                 )}
                 {arte.cta ? (
-                  <div className="rounded-full bg-zinc-950 px-3 py-2 text-center text-[11px] font-medium text-white">
+                  <div className="rounded-full bg-primary/15 px-3 py-2 text-center text-xs font-semibold text-primary ring-1 ring-inset ring-primary/25">
                     <span className="line-clamp-2">{arte.cta}</span>
                   </div>
                 ) : (
@@ -244,7 +251,7 @@ export function DemandArteFeed({
 }
 
 const FIELD_BASE =
-  "w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-400 disabled:opacity-60";
+  "w-full rounded-lg border border-border bg-input px-2.5 py-1.5 text-sm text-foreground transition-premium placeholder:text-muted-foreground/70 hover:border-border-strong focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-ring/20 disabled:opacity-60";
 
 function ArteField({
   label,
@@ -261,7 +268,7 @@ function ArteField({
 }) {
   return (
     <label className="block space-y-1">
-      <span className="text-[9px] font-medium uppercase tracking-wide text-zinc-400">{label}</span>
+      <span className="text-xs font-semibold text-muted-foreground">{label}</span>
       {multiline ? (
         <AutoTextarea value={value} onChange={onChange} disabled={disabled} />
       ) : (

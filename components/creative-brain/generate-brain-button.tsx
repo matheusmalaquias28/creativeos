@@ -12,12 +12,17 @@ type GenerateBrainButtonProps = {
   clientId: string;
   disabled?: boolean;
   label?: string;
+  /** Visual do botão — padrão é a ação principal (violeta). */
+  variant?: "default" | "outline" | "secondary";
+  size?: "default" | "sm";
 };
 
 export function GenerateBrainButton({
   clientId,
   disabled,
   label = "Gerar Creative Brain",
+  variant = "default",
+  size = "default",
 }: GenerateBrainButtonProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -55,9 +60,10 @@ export function GenerateBrainButton({
       <CreativeBrainGeneratingModal open={modalOpen} />
       <Button
         type="button"
+        variant={variant}
+        size={size}
         onClick={handleGenerate}
         disabled={disabled || loading}
-        className="gap-2"
       >
         {isPending ? (
           <>
@@ -66,7 +72,7 @@ export function GenerateBrainButton({
           </>
         ) : (
           <>
-            <Brain className="size-4" strokeWidth={1.75} />
+            <Brain className="size-4" strokeWidth={2} />
             {label}
           </>
         )}

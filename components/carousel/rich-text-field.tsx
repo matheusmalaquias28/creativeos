@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Italic, Baseline, PaintBucket, Eraser } from "lucide-react";
+import { Italic, Baseline, ChevronDown, PaintBucket, Eraser } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FONT_OPTIONS } from "@/lib/design/fonts";
 import { sanitizeRichHtml, hasRichContent } from "@/lib/carousel/sanitize-html";
@@ -54,12 +54,13 @@ function MiniColor({
         title={title}
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => setOpen((o) => !o)}
-        className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors"
+        className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
       >
         {icon}
       </button>
       {open && (
-        <div className="absolute left-0 top-9 z-40 w-52 rounded-xl border border-border bg-card p-2.5 shadow-2xl dark:border-white/10 dark:bg-surface-elevated">
+        <div className="absolute left-0 top-9 z-40 w-52 rounded-xl border border-border bg-popover p-2.5 text-popover-foreground shadow-[var(--surface-shadow-elevated)]">
+          {/* Presets = cores de conteúdo do slide */}
           <div className="grid grid-cols-9 gap-1">
             {PRESET_COLORS.map((c) => (
               <button
@@ -67,7 +68,7 @@ function MiniColor({
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => { onPick(c); setOpen(false); }}
-                className="size-5 rounded border border-white/10 transition-transform hover:scale-110"
+                className="size-5 rounded border border-border-strong transition-transform hover:scale-110"
                 style={{ backgroundColor: c }}
                 title={c}
               />
@@ -78,7 +79,7 @@ function MiniColor({
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => { onClear(); setOpen(false); }}
-              className="mt-2 w-full rounded-lg border border-border px-2 py-1 text-[0.625rem] text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+              className="mt-2 w-full rounded-lg border border-border bg-card px-2 py-1 text-[0.6875rem] font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
               Remover
             </button>
@@ -194,27 +195,28 @@ export function RichTextField({
   return (
     <div className="space-y-1.5">
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-1 rounded-lg border border-border/50 bg-muted/20 p-1">
+      <div className="flex flex-wrap items-center gap-1 rounded-xl border border-border bg-surface p-1">
         {/* Font family */}
         <div className="relative">
           <button
             type="button"
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => setFontOpen((o) => !o)}
-            className="flex h-7 items-center gap-1 rounded-md px-2 text-[0.625rem] text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors"
+            className="flex h-7 items-center gap-1 rounded-md px-2 text-[0.6875rem] font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             title="Fonte"
           >
-            Fonte ▾
+            Fonte
+            <ChevronDown className="size-3" />
           </button>
           {fontOpen && (
-            <div className="absolute left-0 top-9 z-40 max-h-56 w-48 overflow-y-auto rounded-xl border border-border bg-card p-1 shadow-2xl dark:border-white/10 dark:bg-surface-elevated">
+            <div className="absolute left-0 top-9 z-40 max-h-56 w-48 overflow-y-auto rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-[var(--surface-shadow-elevated)]">
               {FONT_OPTIONS.map((f) => (
                 <button
                   key={f.id}
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => { applyStyle({ fontFamily: f.family }); setFontOpen(false); }}
-                  className="block w-full rounded-lg px-3 py-1.5 text-left text-xs hover:bg-muted/60"
+                  className="block w-full rounded-lg px-3 py-1.5 text-left text-xs transition-colors hover:bg-accent"
                   style={{ fontFamily: f.family }}
                 >
                   {f.label}
@@ -230,20 +232,21 @@ export function RichTextField({
             type="button"
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => setWeightOpen((o) => !o)}
-            className="flex h-7 items-center gap-1 rounded-md px-2 text-[0.625rem] text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors"
+            className="flex h-7 items-center gap-1 rounded-md px-2 text-[0.6875rem] font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             title="Peso"
           >
-            Peso ▾
+            Peso
+            <ChevronDown className="size-3" />
           </button>
           {weightOpen && (
-            <div className="absolute left-0 top-9 z-40 w-36 rounded-xl border border-border bg-card p-1 shadow-2xl dark:border-white/10 dark:bg-surface-elevated">
+            <div className="absolute left-0 top-9 z-40 w-36 rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-[var(--surface-shadow-elevated)]">
               {WEIGHTS.map((w) => (
                 <button
                   key={w.value}
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => { applyStyle({ fontWeight: w.value }); setWeightOpen(false); }}
-                  className="block w-full rounded-lg px-3 py-1.5 text-left text-xs hover:bg-muted/60"
+                  className="block w-full rounded-lg px-3 py-1.5 text-left text-xs transition-colors hover:bg-accent"
                   style={{ fontWeight: w.value as React.CSSProperties["fontWeight"] }}
                 >
                   {w.label}
@@ -258,7 +261,7 @@ export function RichTextField({
           title="Itálico"
           onMouseDown={(e) => e.preventDefault()}
           onClick={toggleItalic}
-          className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors"
+          className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
           <Italic className="size-3.5" />
         </button>
@@ -280,7 +283,7 @@ export function RichTextField({
           title="Limpar formatação"
           onMouseDown={(e) => e.preventDefault()}
           onClick={clearFormatting}
-          className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors"
+          className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
           <Eraser className="size-3.5" />
         </button>
@@ -290,10 +293,10 @@ export function RichTextField({
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => setApplyAll((v) => !v)}
           className={cn(
-            "ml-auto rounded-md px-2 py-1 text-[0.5625rem] font-semibold uppercase tracking-wider transition-colors",
+            "ml-auto h-7 rounded-md px-2 text-[0.6875rem] font-semibold transition-colors",
             applyAll
               ? "bg-primary/15 text-primary"
-              : "text-muted-foreground/60 hover:text-foreground"
+              : "text-muted-foreground hover:bg-accent hover:text-foreground"
           )}
           title="Aplicar formatação ao texto todo ou só à seleção"
         >
@@ -310,9 +313,9 @@ export function RichTextField({
         data-placeholder={placeholder}
         style={{ minHeight: rows * 22 + 16 }}
         className={cn(
-          "rich-text-editable w-full rounded-lg border border-border bg-background/40 px-3 py-2 text-xs leading-relaxed outline-none",
-          "focus:border-primary/50 focus:ring-1 focus:ring-primary/30",
-          "empty:before:text-muted-foreground/40 empty:before:content-[attr(data-placeholder)]"
+          "rich-text-editable w-full rounded-xl border border-border bg-input px-3 py-2 text-xs leading-relaxed text-foreground outline-none transition-premium",
+          "hover:border-border-strong focus:border-primary/60 focus:ring-3 focus:ring-ring/20",
+          "empty:before:text-muted-foreground/70 empty:before:content-[attr(data-placeholder)]"
         )}
       />
     </div>

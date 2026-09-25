@@ -91,18 +91,22 @@ export function BackgroundGenerator({
   }
 
   return (
-    <div className="space-y-2 rounded-xl border border-border/40 bg-muted/10 p-3">
-      <p className="text-[0.625rem] font-medium uppercase tracking-widest text-muted-foreground/60">
-        Gerar fundo com IA · Nano Banana
-      </p>
+    <div className="space-y-2.5 rounded-xl border border-tone-pink/25 bg-tone-pink/5 p-3">
+      <div className="flex items-center gap-2">
+        <span className="flex size-6 items-center justify-center rounded-lg bg-tone-pink/14 text-tone-pink ring-1 ring-inset ring-tone-pink/20">
+          <Sparkles className="size-3.5" />
+        </span>
+        <p className="text-xs font-semibold text-foreground">Gerar fundo com IA</p>
+        <span className="ml-auto text-[0.6875rem] text-muted-foreground">Nano Banana</span>
+      </div>
       <Textarea
         placeholder="Ex: gradiente abstrato roxo e azul, textura suave, cinematográfico"
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
-        className="text-xs resize-none"
+        className="min-h-0 resize-none text-xs"
         rows={3}
       />
-      <Button size="sm" className="w-full gap-1.5 text-xs" onClick={handleGenerate} disabled={loading}>
+      <Button size="sm" variant="outline" className="w-full" onClick={handleGenerate} disabled={loading}>
         {loading ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
         {loading ? "Gerando..." : "Gerar fundo"}
       </Button>
@@ -113,7 +117,7 @@ export function BackgroundGenerator({
             <button
               key={url}
               onClick={() => { onApply(url); toast.success("Fundo aplicado"); }}
-              className="overflow-hidden rounded-lg border border-border/40 transition-transform hover:scale-[1.02]"
+              className="overflow-hidden rounded-lg border border-border transition-premium hover:scale-[1.02] hover:border-primary/50"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={url} alt="fundo gerado" className="aspect-square w-full object-cover" />

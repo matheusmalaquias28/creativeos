@@ -11,10 +11,11 @@ import {
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Building2, Loader2, Search } from "lucide-react";
+import { AlertTriangle, Building2, ChevronDown, Loader2, Search } from "lucide-react";
 import { toast } from "sonner";
 import { linkSubscriptionToClientAction } from "@/actions/subscriptions";
 import { cn } from "@/lib/utils";
+import { tones } from "@/lib/design/tokens";
 
 export type SubscriptionClientOption = { id: string; name: string };
 
@@ -136,10 +137,10 @@ export function SubscriptionClientLinker({
             <div className="fixed inset-0 z-40" aria-hidden onClick={() => setOpen(false)} />
             <div
               role="menu"
-              className="fixed z-50 w-[260px] overflow-hidden rounded-xl border border-border/60 bg-popover shadow-xl"
+              className="fixed z-50 w-[260px] overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-[var(--surface-shadow-elevated),var(--inner-highlight)]"
               style={{ top: menuPos.top, left: menuPos.left }}
             >
-              <div className="flex items-center gap-2 border-b border-border/50 px-3 py-2">
+              <div className="flex items-center gap-2 border-b border-border px-3 py-2">
                 <Search className="size-3.5 text-muted-foreground" />
                 <input
                   ref={searchRef}
@@ -165,13 +166,13 @@ export function SubscriptionClientLinker({
                       disabled={isPending}
                       onClick={() => handleSelect(client)}
                       className={cn(
-                        "flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-xs transition-colors hover:bg-accent",
-                        client.id === linkedClientId && "bg-accent/60 font-medium"
+                        "flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-xs transition-colors hover:bg-accent",
+                        client.id === linkedClientId && "bg-accent font-semibold"
                       )}
                     >
                       <span className="truncate">{client.name}</span>
                       {client.id === linkedClientId ? (
-                        <span className="shrink-0 text-[10px] text-muted-foreground">atual</span>
+                        <span className="shrink-0 rounded-md bg-primary/15 px-1.5 text-[0.625rem] font-semibold text-primary">atual</span>
                       ) : null}
                     </button>
                   ))
@@ -179,7 +180,7 @@ export function SubscriptionClientLinker({
               </div>
 
               {linkedClientId ? (
-                <div className="border-t border-border/50 p-2">
+                <div className="border-t border-border p-2">
                   <Link
                     href={`/clients/${linkedClientId}`}
                     className="flex h-8 items-center justify-center rounded-lg px-2 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -202,10 +203,10 @@ export function SubscriptionClientLinker({
       disabled={isPending}
       onClick={() => setOpen((v) => !v)}
       className={cn(
-        "relative z-50 inline-flex max-w-[200px] items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all outline-none disabled:opacity-60",
+        "relative inline-flex max-w-[200px] items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-premium outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-60",
         isUnmatched
-          ? "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300"
-          : "border-border/70 bg-muted/70 text-foreground/90 dark:border-white/10 dark:bg-white/5"
+          ? cn(tones.amber.badge, "hover:bg-tone-amber/18")
+          : "border-border bg-muted text-foreground/90 hover:border-border-strong hover:bg-accent"
       )}
     >
       {isPending ? (
@@ -216,7 +217,7 @@ export function SubscriptionClientLinker({
         <Building2 className="size-3.5 shrink-0" />
       )}
       <span className="truncate">{badgeLabel}</span>
-      <span className="ml-0.5 shrink-0 text-[0.6rem] opacity-60">▾</span>
+      <ChevronDown className="size-3 shrink-0 opacity-60" strokeWidth={2.25} />
     </button>
   );
 

@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useCallback, useRef, useState } from "react";
-import { Download, StopCircle } from "lucide-react";
+import { Download, ImageIcon, StopCircle } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ArtCard } from "./art-card";
 import { GenerationProgress } from "@/components/art-director/generation-progress";
 import { ImageLightbox, type LightboxItem } from "@/components/ui/image-lightbox";
@@ -205,9 +207,12 @@ export function ArtCurationGrid({ demandId, initialJobs }: Props) {
 
   if (jobs.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">
-        Nenhuma arte gerada ainda. Clique em &quot;Gerar artes&quot; para iniciar.
-      </p>
+      <EmptyState
+        icon={ImageIcon}
+        tone="pink"
+        title="Nenhuma arte gerada ainda"
+        description={<>Clique em &quot;Gerar artes&quot; para iniciar.</>}
+      />
     );
   }
 
@@ -234,18 +239,27 @@ export function ArtCurationGrid({ demandId, initialJobs }: Props) {
       <GenerationProgress counts={progress} label="Gerando as imagens" />
 
       {/* Header com ações em lote */}
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
-          {jobs.length} arte(s) · {approvedCount} aprovada(s)
-          {activeCount > 0 && ` · ${activeCount} gerando`}
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Badge variant="secondary" className="tabular-nums">
+            {jobs.length} arte(s)
+          </Badge>
+          <Badge variant="green" className="tabular-nums">
+            {approvedCount} aprovada(s)
+          </Badge>
+          {activeCount > 0 && (
+            <Badge variant="blue" className="tabular-nums">
+              {activeCount} gerando
+            </Badge>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           {activeCount > 0 && (
             <Button
               size="sm"
-              variant="outline"
+              variant="destructive"
               onClick={() => void handleCancelGeneration()}
-              className="gap-2 border-destructive/50 text-destructive hover:bg-destructive/10"
+              className="gap-2"
             >
               <StopCircle className="size-3.5" />
               Cancelar geração

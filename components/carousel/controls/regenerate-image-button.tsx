@@ -47,7 +47,7 @@ export function RegenerateImageButton({
         disabled={loading}
         title="Regenerar imagem (prompt original)"
         className={cn(
-          "flex size-6 items-center justify-center rounded-md bg-black/50 text-white shadow transition-colors hover:bg-black/70 disabled:opacity-60",
+          "flex size-6 items-center justify-center rounded-md border border-border bg-popover/90 text-foreground shadow-[var(--surface-shadow)] transition-colors hover:bg-accent disabled:opacity-60",
           className
         )}
       >
@@ -62,7 +62,7 @@ export function RegenerateImageButton({
       onClick={run}
       disabled={loading}
       className={cn(
-        "flex w-full items-center justify-center gap-1.5 rounded-xl border border-primary/40 bg-primary/5 py-2 text-xs font-medium text-primary transition-colors hover:bg-primary/10 disabled:opacity-60",
+        "flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border border-primary/40 bg-primary/8 text-[0.8125rem] font-semibold text-primary transition-colors hover:bg-primary/14 disabled:opacity-60",
         className
       )}
     >

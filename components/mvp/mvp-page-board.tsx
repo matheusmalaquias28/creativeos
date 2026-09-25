@@ -12,7 +12,7 @@ type Props = {
  */
 export function MvpPageBoard({ pages }: Props) {
   return (
-    <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+    <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
       {pages.map((page) => (
         <MvpPageCard key={page.index} page={page} />
       ))}
@@ -24,14 +24,15 @@ function MvpPageCard({ page }: { page: MvpPage }) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+        <span className="inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-[0.6875rem] font-bold text-muted-foreground tabular-nums">
           Página {page.index + 1}
-        </p>
-        <p className="max-w-[60%] truncate text-xs text-muted-foreground/70">{page.title}</p>
+        </span>
+        <p className="max-w-[65%] truncate text-xs font-medium text-muted-foreground">{page.title}</p>
       </div>
 
-      {/* Folha A4 */}
-      <div className="aspect-[210/297] overflow-hidden rounded-lg border border-white/12 bg-white text-neutral-900 shadow-lg dark:border-white/10">
+      {/* Folha A4 — preview fiel do papel impresso: as cores neutras claras são
+          intencionais (representam a página final, independente do tema do app). */}
+      <div className="aspect-[210/297] overflow-hidden rounded-xl border border-border bg-neutral-50 text-neutral-900 shadow-[var(--surface-shadow-elevated)] transition-premium hover:shadow-[var(--surface-shadow-hover)]">
         <div className="flex h-full flex-col gap-2.5 overflow-hidden p-[8%]">
           {page.blocks.map((block, i) => {
             switch (block.type) {
@@ -61,7 +62,7 @@ function MvpPageCard({ page }: { page: MvpPage }) {
                 );
               case "cta":
                 return (
-                  <p key={i} className="mx-auto mt-auto w-fit rounded-md bg-neutral-900 px-3 py-1.5 text-center text-[clamp(0.55rem,0.85vw,0.75rem)] font-semibold text-white">
+                  <p key={i} className="mx-auto mt-auto w-fit rounded-md bg-neutral-900 px-3 py-1.5 text-center text-[clamp(0.55rem,0.85vw,0.75rem)] font-semibold text-neutral-50">
                     {block.text}
                   </p>
                 );

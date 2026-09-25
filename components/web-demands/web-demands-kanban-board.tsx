@@ -13,7 +13,13 @@ import {
   TrendingUp,
   X,
 } from "lucide-react";
-import { CARD_NEON_THEMES, GROUP_DOT_CLASSES } from "@/lib/demands/demand-color";
+import { Button } from "@/components/ui/button";
+import {
+  CARD_NEON_THEMES,
+  DEMAND_TONE,
+  type DemandColorState,
+} from "@/lib/demands/demand-color";
+import { tones } from "@/lib/design/tokens";
 import { cn } from "@/lib/utils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -41,56 +47,19 @@ export type WebDemand = {
 type KanbanColumn = {
   status: WebDemandStatus;
   label: string;
-  dot: string;
-  header: string;
-  border: string;
-  bg: string;
+  /** Estado de cor — mesmo vocabulário (e tons) do Kanban de demandas. */
+  color: DemandColorState;
 };
 
 const COLUMNS: KanbanColumn[] = [
-  {
-    status: "Nova",
-    label: "Nova",
-    dot: GROUP_DOT_CLASSES.cyan,
-    header: "text-cyan-400",
-    border: "border-cyan-500/20 hover:border-cyan-500/40",
-    bg: "dark:bg-cyan-500/3",
-  },
-  {
-    status: "Fazendo",
-    label: "Em andamento",
-    dot: GROUP_DOT_CLASSES.blue,
-    header: "text-blue-400",
-    border: "border-blue-500/20 hover:border-blue-500/40",
-    bg: "dark:bg-blue-500/3",
-  },
-  {
-    status: "Revisão",
-    label: "Em revisão",
-    dot: GROUP_DOT_CLASSES.purple,
-    header: "text-violet-400",
-    border: "border-violet-500/20 hover:border-violet-500/40",
-    bg: "dark:bg-violet-500/3",
-  },
-  {
-    status: "Concluída",
-    label: "Concluída",
-    dot: GROUP_DOT_CLASSES.green,
-    header: "text-emerald-400",
-    border: "border-emerald-500/20 hover:border-emerald-500/40",
-    bg: "dark:bg-emerald-500/3",
-  },
-  {
-    status: "Cancelada",
-    label: "Cancelada",
-    dot: GROUP_DOT_CLASSES.gray,
-    header: "text-zinc-500",
-    border: "border-zinc-500/15 hover:border-zinc-500/30",
-    bg: "dark:bg-zinc-500/2",
-  },
+  { status: "Nova", label: "Nova", color: "cyan" },
+  { status: "Fazendo", label: "Em andamento", color: "blue" },
+  { status: "Revisão", label: "Em revisão", color: "purple" },
+  { status: "Concluída", label: "Concluída", color: "green" },
+  { status: "Cancelada", label: "Cancelada", color: "gray" },
 ];
 
-const STATUS_THEME_MAP: Record<WebDemandStatus, keyof typeof CARD_NEON_THEMES> = {
+const STATUS_THEME_MAP: Record<WebDemandStatus, DemandColorState> = {
   Nova: "cyan",
   Fazendo: "blue",
   Revisão: "purple",
@@ -147,25 +116,37 @@ function MonthlySalesCard({ demands }: { demands: WebDemand[] }) {
   const monthLabel = now.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
   return (
-    <div className="mb-6 flex items-center gap-4 rounded-2xl border border-emerald-500/20 bg-gradient-to-r from-emerald-950/40 via-background to-background p-5 shadow-[0_0_40px_rgba(52,211,153,0.06)]">
-      <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-emerald-500/25 bg-emerald-500/10">
-        <TrendingUp className="size-5 text-emerald-400" strokeWidth={1.75} />
+    <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-border bg-card p-5 shadow-[var(--surface-shadow),var(--inner-highlight)]">
+      <div
+        className={cn(
+          "flex size-11 shrink-0 items-center justify-center rounded-xl",
+          tones.green.iconTile
+        )}
+      >
+        <TrendingUp className="size-5" strokeWidth={2} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[0.6875rem] font-medium uppercase tracking-[0.12em] text-emerald-400/70">
+        <p className="text-[0.8125rem] font-semibold text-muted-foreground first-letter:uppercase">
           Vendas em {monthLabel}
         </p>
-        <p className="mt-0.5 text-2xl font-semibold tracking-tight text-emerald-300">
+        <p className="mt-0.5 text-2xl font-bold tracking-[-0.03em] text-foreground tabular-nums">
           {formatCurrency(total)}
         </p>
       </div>
-      <div className="shrink-0 text-right">
-        <p className="text-[0.6875rem] text-muted-foreground/50">
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <span
+          className={cn(
+            "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[0.6875rem] font-semibold tabular-nums",
+            withValue.length > 0
+              ? tones.green.badge
+              : "border-transparent bg-muted text-muted-foreground"
+          )}
+        >
           {withValue.length} demanda{withValue.length !== 1 ? "s" : ""} com valor
-        </p>
-        <p className="mt-0.5 text-[0.6875rem] text-muted-foreground/40">
+        </span>
+        <span className="inline-flex items-center rounded-full border border-transparent bg-muted px-2.5 py-0.5 text-[0.6875rem] font-semibold text-muted-foreground tabular-nums">
           {monthDemands.length} no total
-        </p>
+        </span>
       </div>
     </div>
   );
@@ -175,12 +156,12 @@ function MonthlySalesCard({ demands }: { demands: WebDemand[] }) {
 
 function MicroTaskList({
   tasks,
-  themeKey,
   onToggle,
   onAdd,
   onDelete,
 }: {
   tasks: MicroTask[];
+  /** Mantido por compatibilidade — as tasks concluídas usam sempre o tom de sucesso. */
   themeKey: keyof typeof CARD_NEON_THEMES;
   onToggle: (taskId: string) => void;
   onAdd: (title: string) => void;
@@ -188,7 +169,6 @@ function MicroTaskList({
 }) {
   const [newTitle, setNewTitle] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
-  const theme = CARD_NEON_THEMES[themeKey];
 
   function handleAddKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") {
@@ -211,7 +191,7 @@ function MicroTaskList({
       onDragStart={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
     >
-      <div className="h-px bg-border/30 mb-2" />
+      <div className="mb-2 h-px bg-border" />
 
       {tasks.map((task) => (
         <div key={task.id} className="group/task flex items-center gap-2 py-0.5">
@@ -221,22 +201,22 @@ function MicroTaskList({
             title={task.done ? "Marcar como pendente" : "Marcar como concluída"}
           >
             {task.done ? (
-              <CheckCircle2 className={cn("size-3.5", theme.accent)} />
+              <CheckCircle2 className={cn("size-3.5", tones.green.text)} />
             ) : (
-              <Circle className="size-3.5 text-muted-foreground/35 hover:text-muted-foreground/70" />
+              <Circle className="size-3.5 text-muted-foreground/60 hover:text-foreground" />
             )}
           </button>
           <span
             className={cn(
               "flex-1 text-[0.75rem] leading-tight",
-              task.done ? "line-through text-muted-foreground/40" : "text-foreground/80"
+              task.done ? "text-muted-foreground/70 line-through" : "text-foreground/85"
             )}
           >
             {task.title}
           </span>
           <button
             onClick={() => onDelete(task.id)}
-            className="opacity-0 group-hover/task:opacity-100 transition-opacity shrink-0 text-muted-foreground/30 hover:text-red-400"
+            className="shrink-0 text-muted-foreground/60 opacity-0 transition-opacity group-hover/task:opacity-100 hover:text-tone-red focus-visible:opacity-100"
           >
             <X className="size-3" />
           </button>
@@ -244,7 +224,7 @@ function MicroTaskList({
       ))}
 
       <div className="flex items-center gap-2 pt-0.5">
-        <Plus className="size-3 shrink-0 text-muted-foreground/30" />
+        <Plus className="size-3 shrink-0 text-muted-foreground/60" />
         <input
           ref={inputRef}
           type="text"
@@ -252,7 +232,7 @@ function MicroTaskList({
           onChange={(e) => setNewTitle(e.target.value)}
           onKeyDown={handleAddKeyDown}
           placeholder="Nova micro task..."
-          className="flex-1 bg-transparent text-[0.75rem] text-foreground/70 placeholder:text-muted-foreground/30 focus:outline-none focus:placeholder:text-muted-foreground/50"
+          className="flex-1 bg-transparent text-[0.75rem] text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
         />
       </div>
     </div>
@@ -292,7 +272,7 @@ function ServiceValuePanel({
       onDragStart={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
     >
-      <div className="h-px bg-border/30" />
+      <div className="h-px bg-border" />
 
       {/* Value */}
       <div className="flex items-center gap-2">
@@ -305,10 +285,10 @@ function ServiceValuePanel({
           onBlur={commitValue}
           onKeyDown={(e) => e.key === "Enter" && commitValue()}
           placeholder="Valor do serviço"
-          className="flex-1 bg-transparent text-[0.75rem] text-foreground/80 placeholder:text-muted-foreground/30 focus:outline-none"
+          className="flex-1 bg-transparent text-[0.75rem] text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
         />
         {serviceValue !== undefined && (
-          <span className={cn("text-[0.6875rem] font-medium tabular-nums shrink-0", theme.accent)}>
+          <span className={cn("shrink-0 text-[0.6875rem] font-semibold tabular-nums", tones.green.text)}>
             {formatCurrency(serviceValue)}
           </span>
         )}
@@ -316,8 +296,8 @@ function ServiceValuePanel({
 
       {/* Payment note */}
       <div className="flex items-start gap-2">
-        <span className={cn("mt-0.5 text-[0.5625rem] uppercase font-semibold tracking-wide shrink-0", theme.muted)}>
-          obs
+        <span className={cn("mt-0.5 shrink-0 text-[0.625rem] font-semibold", theme.muted)}>
+          Obs
         </span>
         <input
           type="text"
@@ -326,7 +306,7 @@ function ServiceValuePanel({
           onBlur={commitValue}
           onKeyDown={(e) => e.key === "Enter" && commitValue()}
           placeholder="Como será pago..."
-          className="flex-1 bg-transparent text-[0.75rem] text-foreground/70 placeholder:text-muted-foreground/30 focus:outline-none"
+          className="flex-1 bg-transparent text-[0.75rem] text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
         />
       </div>
     </div>
@@ -374,24 +354,18 @@ function WebKanbanCard({
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       className={cn(
-        "group relative cursor-grab overflow-hidden rounded-xl border p-3.5 transition-premium select-none active:cursor-grabbing",
-        isDragging ? "opacity-40 scale-95" : "hover:-translate-y-0.5",
+        "group relative cursor-grab overflow-hidden rounded-xl border p-3.5 pl-4 transition-premium select-none active:cursor-grabbing",
+        isDragging ? "scale-95 opacity-40" : "hover:-translate-y-0.5",
         theme.card
       )}
     >
-      {/* Glow orb */}
-      <div
-        className={cn(
-          "pointer-events-none absolute -right-10 -top-10 size-28 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity",
-          theme.glowA
-        )}
-        aria-hidden
-      />
+      {/* Acento do status */}
+      <span aria-hidden className={cn("absolute inset-y-3 left-0 w-[3px] rounded-r-full", theme.bar)} />
 
       <div className="relative space-y-2">
         {/* Title row */}
         <div className="flex items-start justify-between gap-2">
-          <h3 className="text-[0.8125rem] font-medium leading-snug tracking-tight text-foreground line-clamp-2 flex-1">
+          <h3 className="line-clamp-2 flex-1 text-[0.8125rem] leading-snug font-semibold tracking-tight text-foreground">
             {demand.title}
           </h3>
           <div
@@ -401,12 +375,12 @@ function WebKanbanCard({
           >
             <button
               onClick={onDelete}
-              className="flex size-5 items-center justify-center rounded opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground/40 hover:text-red-400"
+              className="flex size-6 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-premium group-hover:opacity-100 hover:bg-tone-red/12 hover:text-tone-red focus-visible:opacity-100"
               title="Remover card"
             >
               <Trash2 className="size-3" />
             </button>
-            <Grip className="size-3.5 mt-0.5 text-muted-foreground/30 group-hover:text-muted-foreground/60 transition-colors" />
+            <Grip className="size-3.5 text-muted-foreground/40 transition-colors group-hover:text-muted-foreground" />
           </div>
         </div>
 
@@ -428,10 +402,10 @@ function WebKanbanCard({
             <button
               onClick={() => setValueExpanded((v) => !v)}
               className={cn(
-                "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.625rem] font-medium transition-colors",
+                "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[0.625rem] font-semibold transition-colors",
                 demand.serviceValue
-                  ? `${theme.accent} bg-white/5 border border-white/8 hover:bg-white/8`
-                  : "text-muted-foreground/40 hover:text-muted-foreground/70 border border-dashed border-border/40 hover:border-border/60"
+                  ? cn(tones.green.badge, "tabular-nums hover:border-tone-green/50")
+                  : "border-dashed border-border-strong text-muted-foreground hover:border-primary/40 hover:text-foreground"
               )}
               title="Valor do serviço"
             >
@@ -447,12 +421,12 @@ function WebKanbanCard({
             <button
               onClick={() => setTasksExpanded((v) => !v)}
               className={cn(
-                "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.625rem] font-medium transition-colors",
+                "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[0.625rem] font-semibold transition-colors",
                 hasTasks
                   ? allDone
-                    ? "text-emerald-400 bg-emerald-500/10 border border-emerald-500/20"
-                    : `${theme.accent} bg-white/5 border border-white/8 hover:bg-white/8`
-                  : "text-muted-foreground/40 hover:text-muted-foreground/70 border border-dashed border-border/40 hover:border-border/60"
+                    ? tones.green.badge
+                    : "border-transparent bg-muted text-foreground/80 tabular-nums hover:bg-accent"
+                  : "border-dashed border-border-strong text-muted-foreground hover:border-primary/40 hover:text-foreground"
               )}
               title={tasksExpanded ? "Recolher tasks" : "Expandir tasks"}
             >
@@ -479,13 +453,13 @@ function WebKanbanCard({
         {/* Progress bar */}
         {hasTasks && (
           <div
-            className="h-0.5 w-full rounded-full bg-white/8 overflow-hidden"
+            className="h-1 w-full overflow-hidden rounded-full bg-muted"
             onMouseDown={(e) => e.stopPropagation()}
           >
             <div
               className={cn(
                 "h-full rounded-full transition-all duration-500",
-                allDone ? "bg-emerald-400" : theme.accent.replace("text-", "bg-")
+                allDone ? tones.green.solid : theme.bar
               )}
               style={{ width: `${(doneTasks / totalTasks) * 100}%` }}
             />
@@ -558,23 +532,21 @@ function NewCardForm({
         onKeyDown={handleKeyDown}
         placeholder="Título da demanda..."
         rows={2}
-        className="w-full resize-none rounded-xl border border-border/60 bg-background/80 px-3 py-2.5 text-[0.8125rem] placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/40 focus:border-cyan-500/40 transition-colors"
+        className="w-full resize-none rounded-xl border border-border bg-card px-3 py-2.5 text-[0.8125rem] text-foreground shadow-[var(--surface-shadow)] transition-premium placeholder:text-muted-foreground/70 hover:border-border-strong focus:border-primary/60 focus:outline-none focus:ring-3 focus:ring-ring/20"
       />
       <div className="flex items-center gap-2">
-        <button
-          type="submit"
-          disabled={!title.trim()}
-          className="flex-1 rounded-lg bg-cyan-500/15 border border-cyan-500/25 px-3 py-1.5 text-[0.75rem] font-medium text-cyan-400 hover:bg-cyan-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-        >
+        <Button type="submit" size="sm" disabled={!title.trim()} className="flex-1">
           Adicionar
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-sm"
           onClick={onCancel}
-          className="flex size-7 items-center justify-center rounded-lg border border-border/50 text-muted-foreground/60 hover:text-foreground transition-colors"
+          title="Cancelar"
         >
-          <X className="size-3.5" />
-        </button>
+          <X />
+        </Button>
       </div>
     </form>
   );
@@ -616,80 +588,92 @@ function WebKanbanColumn({
   onUpdateServiceValue: (demandId: string, value: number | undefined, note: string | undefined) => void;
 }) {
   const [adding, setAdding] = useState(false);
+  const t = tones[DEMAND_TONE[column.color]];
 
   return (
-    <div className="flex w-[272px] shrink-0 flex-col gap-3">
-      <div className="flex items-center gap-2 px-1">
-        <span className={cn("size-2 shrink-0 rounded-full", column.dot)} />
-        <h2 className={cn("text-xs font-semibold tracking-wide", column.header)}>
-          {column.label}
-        </h2>
-        <span className="ml-auto text-[0.6875rem] tabular-nums text-muted-foreground/60">
+    <div
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+      className={cn(
+        "flex w-[288px] shrink-0 flex-col rounded-2xl border border-border bg-surface transition-all duration-200",
+        isOver && "border-primary/50 bg-primary/5 ring-2 ring-primary/20"
+      )}
+    >
+      {/* Column header */}
+      <div className="flex items-center gap-2 px-3.5 pt-3.5 pb-2.5">
+        <span className={cn("size-2 shrink-0 rounded-full", t.dot)} />
+        <h2 className="truncate text-[0.8125rem] font-bold text-foreground">{column.label}</h2>
+        <span
+          className={cn(
+            "ml-auto rounded-md border px-1.5 py-px text-[0.6875rem] font-bold tabular-nums",
+            demands.length > 0 ? t.badge : "border-transparent bg-muted text-muted-foreground"
+          )}
+        >
           {demands.length}
         </span>
         <button
+          type="button"
           onClick={() => setAdding(true)}
-          className="flex size-5 items-center justify-center rounded-md border border-border/40 text-muted-foreground/50 hover:text-foreground hover:border-border/70 transition-colors"
+          className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-premium hover:bg-accent hover:text-foreground"
           title={`Novo card em ${column.label}`}
         >
-          <Plus className="size-3" />
+          <Plus className="size-3.5" />
         </button>
       </div>
 
-      <div
-        onDragOver={onDragOver}
-        onDragLeave={onDragLeave}
-        onDrop={onDrop}
-        className={cn(
-          "min-h-[120px] flex-1 rounded-xl border transition-all duration-200",
-          column.border,
-          column.bg,
-          "dark:bg-white/[0.015]",
-          isOver && "ring-2 ring-inset dark:ring-white/15 scale-[1.01] bg-white/[0.02]"
+      <div className="flex min-h-[120px] flex-1 flex-col gap-2 px-2 pb-2">
+        {adding && (
+          <NewCardForm
+            onAdd={(title) => {
+              onAddCard(title, column.status);
+              setAdding(false);
+            }}
+            onCancel={() => setAdding(false)}
+          />
         )}
-      >
-        <div className="flex flex-col gap-2.5 p-2.5">
-          {adding && (
-            <NewCardForm
-              onAdd={(title) => {
-                onAddCard(title, column.status);
-                setAdding(false);
-              }}
-              onCancel={() => setAdding(false)}
+
+        {demands.length === 0 && !isOver && !adding ? (
+          <button
+            type="button"
+            className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-8 text-center transition-colors hover:border-primary/40 hover:bg-card/60"
+            onClick={() => setAdding(true)}
+          >
+            <Inbox className="mb-1.5 size-5 text-muted-foreground/40" strokeWidth={1.5} />
+            <p className="text-[0.6875rem] text-muted-foreground/70">Vazio · clique para adicionar</p>
+          </button>
+        ) : (
+          demands.map((demand) => (
+            <WebKanbanCard
+              key={demand.id}
+              demand={demand}
+              isDragging={demand.id === draggingId}
+              onDragStart={onCardDragStart(demand)}
+              onDragEnd={onCardDragEnd}
+              onDelete={() => onDelete(demand.id)}
+              onToggleTask={(taskId) => onToggleTask(demand.id, taskId)}
+              onAddTask={(title) => onAddTask(demand.id, title)}
+              onDeleteTask={(taskId) => onDeleteTask(demand.id, taskId)}
+              onUpdateServiceValue={(value, note) =>
+                onUpdateServiceValue(demand.id, value, note)
+              }
             />
-          )}
+          ))
+        )}
 
-          {demands.length === 0 && !isOver && !adding ? (
-            <div
-              className="flex flex-col items-center justify-center py-8 text-center cursor-pointer"
-              onClick={() => setAdding(true)}
-            >
-              <Inbox className="mb-2 size-5 text-muted-foreground/25" strokeWidth={1.25} />
-              <p className="text-[0.6875rem] text-muted-foreground/40">Vazio</p>
-            </div>
-          ) : (
-            demands.map((demand) => (
-              <WebKanbanCard
-                key={demand.id}
-                demand={demand}
-                isDragging={demand.id === draggingId}
-                onDragStart={onCardDragStart(demand)}
-                onDragEnd={onCardDragEnd}
-                onDelete={() => onDelete(demand.id)}
-                onToggleTask={(taskId) => onToggleTask(demand.id, taskId)}
-                onAddTask={(title) => onAddTask(demand.id, title)}
-                onDeleteTask={(taskId) => onDeleteTask(demand.id, taskId)}
-                onUpdateServiceValue={(value, note) =>
-                  onUpdateServiceValue(demand.id, value, note)
-                }
-              />
-            ))
-          )}
+        {demands.length > 0 && !adding && !isOver && (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <Plus className="size-3.5" />
+            Adicionar card
+          </button>
+        )}
 
-          {isOver && (
-            <div className="h-1.5 w-full rounded-full bg-white/10 animate-pulse" />
-          )}
-        </div>
+        {/* Drop target indicator */}
+        {isOver && <div className="h-1.5 w-full animate-pulse rounded-full bg-primary/40" />}
       </div>
     </div>
   );
@@ -816,9 +800,9 @@ export function WebDemandsKanbanBoard() {
   );
 
   return (
-    <div className="space-y-0">
+    <div className="space-y-6">
       <MonthlySalesCard demands={demands} />
-      <div className="flex gap-4 overflow-x-auto pb-4">
+      <div className="flex items-start gap-3 overflow-x-auto pb-4">
         {COLUMNS.map((col) => (
           <WebKanbanColumn
             key={col.status}

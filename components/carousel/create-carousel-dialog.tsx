@@ -1,10 +1,18 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { createPortal } from "react-dom";
 import { Layers, Plus, Square, Monitor } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { createCarouselAction } from "@/actions/carousels";
 import type { CarouselFormat } from "@/types/carousel";
@@ -51,109 +59,104 @@ export function CreateCarouselDialog() {
 
   return (
     <>
-      <Button onClick={() => setOpen(true)} size="sm" className="gap-1.5">
-        <Plus className="size-4" />
-        Novo Carrossel
+      <Button onClick={() => setOpen(true)} size="sm">
+        <Plus />
+        Novo carrossel
       </Button>
 
-      {open &&
-        createPortal(
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-            {/* Backdrop */}
-            <div
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-              onClick={() => setOpen(false)}
-            />
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Novo carrossel</DialogTitle>
+            <DialogDescription>
+              Escolha o formato e dê um nome ao seu carrossel.
+            </DialogDescription>
+          </DialogHeader>
 
-            {/* Dialog */}
-            <div className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card shadow-2xl dark:border-white/10 dark:bg-surface-elevated">
-              <div className="px-6 pt-6 pb-4">
-                <h2 className="text-base font-semibold tracking-tight text-foreground">
-                  Novo Carrossel
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Escolha o formato e dê um nome ao seu carrossel.
-                </p>
+          <form action={formAction} className="flex min-h-0 flex-1 flex-col">
+            {/* Hidden format field */}
+            <input type="hidden" name="format" value={format} />
+
+            <DialogBody className="space-y-5">
+              {/* Name */}
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="carousel-name"
+                  className="text-[0.8125rem] font-semibold text-foreground"
+                >
+                  Nome
+                </label>
+                <Input
+                  id="carousel-name"
+                  name="name"
+                  placeholder="Ex: Dicas de produtividade"
+                  autoFocus
+                />
               </div>
 
-              <form action={formAction} className="px-6 pb-6 space-y-5">
-                {/* Hidden format field */}
-                <input type="hidden" name="format" value={format} />
-
-                {/* Name */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">
-                    Nome
-                  </label>
-                  <Input
-                    name="name"
-                    placeholder="Ex: Dicas de produtividade"
-                    autoFocus
-                  />
-                </div>
-
-                {/* Format */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">
-                    Formato
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {FORMATS.map((f) => {
-                      const Icon = f.icon;
-                      const active = format === f.value;
-                      return (
-                        <button
-                          key={f.value}
-                          type="button"
-                          onClick={() => setFormat(f.value)}
+              {/* Format */}
+              <div className="space-y-1.5">
+                <p className="text-[0.8125rem] font-semibold text-foreground">Formato</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {FORMATS.map((f) => {
+                    const active = format === f.value;
+                    return (
+                      <button
+                        key={f.value}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => setFormat(f.value)}
+                        className={cn(
+                          "flex flex-col items-center gap-2 rounded-xl border p-3 text-center transition-premium outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                          active
+                            ? "border-primary/60 bg-primary/10 text-foreground ring-1 ring-primary/30"
+                            : "border-border bg-surface text-muted-foreground hover:border-border-strong hover:bg-accent"
+                        )}
+                      >
+                        {/* Mini format preview */}
+                        <div
                           className={cn(
-                            "flex flex-col items-center gap-2 rounded-xl border p-3 text-center transition-premium",
+                            "w-8 rounded border-2",
+                            f.preview,
                             active
-                              ? "border-primary bg-primary/8 text-foreground"
-                              : "border-border hover:border-border/80 hover:bg-muted/40 text-muted-foreground"
+                              ? "border-primary bg-primary/15"
+                              : "border-border-strong bg-muted"
                           )}
-                        >
-                          {/* Mini format preview */}
-                          <div
-                            className={cn(
-                              "w-8 rounded border-2 bg-muted/60",
-                              f.preview,
-                              active ? "border-primary" : "border-muted-foreground/30"
-                            )}
-                            style={{ maxHeight: 44 }}
-                          />
-                          <span className="text-xs font-medium">{f.label}</span>
-                          <span className="text-[0.6rem] text-muted-foreground">
-                            {f.ratio}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                          style={{ maxHeight: 44 }}
+                        />
+                        <span className="text-xs font-semibold">{f.label}</span>
+                        <span className="text-[0.6875rem] tabular-nums text-muted-foreground">
+                          {f.ratio}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
+              </div>
 
-                {state?.error && (
-                  <p className="text-xs text-negative">{state.error}</p>
-                )}
+              {state?.error && (
+                <p className="rounded-lg border border-tone-red/25 bg-tone-red/12 px-3 py-2 text-xs text-tone-red">
+                  {state.error}
+                </p>
+              )}
+            </DialogBody>
 
-                <div className="flex gap-2 justify-end pt-1">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setOpen(false)}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button type="submit" size="sm" disabled={pending}>
-                    {pending ? "Criando..." : "Criar e editar"}
-                  </Button>
-                </div>
-              </form>
-            </div>
-          </div>,
-          document.body
-        )}
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" size="sm" disabled={pending}>
+                {pending ? "Criando..." : "Criar e editar"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

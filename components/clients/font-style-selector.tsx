@@ -70,13 +70,13 @@ export function FontStyleSelector({
               type="button"
               onClick={() => togglePreset(preset.id)}
               className={cn(
-                "rounded-lg border px-3 py-2 text-left transition-premium",
+                "rounded-xl border px-3 py-2 text-left transition-premium outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                 active
-                  ? "border-foreground/30 bg-muted/50"
-                  : "border-border/50 bg-card/30 hover:border-border/70"
+                  ? "border-primary/40 bg-primary/10 ring-1 ring-inset ring-primary/20"
+                  : "border-border bg-card hover:border-border-strong hover:bg-accent"
               )}
             >
-              <span className="block text-xs font-medium text-foreground">
+              <span className="block text-xs font-semibold text-foreground">
                 {preset.label}
               </span>
               <span className="mt-0.5 block text-[0.6875rem] text-muted-foreground">
@@ -97,7 +97,7 @@ export function FontStyleSelector({
       <input type="hidden" name="fontStyles" value={composedValue} readOnly />
 
       {composedValue && (
-        <p className="rounded-lg border border-border/40 bg-muted/20 px-3 py-2 font-mono text-xs text-muted-foreground">
+        <p className="rounded-xl border border-border bg-surface px-3 py-2 font-mono text-xs text-muted-foreground">
           {composedValue}
         </p>
       )}

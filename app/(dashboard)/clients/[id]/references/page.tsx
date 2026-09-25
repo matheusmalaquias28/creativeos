@@ -1,21 +1,13 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { Camera, ImageIcon, Library, Upload } from "lucide-react";
 import { DashboardPage } from "@/components/layout/dashboard-page";
+import { SectionHeader } from "@/components/layout/section-header";
 import { ReferenceUpload } from "@/components/clients/reference-upload";
 import { ReferenceGallery } from "@/components/clients/reference-gallery";
 import { ClientPhotosPanel } from "@/components/clients/client-photos-panel";
 import { ReferenceBank } from "@/components/art-director/reference-bank";
 import { ReadinessChips } from "@/components/art-director/readiness-chips";
-import { buttonVariants } from "@/components/ui/button";
-import {
-  Surface,
-  SurfaceContent,
-  SurfaceDescription,
-  SurfaceHeader,
-  SurfaceTitle,
-} from "@/components/ui/surface";
-import { cn } from "@/lib/utils";
+import { Surface } from "@/components/ui/surface";
 import { layout } from "@/lib/design/tokens";
 import { getAuthUser } from "@/lib/auth/session";
 import { getClientById, getClientReferences } from "@/services/clients";
@@ -44,80 +36,63 @@ export default async function ReferencesPage({ params }: PageProps) {
   return (
     <DashboardPage
       title="Referências visuais"
-      description={`${client.name} · inspirações para o Brand DNA`}
+      description="Inspirações, acervo anotado por IA e fotos do cliente usados no Brand DNA e na geração de artes."
+      backHref={`/clients/${id}`}
+      backLabel={client.name}
     >
       <div className={layout.sectionGap}>
-        <Surface variant="elevated">
-          <SurfaceHeader>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="space-y-1">
-                <SurfaceTitle>Acervo para geração com IA ({bankAssets.length})</SurfaceTitle>
-                <SurfaceDescription>
-                  Cada imagem é anotada por IA no upload. É essa descrição que o diretor
-                  de arte lê para escolher referências — confira se ela bate com o que
-                  a imagem tem de reaproveitável.
-                </SurfaceDescription>
-              </div>
-              <ReadinessChips readiness={readiness} />
-            </div>
-          </SurfaceHeader>
-          <SurfaceContent>
+        <section className="space-y-4">
+          <SectionHeader
+            title={`Acervo para geração com IA (${bankAssets.length})`}
+            description="Cada imagem é anotada por IA no upload — confira se a descrição bate com o que a imagem tem de reaproveitável."
+            icon={Library}
+            tone="violet"
+            action={<ReadinessChips readiness={readiness} />}
+          />
+          <Surface padding="md">
             <ReferenceBank clientId={id} assets={bankAssets} />
-          </SurfaceContent>
-        </Surface>
+          </Surface>
+        </section>
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          <div className="space-y-6">
-            <Surface variant="elevated">
-              <SurfaceHeader>
-                <SurfaceTitle>Upload de referências</SurfaceTitle>
-                <SurfaceDescription>
-                  Envie imagens de referência do Behance ou outras fontes.
-                  Usadas como contexto na geração do Creative Brain.
-                </SurfaceDescription>
-              </SurfaceHeader>
-              <SurfaceContent>
-                <ReferenceUpload clientId={id} />
-              </SurfaceContent>
-            </Surface>
-
-            <Surface>
-              <SurfaceHeader>
-                <SurfaceTitle>Referências ({references.length})</SurfaceTitle>
-              </SurfaceHeader>
-              <SurfaceContent>
+        <div className="grid gap-8 lg:grid-cols-2">
+          <section className="space-y-4">
+            <SectionHeader
+              title="Upload de referências"
+              description="Imagens do Behance ou outras fontes, usadas na geração do Creative Brain."
+              icon={Upload}
+              tone="cyan"
+            />
+            <Surface padding="md" className="space-y-6">
+              <ReferenceUpload clientId={id} />
+              <div className="space-y-3 border-t border-border pt-5">
+                <p className="flex items-center gap-2 text-[0.8125rem] font-semibold text-muted-foreground">
+                  <ImageIcon className="size-3.5" strokeWidth={2} />
+                  Referências enviadas
+                  <span className="rounded-md bg-muted px-1.5 text-[0.6875rem] tabular-nums">
+                    {references.length}
+                  </span>
+                </p>
                 <ReferenceGallery clientId={id} references={references} />
-              </SurfaceContent>
+              </div>
             </Surface>
-          </div>
+          </section>
 
-          <Surface>
-            <SurfaceHeader>
-              <SurfaceTitle>Fotos do cliente ({clientPhotos.length}/5)</SurfaceTitle>
-              <SurfaceDescription>
-                Fotos do cliente, produto ou espaço. Copie as URLs para usar no Spaces.
-              </SurfaceDescription>
-            </SurfaceHeader>
-            <SurfaceContent>
+          <section className="space-y-4">
+            <SectionHeader
+              title={`Fotos do cliente (${clientPhotos.length}/5)`}
+              description="Produto, espaço ou contexto. Copie para usar no Spaces."
+              icon={Camera}
+              tone="orange"
+            />
+            <Surface padding="md">
               <ClientPhotosPanel
                 clientId={id}
                 clientName={client.name}
                 photos={clientPhotos}
               />
-            </SurfaceContent>
-          </Surface>
+            </Surface>
+          </section>
         </div>
-
-        <Link
-          href={`/clients/${id}`}
-          className={cn(
-            buttonVariants({ variant: "ghost", size: "sm" }),
-            "inline-flex gap-2 text-muted-foreground"
-          )}
-        >
-          <ArrowLeft className="size-4" strokeWidth={1.75} />
-          Voltar ao cliente
-        </Link>
       </div>
     </DashboardPage>
   );

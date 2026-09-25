@@ -1,9 +1,12 @@
-import { Layers } from "lucide-react";
+import Link from "next/link";
+import { Layers, Palette } from "lucide-react";
 import { DashboardPage } from "@/components/layout/dashboard-page";
+import { SectionHeader } from "@/components/layout/section-header";
 import { CarouselCard } from "@/components/carousel/carousel-card";
 import { CreateCarouselDialog } from "@/components/carousel/create-carousel-dialog";
 import { TurboButton, type TurboProfile } from "@/components/carousel/turbo/turbo-button";
-import { Surface, SurfaceContent } from "@/components/ui/surface";
+import { EmptyState } from "@/components/ui/empty-state";
+import { buttonVariants } from "@/components/ui/button";
 import { layout } from "@/lib/design/tokens";
 import { getCarouselsForUser } from "@/services/carousels";
 import { getCarouselProfilesForUser } from "@/services/carousel-profiles";
@@ -30,38 +33,42 @@ export default async function CarouselPage() {
       title="Carrosséis"
       description="Crie e gerencie carrosséis para o Instagram com IA"
       headerAction={
-        <div className="flex items-center gap-2">
+        <>
+          <Link
+            href="/carousel/perfis"
+            className={buttonVariants({ variant: "ghost", size: "sm" })}
+          >
+            <Palette />
+            Perfis de design
+          </Link>
           <TurboButton profiles={turboProfiles} />
           <CreateCarouselDialog />
-        </div>
+        </>
       }
     >
       <div className={layout.sectionGap}>
         {carousels.length === 0 ? (
-          <Surface variant="dashed" padding="lg">
-            <SurfaceContent className="flex flex-col items-center text-center">
-              <Layers
-                className="mb-4 size-8 text-muted-foreground/40"
-                strokeWidth={1.25}
-              />
-              <p className="text-sm font-medium text-foreground">
-                Nenhum carrossel ainda
-              </p>
-              <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                Crie seu primeiro carrossel e use IA para gerar slides
-                automaticamente a partir de um tema.
-              </p>
-              <div className="mt-4">
-                <CreateCarouselDialog />
-              </div>
-            </SurfaceContent>
-          </Surface>
+          <EmptyState
+            icon={Layers}
+            tone="pink"
+            title="Nenhum carrossel ainda"
+            description="Crie seu primeiro carrossel e use IA para gerar slides automaticamente a partir de um tema."
+            action={<CreateCarouselDialog />}
+          />
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {carousels.map((carousel) => (
-              <CarouselCard key={carousel.id} carousel={carousel} />
-            ))}
-          </div>
+          <section className="space-y-4">
+            <SectionHeader
+              icon={Layers}
+              tone="pink"
+              title="Seus carrosséis"
+              description={`${carousels.length} ${carousels.length === 1 ? "carrossel" : "carrosséis"} · ordenados pela última edição`}
+            />
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              {carousels.map((carousel) => (
+                <CarouselCard key={carousel.id} carousel={carousel} />
+              ))}
+            </div>
+          </section>
         )}
       </div>
     </DashboardPage>

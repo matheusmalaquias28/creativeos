@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Copy, Loader2 } from "lucide-react";
+import { AlertTriangle, Check, Copy, ImageIcon, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { buttonVariants } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { tones } from "@/lib/design/tokens";
 import { buildClientLogoCopyFileName } from "@/lib/utils/logo-filename";
 import {
   copyPngBlobToClipboard,
@@ -144,18 +146,26 @@ export function DemandClientAssets({
 
   if (!logoUrl && references.length === 0) {
     return (
-      <div className="space-y-3">
-        <p className="text-sm text-muted-foreground">
-          Nenhuma logo ou referência cadastrada para{" "}
-          <span className="font-medium text-foreground">{clientName}</span>.
-        </p>
-        <Link
-          href={`/clients/${clientId}/references`}
-          className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-        >
-          Cadastrar materiais do cliente
-        </Link>
-      </div>
+      <EmptyState
+        compact
+        icon={ImageIcon}
+        tone="slate"
+        title="Sem materiais do cliente"
+        description={
+          <>
+            Nenhuma logo ou referência cadastrada para{" "}
+            <span className="font-medium text-foreground">{clientName}</span>.
+          </>
+        }
+        action={
+          <Link
+            href={`/clients/${clientId}/references`}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          >
+            Cadastrar materiais do cliente
+          </Link>
+        }
+      />
     );
   }
 
@@ -166,7 +176,7 @@ export function DemandClientAssets({
           Materiais de{" "}
           <Link
             href={`/clients/${clientId}`}
-            className="font-medium text-foreground underline-offset-4 hover:underline"
+            className="font-semibold text-foreground underline-offset-4 hover:text-primary hover:underline"
           >
             {clientName}
           </Link>
@@ -203,10 +213,10 @@ export function DemandClientAssets({
 
       {logoUrl && (
         <div className="space-y-2">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <p className="text-[0.8125rem] font-semibold text-muted-foreground">
             Logo
           </p>
-          <div className="inline-flex overflow-hidden rounded-lg border border-border/50 bg-card/30 p-3">
+          <div className="bg-dot-grid inline-flex overflow-hidden rounded-xl border border-border bg-surface p-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={logoUrl}
@@ -221,14 +231,15 @@ export function DemandClientAssets({
 
       {references.length > 0 && (
         <div className="space-y-3">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Referências ({references.length})
+          <p className="text-[0.8125rem] font-semibold text-muted-foreground">
+            Referências{" "}
+            <span className="tabular-nums text-muted-foreground/70">({references.length})</span>
           </p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
             {references.map((ref) => (
               <div
                 key={ref.id}
-                className="aspect-square overflow-hidden rounded-lg border border-border/50 bg-card/30"
+                className="aspect-square overflow-hidden rounded-xl border border-border bg-muted"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -249,9 +260,17 @@ export function DemandClientAssets({
 
 export function DemandClientAssetsEmpty() {
   return (
-    <p className="text-sm text-muted-foreground">
-      Cliente pendente de cadastro. Você ainda pode anexar referências desta
-      demanda abaixo.
+    <p
+      className={cn(
+        "flex items-start gap-2 rounded-xl border px-3 py-2.5 text-[0.8125rem] leading-relaxed",
+        tones.amber.badge
+      )}
+    >
+      <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+      <span>
+        Cliente pendente de cadastro. Você ainda pode anexar referências desta
+        demanda abaixo.
+      </span>
     </p>
   );
 }

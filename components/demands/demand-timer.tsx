@@ -51,7 +51,7 @@ export function DemandTimer({ status, startedAt, elapsedSeconds }: Props) {
 
   if (isDoneStatus(status) && elapsedSeconds != null) {
     return (
-      <span className="inline-flex items-center gap-1.5 text-xs text-emerald-600">
+      <span className="inline-flex h-8 items-center gap-1.5 rounded-full border border-tone-green/25 bg-tone-green/12 px-3 text-xs font-semibold tabular-nums text-tone-green">
         <Timer className="size-3.5" />
         Tempo total: {formatElapsed(elapsedSeconds)}
       </span>
@@ -61,11 +61,11 @@ export function DemandTimer({ status, startedAt, elapsedSeconds }: Props) {
   if (!isTiming) return null;
 
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-amber-600">
+    <span className="inline-flex h-8 items-center gap-1.5 rounded-full border border-tone-blue/25 bg-tone-blue/12 px-3 text-xs font-semibold tabular-nums text-tone-blue">
       <Timer className="size-3.5 animate-pulse" />
       Em execução: {formatTime(elapsed)}
       {elapsed >= MAX_SECONDS && (
-        <span className="text-[0.65rem] text-muted-foreground">(máx. 1h)</span>
+        <span className="text-[0.6875rem] font-medium text-muted-foreground">(máx. 1h)</span>
       )}
     </span>
   );

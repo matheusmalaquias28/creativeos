@@ -92,7 +92,7 @@ export function ImageLightbox({ items, index, onClose, onNavigate }: Props) {
               handleDownload();
             }}
             aria-label="Baixar arte"
-            className="transition-premium rounded-lg p-2 text-muted-foreground hover:bg-white/8 hover:text-foreground"
+            className="transition-premium rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
           >
             <Download className="size-4" />
           </button>
@@ -100,7 +100,7 @@ export function ImageLightbox({ items, index, onClose, onNavigate }: Props) {
             type="button"
             onClick={onClose}
             aria-label="Fechar"
-            className="transition-premium rounded-lg p-2 text-muted-foreground hover:bg-white/8 hover:text-foreground"
+            className="transition-premium rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
           >
             <X className="size-4" />
           </button>
@@ -161,8 +161,8 @@ function NavButton({
       onClick={onClick}
       aria-label={side === "left" ? "Arte anterior" : "Próxima arte"}
       className={cn(
-        "transition-premium absolute top-1/2 -translate-y-1/2 rounded-full border border-border/60 bg-background/80 p-2.5 text-muted-foreground backdrop-blur",
-        "hover:text-foreground dark:border-white/10",
+        "transition-premium absolute top-1/2 -translate-y-1/2 rounded-full border border-border bg-popover/90 p-2.5 text-muted-foreground backdrop-blur",
+        "hover:text-foreground hover:border-border-strong",
         side === "left" ? "left-2" : "right-2"
       )}
     >

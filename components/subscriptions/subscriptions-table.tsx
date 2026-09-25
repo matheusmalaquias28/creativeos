@@ -2,6 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import type { Tone } from "@/lib/design/tokens";
+import { tones } from "@/lib/design/tokens";
 import { formatCentsBRL } from "@/lib/format/currency";
 import {
   SUBSCRIPTION_STATUS_LABELS,
@@ -21,10 +25,10 @@ const FILTERS: { value: SubscriptionStatus | "all"; label: string }[] = [
   { value: "canceled", label: "Canceladas" },
 ];
 
-const STATUS_BADGE_CLASS: Record<SubscriptionStatus, string> = {
-  active: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-  payment_issue: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",
-  canceled: "border-zinc-500/25 bg-zinc-500/10 text-zinc-600 dark:text-zinc-400",
+const STATUS_TONE: Record<SubscriptionStatus, Tone> = {
+  active: "green",
+  payment_issue: "amber",
+  canceled: "slate",
 };
 
 function formatDate(value: string | null): string {
@@ -62,33 +66,23 @@ export function SubscriptionsTable({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        {FILTERS.map((f) => {
-          const count = f.value === "all" ? subscriptions.length : (counts.get(f.value) ?? 0);
-          const active = filter === f.value;
-          return (
-            <button
-              key={f.value}
-              type="button"
-              onClick={() => setFilter(f.value)}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-premium",
-                active
-                  ? "border-positive/40 bg-positive/10 text-foreground"
-                  : "border-border/60 text-muted-foreground hover:text-foreground dark:border-white/8"
-              )}
-            >
-              {f.label}
-              <span className="tabular-nums opacity-60">{count}</span>
-            </button>
-          );
-        })}
+      <div className="max-w-full overflow-x-auto">
+        <SegmentedControl
+          aria-label="Filtrar assinaturas por status"
+          value={filter}
+          onChange={setFilter}
+          options={FILTERS.map((f) => ({
+            value: f.value,
+            label: f.label,
+            count: f.value === "all" ? subscriptions.length : (counts.get(f.value) ?? 0),
+          }))}
+        />
       </div>
 
-      <div className="surface-panel overflow-x-auto">
+      <div className="max-h-[70vh] overflow-auto rounded-2xl border border-border bg-card shadow-[var(--surface-shadow),var(--inner-highlight)]">
         <table className="w-full min-w-[820px] text-sm">
-          <thead>
-            <tr className="border-b border-border/50 text-left text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground/70">
+          <thead className="sticky top-0 z-10 bg-surface">
+            <tr className="border-b border-border text-left text-xs font-semibold text-muted-foreground">
               <th className="px-4 py-3">Cliente</th>
               <th className="px-4 py-3">Produto</th>
               <th className="px-4 py-3">Status</th>
@@ -101,7 +95,7 @@ export function SubscriptionsTable({
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-sm text-muted-foreground/60">
+                <td colSpan={7} className="px-4 py-12 text-center text-sm text-muted-foreground">
                   Nenhuma assinatura nesse filtro.
                 </td>
               </tr>
@@ -109,7 +103,7 @@ export function SubscriptionsTable({
               filtered.map((sub) => (
                 <tr
                   key={sub.id}
-                  className="border-b border-border/30 last:border-0 hover:bg-white/[0.015]"
+                  className="border-b border-border transition-colors last:border-0 hover:bg-accent/50"
                 >
                   <td className="px-4 py-3">
                     <SubscriptionClientLinker
@@ -121,20 +115,18 @@ export function SubscriptionsTable({
                       clients={clients}
                     />
                   </td>
-                  <td className="max-w-[180px] truncate px-4 py-3 text-foreground/85">
+                  <td className="max-w-[180px] truncate px-4 py-3 text-foreground/90">
                     {sub.product_name || "—"}
                   </td>
                   <td className="px-4 py-3">
-                    <span
-                      className={cn(
-                        "inline-flex items-center rounded-full border px-2 py-0.5 text-[0.6875rem] font-medium",
-                        STATUS_BADGE_CLASS[sub.status]
-                      )}
-                    >
+                    <Badge variant={STATUS_TONE[sub.status]}>
+                      <span
+                        className={cn("size-1.5 rounded-full", tones[STATUS_TONE[sub.status]].dot)}
+                      />
                       {SUBSCRIPTION_STATUS_LABELS[sub.status]}
-                    </span>
+                    </Badge>
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums text-foreground/90">
+                  <td className="px-4 py-3 text-right font-semibold tabular-nums text-foreground">
                     {formatCentsBRL(monthlyAmountCents(sub))}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums text-foreground/90">
@@ -146,7 +138,7 @@ export function SubscriptionsTable({
                       currentSalesperson={sub.salesperson}
                     />
                   </td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground/70">
+                  <td className="px-4 py-3 text-xs tabular-nums text-muted-foreground">
                     {formatDate(sub.last_event_at)}
                   </td>
                 </tr>

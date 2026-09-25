@@ -28,10 +28,10 @@ function CornerPicker({ value, onChange }: { value: Corner; onChange: (c: Corner
           key={c.id}
           onClick={() => onChange(c.id)}
           className={cn(
-            "rounded-lg border px-2 py-1.5 text-[0.625rem] font-medium transition-colors",
+            "rounded-lg border px-2 py-1.5 text-[0.6875rem] font-semibold transition-colors",
             value === c.id
-              ? "border-primary bg-primary/10 text-primary"
-              : "border-border text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+              ? "border-primary/50 bg-primary/12 text-primary"
+              : "border-border bg-surface text-muted-foreground hover:border-border-strong hover:bg-accent hover:text-foreground"
           )}
         >
           {c.label}
@@ -52,7 +52,7 @@ function ToggleRow({
 }) {
   return (
     <label className="flex items-center justify-between gap-2 cursor-pointer">
-      <span className="text-xs font-medium text-foreground">{label}</span>
+      <span className="text-[0.8125rem] font-semibold text-foreground">{label}</span>
       <input
         type="checkbox"
         checked={checked}
@@ -99,13 +99,13 @@ export function DesignControls({
       <div className="space-y-3">
         <ToggleRow label="Badge (logo + @)" checked={design.badge.enabled} onChange={(v) => patchBadge({ enabled: v })} />
         {design.badge.enabled && (
-          <div className="space-y-3 pl-1">
+          <div className="space-y-3 rounded-xl border border-border bg-surface/60 p-3">
             <label
               className={cn(
                 "flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed py-2.5 text-xs transition-colors",
                 design.badge.logoUrl
                   ? "border-primary/40 bg-primary/5 text-primary"
-                  : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                  : "border-border-strong bg-surface text-muted-foreground hover:border-primary/50 hover:bg-primary/5 hover:text-foreground"
               )}
             >
               <input type="file" accept="image/*" className="sr-only" onChange={handleLogo} />
@@ -113,19 +113,19 @@ export function DesignControls({
               {design.badge.logoUrl ? "Trocar logo" : "Carregar logo (PNG/JPG)"}
             </label>
             {design.badge.logoUrl && (
-              <div className="flex items-center justify-between gap-2 rounded-lg border border-border/40 bg-muted/20 px-3 py-2">
+              <div className="flex items-center justify-between gap-2 rounded-xl border border-border bg-surface px-3 py-2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={design.badge.logoUrl} alt="logo" className="h-8 w-auto max-w-[120px] object-contain" />
                 <button
                   onClick={() => patchBadge({ logoUrl: null })}
-                  className="text-[0.625rem] text-negative hover:underline"
+                  className="text-xs font-semibold text-tone-red hover:underline"
                 >
                   Remover
                 </button>
               </div>
             )}
             <div className="space-y-1.5">
-              <label className="text-[0.625rem] text-muted-foreground/70">@ do Instagram</label>
+              <label className="text-xs font-medium text-muted-foreground">@ do Instagram</label>
               <Input
                 value={design.badge.handle}
                 onChange={(e) => patchBadge({ handle: e.target.value })}
@@ -133,7 +133,7 @@ export function DesignControls({
                 className="h-8 text-xs"
               />
             </div>
-            <p className="text-[0.5625rem] leading-relaxed text-muted-foreground/50">
+            <p className="text-[0.6875rem] leading-relaxed text-muted-foreground">
               O badge aparece somente no primeiro card e acompanha a posição do texto dele (seção Texto).
             </p>
           </div>
@@ -141,33 +141,33 @@ export function DesignControls({
       </div>
 
       {/* Numbering */}
-      <div className="space-y-3 border-t border-white/6 pt-4">
+      <div className="space-y-3 border-t border-border pt-4">
         <ToggleRow label="Numeração dos slides" checked={design.numbering.enabled} onChange={(v) => patchNumbering({ enabled: v })} />
         {design.numbering.enabled && (
-          <div className="space-y-1.5 pl-1">
-            <label className="text-[0.625rem] text-muted-foreground/70">Posição</label>
+          <div className="space-y-1.5 rounded-xl border border-border bg-surface/60 p-3">
+            <label className="text-xs font-medium text-muted-foreground">Posição</label>
             <CornerPicker value={design.numbering.position} onChange={(c) => patchNumbering({ position: c })} />
           </div>
         )}
       </div>
 
       {/* Pagination */}
-      <div className="space-y-3 border-t border-white/6 pt-4">
+      <div className="space-y-3 border-t border-border pt-4">
         <ToggleRow label="Botão de paginação" checked={design.pagination.enabled} onChange={(v) => patchPagination({ enabled: v })} />
         {design.pagination.enabled && (
-          <div className="space-y-3 pl-1">
+          <div className="space-y-3 rounded-xl border border-border bg-surface/60 p-3">
             <div className="space-y-1.5">
-              <label className="text-[0.625rem] text-muted-foreground/70">Lado</label>
+              <label className="text-xs font-medium text-muted-foreground">Lado</label>
               <div className="flex gap-1">
                 {(["left", "right"] as const).map((side) => (
                   <button
                     key={side}
                     onClick={() => patchPagination({ side })}
                     className={cn(
-                      "flex-1 rounded-lg border px-2 py-1.5 text-[0.625rem] font-medium transition-colors",
+                      "flex-1 rounded-lg border px-2 py-1.5 text-[0.6875rem] font-semibold transition-colors",
                       design.pagination.side === side
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+                        ? "border-primary/50 bg-primary/12 text-primary"
+                        : "border-border bg-surface text-muted-foreground hover:border-border-strong hover:bg-accent hover:text-foreground"
                     )}
                   >
                     {side === "left" ? "Esquerda" : "Direita"}
