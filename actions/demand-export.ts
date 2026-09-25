@@ -383,10 +383,16 @@ export async function deliverDemandExportAction(
 
   const limit = pLimit(3);
   const failed: DemandExportReport["failed"] = [];
-  let sent = 0;
+  // Arquivos que já têm drive_file_id já foram entregues (e já tiveram a
+  // cópia no Storage apagada abaixo) — reenviar de novo baixaria um arquivo
+  // que não existe mais. Só o que ainda não foi entregue precisa do ciclo
+  // download → upload no Drive → apagar do Storage.
+  const alreadyDelivered = files.filter((file) => file.drive_file_id);
+  const pending = files.filter((file) => !file.drive_file_id);
+  let sent = alreadyDelivered.length;
 
   await Promise.all(
-    files.map((file) =>
+    pending.map((file) =>
       limit(async () => {
         try {
           const { data, error } = await admin.storage.from(BUCKET).download(file.storage_path);
@@ -408,6 +414,9 @@ export async function deliverDemandExportAction(
               updated_at: new Date().toISOString(),
             })
             .eq("id", file.id);
+          // A arte já está no Drive do cliente — não precisa mais ocupar o
+          // Storage do Supabase também (era isso que estourava o limite).
+          await admin.storage.from(BUCKET).remove([file.storage_path]);
           sent += 1;
         } catch (error) {
           failed.push({

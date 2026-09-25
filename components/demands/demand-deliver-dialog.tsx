@@ -438,7 +438,22 @@ export function DemandDeliverDialog({
                                   }
                                   className="p-0"
                                 >
-                                  {current ? (
+                                  {current?.drive_file_id ? (
+                                    // Já foi pro Drive do cliente — a cópia no Storage
+                                    // foi apagada (não faz sentido guardar em 2 lugares),
+                                    // então não tem mais o que mostrar como preview aqui.
+                                    <div
+                                      className={cn(
+                                        "flex flex-col items-center justify-center gap-1.5 rounded-xl border border-emerald-500/25 bg-emerald-500/5 text-center",
+                                        meta.preview
+                                      )}
+                                    >
+                                      <Check className="size-5 text-emerald-400" />
+                                      <p className="px-3 text-[11px] text-emerald-300">
+                                        Entregue no Drive
+                                      </p>
+                                    </div>
+                                  ) : current ? (
                                     <div
                                       className={cn(
                                         "overflow-hidden rounded-xl border border-border/50 bg-black/20",

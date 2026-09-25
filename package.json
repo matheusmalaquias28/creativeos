@@ -10,6 +10,7 @@
     "seed:admin": "node scripts/seed-admin.mjs",
     "db:setup": "node scripts/apply-migrations.mjs",
     "backfill:client-flow": "node scripts/backfill-client-flow-graphs.mjs",
+    "cleanup:delivered-exports": "node scripts/cleanup-delivered-exports.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
