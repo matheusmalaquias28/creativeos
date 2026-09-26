@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   Zap, X, Loader2, ArrowLeft, Sparkles, Check, AlertCircle, Image as ImageIcon,
+  LayoutTemplate, MessageSquareText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +15,8 @@ import { cn } from "@/lib/utils";
 import { SlidePreview } from "@/components/carousel/slide-preview";
 import { applyImageToSlide, type TurboSpec } from "@/lib/carousel/turbo/schema";
 import type { CarouselDesign, CarouselSlide } from "@/types/carousel";
+import { TweetWizard } from "@/components/carousel/tweet/tweet-wizard";
+import type { TweetProfile } from "@/types/tweet-carousel";
 
 export type TurboProfile = {
   id: string;
@@ -23,7 +26,7 @@ export type TurboProfile = {
   hasContext: boolean;
 };
 
-type Step = "profile" | "theme" | "review" | "building";
+type Step = "type" | "tweet" | "profile" | "theme" | "review" | "building";
 
 async function readSSE(res: Response, onEvent: (e: Record<string, unknown>) => void) {
   const reader = res.body!.getReader();
@@ -47,10 +50,16 @@ async function readSSE(res: Response, onEvent: (e: Record<string, unknown>) => v
   }
 }
 
-export function TurboButton({ profiles }: { profiles: TurboProfile[] }) {
+export function TurboButton({
+  profiles,
+  tweetProfiles,
+}: {
+  profiles: TurboProfile[];
+  tweetProfiles: TweetProfile[];
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<Step>("profile");
+  const [step, setStep] = useState<Step>("type");
   const [profileId, setProfileId] = useState<string | null>(null);
   const [theme, setTheme] = useState("");
 
@@ -78,7 +87,7 @@ export function TurboButton({ profiles }: { profiles: TurboProfile[] }) {
   const selectedProfile = profiles.find((p) => p.id === profileId) ?? null;
 
   function reset() {
-    setStep("profile");
+    setStep("type");
     setProfileId(null);
     setTheme("");
     setThinking("");
@@ -298,7 +307,9 @@ export function TurboButton({ profiles }: { profiles: TurboProfile[] }) {
                   </span>
                   <div>
                     <h2 className="text-base font-bold tracking-tight text-foreground">Gerador Turbo</h2>
-                    <p className="text-xs text-muted-foreground">Geração guiada por IA</p>
+                    <p className="text-xs text-muted-foreground">
+                      {step === "tweet" ? "Carrossel tweet" : step === "type" ? "Geração guiada por IA" : "Carrossel avançado"}
+                    </p>
                   </div>
                 </div>
                 <Button variant="ghost" size="icon-sm" onClick={close} aria-label="Fechar">
@@ -307,9 +318,50 @@ export function TurboButton({ profiles }: { profiles: TurboProfile[] }) {
               </div>
 
               <div className="flex-1 overflow-y-auto px-6 py-5">
+                {/* Step 0 — tipo de carrossel */}
+                {step === "type" && (
+                  <div className="space-y-3">
+                    <p className="text-sm font-semibold text-foreground">Que tipo de carrossel vamos criar?</p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <button
+                        onClick={() => setStep("profile")}
+                        className="flex flex-col items-start gap-2 rounded-xl border border-border bg-card p-4 text-left transition-premium hover:border-primary/50 hover:bg-accent"
+                      >
+                        <span className="flex size-9 items-center justify-center rounded-xl bg-tone-pink/14 text-tone-pink">
+                          <LayoutTemplate className="size-4" />
+                        </span>
+                        <span className="text-sm font-semibold text-foreground">Carrossel avançado</span>
+                        <span className="text-xs leading-snug text-muted-foreground">
+                          Design do perfil do cliente, pesquisa do tema e imagens geradas por IA.
+                        </span>
+                      </button>
+                      <button
+                        onClick={() => setStep("tweet")}
+                        className="flex flex-col items-start gap-2 rounded-xl border border-border bg-card p-4 text-left transition-premium hover:border-primary/50 hover:bg-accent"
+                      >
+                        <span className="flex size-9 items-center justify-center rounded-xl bg-[#1d9bf0]/14 text-[#1d9bf0]">
+                          <MessageSquareText className="size-4" />
+                        </span>
+                        <span className="text-sm font-semibold text-foreground">Carrossel tweet</span>
+                        <span className="text-xs leading-snug text-muted-foreground">
+                          Cards no estilo print de tweet, com foto, nome e @ verificado. A IA só escreve o texto.
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {step === "tweet" && (
+                  <TweetWizard profiles={tweetProfiles} onBack={() => setStep("type")} />
+                )}
+
                 {/* Step 1 — profile */}
                 {step === "profile" && (
                   <div className="space-y-3">
+                    <button onClick={() => setStep("type")} className="inline-flex items-center gap-1 rounded-lg text-[0.8125rem] font-medium text-muted-foreground transition-colors hover:text-foreground">
+                      <ArrowLeft className="size-3.5" />
+                      Tipo de carrossel
+                    </button>
                     <p className="text-sm font-semibold text-foreground">Para qual cliente vamos gerar?</p>
                     {profiles.length === 0 ? (
                       <div className="rounded-xl border border-dashed border-border-strong bg-surface p-4 text-center text-sm text-muted-foreground">

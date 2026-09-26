@@ -35,7 +35,7 @@ export type ReferenceAssetKind =
 
 export type ArtReferenceRole = "logo" | ReferenceAssetKind;
 
-export type UserRole = "admin" | "member";
+export type UserRole = "super_admin" | "admin" | "carousel_creator" | "member";
 
 export type User = {
   id: string;
@@ -837,6 +837,70 @@ export type Database = {
           post_style: "minimal" | "profile" | "creator" | "techviral" | "viralsaas";
           slides: Json;
           design: Json;
+          updated_at: string;
+        }>;
+        Relationships: [];
+      };
+      tweet_profiles: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          handle: string;
+          avatar_url: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          handle: string;
+          avatar_url?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<{
+          name: string;
+          handle: string;
+          avatar_url: string | null;
+          updated_at: string;
+        }>;
+        Relationships: [];
+      };
+      tweet_carousels: {
+        Row: {
+          id: string;
+          user_id: string;
+          profile_id: string | null;
+          name: string;
+          profile: Json;
+          theme: "light" | "dark";
+          cards: Json;
+          source: "ai" | "manual";
+          source_input: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          profile_id?: string | null;
+          name?: string;
+          profile?: Json;
+          theme?: "light" | "dark";
+          cards?: Json;
+          source?: "ai" | "manual";
+          source_input?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<{
+          profile_id: string | null;
+          name: string;
+          profile: Json;
+          theme: "light" | "dark";
+          cards: Json;
           updated_at: string;
         }>;
         Relationships: [];

@@ -1,10 +1,11 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/auth/session";
+import { parseRole } from "@/lib/auth/permissions";
 import type { User, UserRole } from "@/types";
 
 function resolveRole(appMetadata: Record<string, unknown> | undefined): UserRole {
-  return appMetadata?.role === "admin" ? "admin" : "member";
+  return parseRole(appMetadata?.role);
 }
 
 /**

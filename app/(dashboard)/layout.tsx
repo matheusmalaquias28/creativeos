@@ -6,6 +6,8 @@ import { NewDemandsCountProvider } from "@/components/demands/new-demands-count-
 import { getAuthUser } from "@/lib/auth/session";
 import { getNewDemandsCount } from "@/services/demands";
 import { getCurrentUserProfile } from "@/services/users";
+import { NavAccessProvider } from "@/components/layout/nav-access";
+import { canAccessPath, parseRole } from "@/lib/auth/permissions";
 
 export default async function DashboardLayout({
   children,
@@ -18,16 +20,20 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
+  const role = parseRole(user.app_metadata?.role);
+  const seesDemands = canAccessPath(role, "/demands");
+
   const [profile, newDemandsCount] = await Promise.all([
     getCurrentUserProfile(),
-    getNewDemandsCount(),
+    seesDemands ? getNewDemandsCount() : Promise.resolve(0),
   ]);
 
   return (
+    <NavAccessProvider role={role}>
     <NewDemandsCountProvider initialCount={newDemandsCount}>
       <CommandMenuProvider>
         <div className="flex min-h-screen flex-col lg:flex-row">
-          <DemandsRealtimeListener />
+          {seesDemands && <DemandsRealtimeListener />}
           <AppSidebar
             userName={profile?.full_name}
             userEmail={profile?.email ?? user.email}
@@ -38,5 +44,6 @@ export default async function DashboardLayout({
         </div>
       </CommandMenuProvider>
     </NewDemandsCountProvider>
+    </NavAccessProvider>
   );
 }

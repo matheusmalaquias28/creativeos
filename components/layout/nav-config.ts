@@ -5,11 +5,13 @@ import {
   Images,
   LayoutDashboard,
   Layers,
+  ShieldCheck,
   Users,
   Wand2,
   type LucideIcon,
 } from "lucide-react";
 import type { Tone } from "@/lib/design/tokens";
+import { canAccessPath, type AppRole } from "@/lib/auth/permissions";
 
 export type NavChild = { href: string; label: string };
 
@@ -113,7 +115,33 @@ export const NAV_SECTIONS: NavSection[] = [
       },
     ],
   },
+  {
+    id: "admin",
+    label: "Administração",
+    items: [
+      {
+        href: "/usuarios",
+        label: "Usuários",
+        icon: ShieldCheck,
+        tone: "violet",
+        keywords: "acessos permissões roles perfis senha equipe",
+      },
+    ],
+  },
 ];
+
+/** Navegação visível para a role (itens, sub-itens e seções vazias somem). */
+export function navSectionsFor(role: AppRole): NavSection[] {
+  return NAV_SECTIONS.map((section) => ({
+    ...section,
+    items: section.items
+      .filter((item) => canAccessPath(role, item.href))
+      .map((item) => ({
+        ...item,
+        children: item.children?.filter((child) => canAccessPath(role, child.href)),
+      })),
+  })).filter((section) => section.items.length > 0);
+}
 
 export const NAV_ITEMS: NavItem[] = NAV_SECTIONS.flatMap((s) => s.items);
 

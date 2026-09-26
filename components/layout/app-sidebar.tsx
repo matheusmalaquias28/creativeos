@@ -15,6 +15,7 @@ import {
   Search,
   Sun,
 } from "lucide-react";
+import { useNavAccess } from "@/components/layout/nav-access";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import {
@@ -29,7 +30,6 @@ import { useNewDemandsCount } from "@/components/demands/new-demands-count-provi
 import { BrandMark, BrandWordmark } from "@/components/layout/brand-mark";
 import { useCommandMenu } from "@/components/layout/command-menu";
 import {
-  NAV_SECTIONS,
   isNavChildActive,
   isNavItemActive,
 } from "@/components/layout/nav-config";
@@ -46,6 +46,7 @@ export function AppSidebar({ userName, userEmail }: AppSidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
   const { open: openCommand } = useCommandMenu();
+  const { homeHref } = useNavAccess();
 
   // Restaura a preferência salva (evita mismatch de hidratação lendo só no client).
   useEffect(() => {
@@ -85,7 +86,7 @@ export function AppSidebar({ userName, userEmail }: AppSidebarProps) {
         >
           <Menu className="size-5" strokeWidth={1.75} />
         </button>
-        <Link href="/dashboard" className="flex items-center gap-2.5">
+        <Link href={homeHref} className="flex items-center gap-2.5">
           <BrandMark size="sm" />
           <span className="text-sm font-bold tracking-tight">Creative OS</span>
         </Link>
@@ -160,6 +161,7 @@ function SidebarBody({
   onSearch,
 }: SidebarBodyProps) {
   const { count: newDemandsCount } = useNewDemandsCount();
+  const { sections, homeHref, can } = useNavAccess();
   const [isMac, setIsMac] = useState(false);
 
   useEffect(() => {
@@ -176,7 +178,7 @@ function SidebarBody({
         )}
       >
         <Link
-          href="/dashboard"
+          href={homeHref}
           onClick={onNavigate}
           className="flex min-w-0 items-center gap-3"
           title={collapsed ? "Creative OS" : undefined}
@@ -239,7 +241,7 @@ function SidebarBody({
 
       {/* Navegação */}
       <nav className={cn("flex-1 overflow-y-auto pb-4", collapsed ? "px-3" : "px-4")}>
-        {NAV_SECTIONS.map((section, sectionIndex) => (
+        {sections.map((section, sectionIndex) => (
           <div key={section.id} className={cn(sectionIndex > 0 && "mt-5")}>
             {collapsed ? (
               sectionIndex > 0 && <div className="mx-auto mb-3 h-px w-6 bg-sidebar-border" />
@@ -328,7 +330,7 @@ function SidebarBody({
       </nav>
 
       {/* Card de fila — só quando há demandas novas */}
-      {!collapsed && newDemandsCount > 0 && (
+      {!collapsed && newDemandsCount > 0 && can("/demands") && (
         <div className="shrink-0 px-4 pb-3">
           <Link
             href="/demands"

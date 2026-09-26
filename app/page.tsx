@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowRight, Brain, ClipboardList, Layers, Wand2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { homePathFor, parseRole } from "@/lib/auth/permissions";
 import { buttonVariants } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { BrandMark, BrandWordmark } from "@/components/layout/brand-mark";
@@ -42,7 +43,7 @@ export default async function HomePage() {
   } = await supabase.auth.getUser();
 
   if (user) {
-    redirect("/dashboard");
+    redirect(homePathFor(parseRole(user.app_metadata?.role)));
   }
 
   return (

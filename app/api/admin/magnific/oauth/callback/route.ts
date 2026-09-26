@@ -1,3 +1,4 @@
+import { isAdminRole } from "@/lib/auth/permissions";
 import { NextResponse } from "next/server";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { getCurrentUserProfile } from "@/services/users";
@@ -8,7 +9,7 @@ const MAGNIFIC_MCP_URL = "https://mcp.magnific.com";
 
 export async function GET(request: Request) {
   const profile = await getCurrentUserProfile();
-  if (!profile || profile.role !== "admin") {
+  if (!profile || !isAdminRole(profile.role)) {
     return NextResponse.json({ error: "Acesso restrito a administradores" }, { status: 403 });
   }
 

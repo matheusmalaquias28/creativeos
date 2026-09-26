@@ -12,7 +12,7 @@ import { FORMAT_LABELS } from "@/components/carousel/slide-preview";
 import { deleteCarouselAction } from "@/actions/carousels";
 import type { Carousel } from "@/types/carousel";
 
-function formatRelativeDate(value: string): string {
+export function formatRelativeDate(value: string): string {
   const diff = Date.now() - new Date(value).getTime();
   const minutes = Math.floor(diff / 60_000);
   if (minutes < 1) return "agora";

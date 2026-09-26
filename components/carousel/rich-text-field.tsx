@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { FONT_OPTIONS } from "@/lib/design/fonts";
 import { sanitizeRichHtml, hasRichContent } from "@/lib/carousel/sanitize-html";
 import { PRESET_COLORS } from "@/components/carousel/controls/pickers";
+import { ColorMenuButton } from "@/components/carousel/controls/color-menu";
 
 const WEIGHTS = [
   { label: "Regular", value: "400" },
@@ -22,73 +23,6 @@ type RichTextFieldProps = {
   rows?: number;
   onChange: (next: { html: string | null; plain: string }) => void;
 };
-
-/** Small popover to pick a color (or clear) — used inside the toolbar. */
-function MiniColor({
-  icon,
-  title,
-  onPick,
-  onClear,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  onPick: (color: string) => void;
-  onClear?: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function outside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", outside);
-    return () => document.removeEventListener("mousedown", outside);
-  }, [open]);
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        title={title}
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={() => setOpen((o) => !o)}
-        className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-      >
-        {icon}
-      </button>
-      {open && (
-        <div className="absolute left-0 top-9 z-40 w-52 rounded-xl border border-border bg-popover p-2.5 text-popover-foreground shadow-[var(--surface-shadow-elevated)]">
-          {/* Presets = cores de conteúdo do slide */}
-          <div className="grid grid-cols-9 gap-1">
-            {PRESET_COLORS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => { onPick(c); setOpen(false); }}
-                className="size-5 rounded border border-border-strong transition-transform hover:scale-110"
-                style={{ backgroundColor: c }}
-                title={c}
-              />
-            ))}
-          </div>
-          {onClear && (
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => { onClear(); setOpen(false); }}
-              className="mt-2 w-full rounded-lg border border-border bg-card px-2 py-1 text-[0.6875rem] font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            >
-              Remover
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
 
 export function RichTextField({
   html,
@@ -266,13 +200,15 @@ export function RichTextField({
           <Italic className="size-3.5" />
         </button>
 
-        <MiniColor
+        <ColorMenuButton
           icon={<Baseline className="size-3.5" />}
           title="Cor do texto"
+          presets={PRESET_COLORS}
           onPick={(c) => applyStyle({ color: c })}
         />
-        <MiniColor
+        <ColorMenuButton
           icon={<PaintBucket className="size-3.5" />}
+          presets={PRESET_COLORS}
           title="Cor de fundo do trecho"
           onPick={(c) => applyStyle({ backgroundColor: c })}
           onClear={() => applyStyle({ backgroundColor: "transparent" })}

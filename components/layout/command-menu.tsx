@@ -13,7 +13,7 @@ import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { ArrowRight, CornerDownLeft, Moon, Plus, Search, Sun, type LucideIcon } from "lucide-react";
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
-import { NAV_SECTIONS } from "@/components/layout/nav-config";
+import { useNavAccess } from "@/components/layout/nav-access";
 import { tones, type Tone } from "@/lib/design/tokens";
 import { cn } from "@/lib/utils";
 
@@ -77,6 +77,7 @@ function CommandMenuDialog({
 }) {
   const router = useRouter();
   const { resolvedTheme, setTheme } = useTheme();
+  const { sections, can } = useNavAccess();
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
@@ -87,7 +88,7 @@ function CommandMenuDialog({
       router.push(href);
     };
 
-    const nav: CommandItem[] = NAV_SECTIONS.flatMap((section) =>
+    const nav: CommandItem[] = sections.flatMap((section) =>
       section.items.flatMap((item) => {
         const base: CommandItem = {
           id: item.href,
@@ -117,7 +118,7 @@ function CommandMenuDialog({
 
     const isDark = resolvedTheme === "dark";
     const actions: CommandItem[] = [
-      {
+      ...(can("/clients") ? [{
         id: "action:new-client",
         label: "Novo cliente",
         group: "Ações rápidas",
@@ -125,7 +126,7 @@ function CommandMenuDialog({
         tone: "orange",
         keywords: "cadastrar criar marca",
         run: go("/clients?novo=1"),
-      },
+      } satisfies CommandItem] : []),
       {
         id: "action:theme",
         label: isDark ? "Mudar para tema claro" : "Mudar para tema escuro",
@@ -141,7 +142,7 @@ function CommandMenuDialog({
     ];
 
     return [...actions, ...nav];
-  }, [onOpenChange, resolvedTheme, router, setTheme]);
+  }, [onOpenChange, resolvedTheme, router, setTheme, sections, can]);
 
   const filtered = useMemo(() => {
     const q = normalize(query.trim());

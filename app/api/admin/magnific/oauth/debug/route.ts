@@ -1,3 +1,4 @@
+import { isAdminRole } from "@/lib/auth/permissions";
 import { NextResponse } from "next/server";
 import { getCurrentUserProfile } from "@/services/users";
 
@@ -40,7 +41,7 @@ async function probe(name: string, url: string) {
 /** Diagnóstico temporário — remover depois de resolver o timeout do bootstrap OAuth. */
 export async function GET() {
   const profile = await getCurrentUserProfile();
-  if (!profile || profile.role !== "admin") {
+  if (!profile || !isAdminRole(profile.role)) {
     return NextResponse.json({ error: "Acesso restrito a administradores" }, { status: 403 });
   }
 

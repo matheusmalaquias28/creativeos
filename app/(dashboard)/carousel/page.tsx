@@ -11,13 +11,23 @@ import { layout } from "@/lib/design/tokens";
 import { getCarouselsForUser } from "@/services/carousels";
 import { getCarouselProfilesForUser } from "@/services/carousel-profiles";
 import { getClientOptionsForCurrentUser } from "@/services/clients";
+import { getTweetCarouselsForUser, getTweetProfilesForUser } from "@/services/tweet-carousels";
+import { TweetCarouselCard } from "@/components/carousel/tweet/tweet-carousel-card";
 
 export default async function CarouselPage() {
-  const [carousels, profiles, clients] = await Promise.all([
+  const [carousels, profiles, clients, tweetCarousels, tweetProfiles] = await Promise.all([
     getCarouselsForUser(),
     getCarouselProfilesForUser(),
     getClientOptionsForCurrentUser(),
+    getTweetCarouselsForUser(),
+    getTweetProfilesForUser(),
   ]);
+
+  // Avançados e tweet na mesma grade, pela última edição.
+  const items = [
+    ...carousels.map((c) => ({ kind: "advanced" as const, updated_at: c.updated_at, carousel: c })),
+    ...tweetCarousels.map((c) => ({ kind: "tweet" as const, updated_at: c.updated_at, carousel: c })),
+  ].sort((a, b) => b.updated_at.localeCompare(a.updated_at));
 
   const clientMap = new Map(clients.map((c) => [c.id, c.name]));
   const turboProfiles: TurboProfile[] = profiles.map((p) => ({
@@ -41,13 +51,13 @@ export default async function CarouselPage() {
             <Palette />
             Perfis de design
           </Link>
-          <TurboButton profiles={turboProfiles} />
+          <TurboButton profiles={turboProfiles} tweetProfiles={tweetProfiles} />
           <CreateCarouselDialog />
         </>
       }
     >
       <div className={layout.sectionGap}>
-        {carousels.length === 0 ? (
+        {items.length === 0 ? (
           <EmptyState
             icon={Layers}
             tone="pink"
@@ -61,12 +71,16 @@ export default async function CarouselPage() {
               icon={Layers}
               tone="pink"
               title="Seus carrosséis"
-              description={`${carousels.length} ${carousels.length === 1 ? "carrossel" : "carrosséis"} · ordenados pela última edição`}
+              description={`${items.length} ${items.length === 1 ? "carrossel" : "carrosséis"} · ordenados pela última edição`}
             />
             <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-              {carousels.map((carousel) => (
-                <CarouselCard key={carousel.id} carousel={carousel} />
-              ))}
+              {items.map((item) =>
+                item.kind === "tweet" ? (
+                  <TweetCarouselCard key={item.carousel.id} carousel={item.carousel} />
+                ) : (
+                  <CarouselCard key={item.carousel.id} carousel={item.carousel} />
+                )
+              )}
             </div>
           </section>
         )}

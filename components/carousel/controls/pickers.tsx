@@ -2,10 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronDown, ChevronRight, Pipette } from "lucide-react";
+import { Check, ChevronDown, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { FONT_OPTIONS } from "@/lib/design/fonts";
+import { usePopoverPosition } from "@/components/carousel/controls/popover-position";
+import { RgbColorPicker, TOP_LAYER_Z } from "@/components/carousel/controls/color-menu";
 
 export const PRESET_COLORS = [
   "#000000", "#0a0a0a", "#111111", "#1a1a2e", "#0d1117", "#1c1c1e",
@@ -15,69 +17,6 @@ export const PRESET_COLORS = [
   "#10b981", "#059669", "#f59e0b", "#d97706", "#ef4444", "#dc2626",
   "#06b6d4", "#0891b2", "#84cc16", "#65a30d", "#f97316", "#ea580c",
 ];
-
-// ─── Anchored popover positioning ──────────────────────────────────────────
-// The picker panels used to be `position: absolute` inside the sidebar, which
-// has `overflow-y-auto` (so overflow-x is clipped). Panels wider than the
-// sidebar got hidden. We render them in a portal with fixed positioning,
-// clamped to the viewport, so they always show in full.
-
-type PopoverPos = {
-  left: number;
-  width: number;
-  top?: number;
-  bottom?: number;
-  maxHeight: number;
-};
-
-function usePopoverPosition(
-  anchorRef: React.RefObject<HTMLElement | null>,
-  open: boolean,
-  fixedWidth: number,
-  matchAnchorWidth = false,
-  gap = 8
-): PopoverPos | null {
-  const [pos, setPos] = useState<PopoverPos | null>(null);
-
-  useEffect(() => {
-    if (!open) {
-      setPos(null);
-      return;
-    }
-    const update = () => {
-      const el = anchorRef.current;
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      const width = matchAnchorWidth ? r.width : fixedWidth;
-      const left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8));
-      const openUp = r.bottom > window.innerHeight * 0.62;
-      if (openUp) {
-        setPos({
-          left,
-          width,
-          bottom: window.innerHeight - r.top + gap,
-          maxHeight: r.top - gap - 8,
-        });
-      } else {
-        setPos({
-          left,
-          width,
-          top: r.bottom + gap,
-          maxHeight: window.innerHeight - r.bottom - gap - 8,
-        });
-      }
-    };
-    update();
-    window.addEventListener("scroll", update, true);
-    window.addEventListener("resize", update);
-    return () => {
-      window.removeEventListener("scroll", update, true);
-      window.removeEventListener("resize", update);
-    };
-  }, [open, anchorRef, fixedWidth, matchAnchorWidth, gap]);
-
-  return pos;
-}
 
 /** Rótulo padrão dos controles do editor (sentence case, legível). */
 export const controlLabelClass = "text-xs font-medium text-muted-foreground";
@@ -187,7 +126,6 @@ export function ModernColorPicker({
 }) {
   const [open, setOpen] = useState(false);
   const [hex, setHex] = useState(value);
-  const nativeRef = useRef<HTMLInputElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const pos = usePopoverPosition(wrapRef, open, COLOR_PANEL_WIDTH);
@@ -250,7 +188,7 @@ export function ModernColorPicker({
             width: pos.width,
             maxHeight: pos.maxHeight,
             overflowY: "auto",
-            zIndex: 10000,
+            zIndex: TOP_LAYER_Z,
           }}
           className="rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-[var(--surface-shadow-elevated)]"
         >
@@ -270,29 +208,10 @@ export function ModernColorPicker({
             ))}
           </div>
 
-          <div className="flex items-center gap-2">
-            <Input
-              value={hex}
-              onChange={(e) => setHex(e.target.value)}
-              onBlur={(e) => commitHex(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") { commitHex(hex); setOpen(false); } }}
-              placeholder="#000000"
-              className="h-7 flex-1 font-mono text-xs uppercase"
-              maxLength={7}
-            />
-            <button
-              onClick={() => nativeRef.current?.click()}
-              className="flex h-7 items-center gap-1 rounded-lg border border-border bg-card px-2 text-[0.6875rem] font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            >
-              <Pipette className="size-3" />
-              Personalizar
-            </button>
-            <input
-              ref={nativeRef}
-              type="color"
+          <div className="border-t border-border pt-3">
+            <RgbColorPicker
               value={value || "#000000"}
-              onChange={(e) => { onChange(e.target.value); setHex(e.target.value); }}
-              className="sr-only"
+              onChange={(v) => { onChange(v); setHex(v); }}
             />
           </div>
 
@@ -367,7 +286,7 @@ function FontSelect({ value, onChange }: { value: string; onChange: (family: str
             bottom: pos.bottom,
             width: pos.width,
             maxHeight: pos.maxHeight,
-            zIndex: 10000,
+            zIndex: TOP_LAYER_Z,
           }}
           className="overflow-y-auto rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-[var(--surface-shadow-elevated)]"
         >

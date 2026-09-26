@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { canAccessPath, homePathFor, parseRole } from "@/lib/auth/permissions";
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -44,9 +45,23 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (user && isAuthRoute && request.nextUrl.pathname === "/login") {
+  const role = user ? parseRole(user.app_metadata?.role) : null;
+
+  if (user && role && isAuthRoute && request.nextUrl.pathname === "/login") {
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = homePathFor(role);
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
+  // Permissões por role: páginas redirecionam para a home da role, APIs recebem 403.
+  if (user && role && !canAccessPath(role, request.nextUrl.pathname)) {
+    if (request.nextUrl.pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Sem permissão para este recurso" }, { status: 403 });
+    }
+    const url = request.nextUrl.clone();
+    url.pathname = homePathFor(role);
+    url.search = "";
     return NextResponse.redirect(url);
   }
 
