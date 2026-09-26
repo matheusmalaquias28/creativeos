@@ -132,6 +132,9 @@ export function TweetWizard({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.id) throw new Error(data.error ?? "Falha ao gerar o carrossel");
+      // A rota de API não invalida o Router Cache: sem o refresh, a lista de
+      // carrosséis continua em cache sem o novo até recarregar a página.
+      router.refresh();
       router.push(`/carousel/tweet/${data.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Falha ao gerar o carrossel");
