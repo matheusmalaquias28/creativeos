@@ -528,3 +528,17 @@
   opacity: 0.025;
   mix-blend-mode: overlay;
 }
+
+/*
+ * iOS dá zoom ao focar qualquer campo com fonte < 16px. Em telas de toque os
+ * campos digitáveis usam no mínimo 16px. Fora de @layer para vencer as
+ * utilities do Tailwind (text-xs, text-sm…).
+ */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="button"]):not([type="submit"]),
+  textarea,
+  select,
+  [contenteditable]:not([contenteditable="false"]) {
+    font-size: max(16px, 1em);
+  }
+}
