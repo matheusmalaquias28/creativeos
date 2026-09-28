@@ -349,8 +349,11 @@ export async function removeIdentitySampleAction(
  * duas vezes é o atrito que fez o cadastro virar uma caça a três uploads. As
  * URLs são do bucket do acervo — por isso entram sem storage path: remover a
  * amostra aqui não pode apagar o arquivo de lá.
+ *
+ * O nome não começa com "use": o eslint trata qualquer `useX()` como React Hook
+ * e reprova a chamada dentro de um callback (react-hooks/rules-of-hooks).
  */
-async function useBankAsIdentitySamplesActionImpl(
+async function adoptBankReferencesActionImpl(
   clientId: string,
   urls: string[]
 ): Promise<VisualIdentityActionState> {
@@ -397,11 +400,11 @@ async function useBankAsIdentitySamplesActionImpl(
   return { success: true, sampleUrls };
 }
 
-export async function useBankAsIdentitySamplesAction(
+export async function adoptBankReferencesAction(
   clientId: string,
   urls: string[]
 ): Promise<VisualIdentityActionState> {
-  return guard("use-bank", () => useBankAsIdentitySamplesActionImpl(clientId, urls));
+  return guard("use-bank", () => adoptBankReferencesActionImpl(clientId, urls));
 }
 
 /** O botão "Extrair DNA" do onboarding — e o "tentar de novo" quando falha. */

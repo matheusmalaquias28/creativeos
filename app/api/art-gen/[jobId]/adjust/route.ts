@@ -1,7 +1,11 @@
 /**
  * POST /api/art-gen/[jobId]/adjust
- * Ajuste por instrução via chat multi-turn do SDK @google/genai.
- * Cria nova art_version; nunca sobrescreve a versão anterior.
+ * Ajuste por instrução: a arte atual entra como referência e a instrução vira
+ * o prompt. Cria nova art_version; nunca sobrescreve a versão anterior.
+ *
+ * Era um chat multi-turn do SDK do Gemini. Com a geração passando pela API da
+ * Magnific não há sessão de chat, e uma geração com a arte como referência
+ * entrega o mesmo resultado nos dois provedores — uma chamada, sem estado.
  *
  * Edita a versão SEM logo (vN_raw.png) quando ela existe e recompõe a logo real
  * por cima — o modelo nunca redesenha a logo e ela nunca sai duplicada. Artes
@@ -9,15 +13,8 @@
  */
 
 import { NextResponse } from "next/server";
-import sharp from "sharp";
 import { createAdminClient } from "@/lib/supabase/admin";
-import {
-  createArtEditSession,
-  editArtInSession,
-  type ImageSize,
-  type AspectRatio,
-} from "@/lib/ai/imagegen/client";
-import { urlToInlineDataPart } from "@/lib/ai/imagegen/storage-refs";
+import { generateArtImage } from "@/lib/ai/imagegen/provider";
 import { compositeBrandLogo, prepareLogo } from "@/lib/ai/imagegen/brand-logo";
 import { IMAGE_GEN_DEFAULTS } from "@/lib/ai/imagegen/defaults";
 
@@ -75,30 +72,33 @@ export async function POST(request: Request, { params }: RouteContext) {
     // Prefere a versão sem logo; cai para a versão atual em artes antigas.
     const rawPath = currentVersion.storage_path.replace(/\.(png|jpe?g)$/i, "_raw.png");
     const { data: rawUrlData } = supabase.storage.from("art-generations").getPublicUrl(rawPath);
-    const rawPart = await urlToInlineDataPart(rawUrlData.publicUrl).catch(() => null);
-    const hasRaw = Boolean(rawPart);
-    const sourcePart = rawPart ?? (await urlToInlineDataPart(currentVersion.result_url));
+    const rawHead = await fetch(rawUrlData.publicUrl, { method: "HEAD" }).catch(() => null);
+    const hasRaw = Boolean(rawHead?.ok);
+    const sourceUrl = hasRaw ? rawUrlData.publicUrl : currentVersion.result_url;
 
     const guardedInstruction = hasRaw
       ? `${instruction.trim()}\n\nKeep everything else as it is. Keep the top-centre band (4–15% of the height) clean — the brand logo goes there afterwards; never draw a logo. Keep the button horizontally centred near the bottom. Do not add any text that is not already in the image.`
       : instruction.trim();
 
-    // Chat multi-turn (SDK gerencia thought signatures)
-    const session = createArtEditSession();
-    const edited = await editArtInSession(
-      session,
-      sourcePart.inlineData.data,
-      sourcePart.inlineData.mimeType,
-      guardedInstruction,
-      (jobParams.image_size as ImageSize) ?? profile?.image_size ?? IMAGE_GEN_DEFAULTS.imageSize,
-      (jobParams.aspect_ratio as AspectRatio) ?? profile?.aspect_ratio ?? IMAGE_GEN_DEFAULTS.aspectRatio
-    );
-
-    const rawBuffer = await sharp(Buffer.from(edited.base64, "base64")).png().toBuffer();
+    const rawBuffer = await generateArtImage({
+      prompt: guardedInstruction,
+      references: [
+        {
+          url: sourceUrl,
+          intent:
+            "the current version of this ad — apply the requested change and keep everything else identical",
+        },
+      ],
+      imageSize:
+        (jobParams.image_size as string) ?? profile?.image_size ?? IMAGE_GEN_DEFAULTS.imageSize,
+      aspectRatio:
+        (jobParams.aspect_ratio as string) ?? profile?.aspect_ratio ?? IMAGE_GEN_DEFAULTS.aspectRatio,
+    });
     let finalBuffer: Buffer = rawBuffer;
     if (hasRaw && profile?.logo_url) {
-      const logoPart = await urlToInlineDataPart(profile.logo_url);
-      const cleanLogo = await prepareLogo(Buffer.from(logoPart.inlineData.data, "base64"));
+      const logoRes = await fetch(profile.logo_url);
+      if (!logoRes.ok) throw new Error(`Falha ao baixar a logo (${logoRes.status})`);
+      const cleanLogo = await prepareLogo(Buffer.from(await logoRes.arrayBuffer()));
       finalBuffer = (
         await compositeBrandLogo({
           art: rawBuffer,

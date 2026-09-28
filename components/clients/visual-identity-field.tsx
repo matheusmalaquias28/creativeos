@@ -20,7 +20,7 @@ import {
   removeIdentitySampleAction,
   updateVisualIdentityDnaAction,
   uploadIdentitySampleAction,
-  useBankAsIdentitySamplesAction,
+  adoptBankReferencesAction,
 } from "@/actions/visual-identity";
 import { createClient } from "@/lib/supabase/client";
 import { ImageDropzone } from "@/components/ui/image-dropzone";
@@ -321,7 +321,7 @@ export function VisualIdentityField({
   function handleUseBank() {
     if (bankReferenceUrls.length === 0) return;
     startTransition(async () => {
-      const result = await useBankAsIdentitySamplesAction(clientId, bankReferenceUrls);
+      const result = await adoptBankReferencesAction(clientId, bankReferenceUrls);
       if (result.error) {
         toast.error(result.error);
         return;

@@ -73,7 +73,6 @@ export default async function ClientDetailPage({ params }: PageProps) {
 
   const parsedOnboarding = parseOnboardingAnswers(onboarding);
   const onboardingDone = Boolean(onboarding?.completed_at) || isVisualIdentityReady(visualIdentity);
-  const logoUrl = parsedOnboarding.logoUrl ?? visualIdentity.identitySampleUrls[0] ?? null;
   const brandDna = creativeBrain?.brand_dna as BrandDna | undefined;
   const hasBrandDna = Boolean(brandDna);
   const totalDemands = demands.length;

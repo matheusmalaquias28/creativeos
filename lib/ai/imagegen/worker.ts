@@ -2,10 +2,10 @@
  * Worker de geração em lote com concorrência limitada.
  * Processa jobs com status 'queued' da tabela art_generation_job.
  *
- * A curadoria gera SEMPRE pelo Gemini, direto — `params.model` é ignorado
- * (nada de Magnific aqui). Por job:
+ * A geração vai pelo provedor configurado (Magnific por padrão, Gemini com
+ * IMAGE_PROVIDER=gemini) — `params.model` continua ignorado. Por job:
  *   1. monta o prompt: referências → briefing do diretor → padrões fixos;
- *   2. gera no Gemini;
+ *   2. gera a imagem no provedor;
  *   3. compõe a logo real (sem fundo, contraste garantido, topo central);
  *   4. revisão automática com visão; se reprovar, UMA nova tentativa com as
  *      correções anexadas ao prompt (fica a melhor das duas);
@@ -25,10 +25,9 @@
  */
 
 import pLimit from "p-limit";
-import sharp from "sharp";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { generateArt, type ImageSize, type AspectRatio } from "./client";
-import { urlsToInlineDataParts, urlToInlineDataPart } from "./storage-refs";
+import { generateArtImage } from "./provider";
+import { urlToInlineDataPart } from "./storage-refs";
 import { compositeBrandLogo, prepareLogo } from "./brand-logo";
 import { compilePrompt } from "./prompt-compiler";
 import { adaptArtToStory } from "./story";
@@ -359,11 +358,17 @@ async function runJob(
     imageSize: artSpec.image_size,
   };
 
-  // Referências enviadas ao Gemini. A logo nunca entra: ela é composta depois.
+  // Referências enviadas ao modelo. A logo nunca entra: ela é composta depois.
   const styleRefs = directedRefs.filter((r) => r.role !== "logo");
-  const refUrls = approvedPrompt
-    ? styleRefs.map((r) => r.storage_url)
-    : [...creativeProfile.style_reference_urls, ...allDemandRefs.map((r) => r.url)];
+  const references = approvedPrompt
+    ? styleRefs.map((r) => ({ url: r.storage_url, intent: r.intent ?? r.role }))
+    : [
+        ...creativeProfile.style_reference_urls.map((url) => ({
+          url,
+          intent: "referência de estilo do cliente",
+        })),
+        ...allDemandRefs.map((r) => ({ url: r.url, intent: r.role })),
+      ];
 
   const buildPrompt = (fixNotes?: string[]): string => {
     if (approvedPrompt) {
@@ -389,7 +394,6 @@ async function runJob(
     return parts.join("\n\n");
   };
 
-  const references = await urlsToInlineDataParts(refUrls);
   const cleanLogo = effectiveLogoUrl
     ? await prepareLogo(
         Buffer.from((await urlToInlineDataPart(effectiveLogoUrl)).inlineData.data, "base64")
@@ -405,13 +409,12 @@ async function runJob(
     attempts += 1;
     const prompt = buildPrompt(fixNotes);
 
-    const generated = await generateArt({
+    const raw = await generateArtImage({
       prompt,
       references,
-      imageSize: (artSpec.image_size as ImageSize) ?? "2K",
-      aspectRatio: (artSpec.aspect_ratio as AspectRatio) ?? IMAGE_GEN_DEFAULTS.aspectRatio,
+      imageSize: artSpec.image_size ?? "2K",
+      aspectRatio: artSpec.aspect_ratio ?? IMAGE_GEN_DEFAULTS.aspectRatio,
     });
-    const raw = await sharp(Buffer.from(generated.base64, "base64")).png().toBuffer();
     const logoResult = cleanLogo
       ? await compositeBrandLogo({ art: raw, logo: cleanLogo, palette: creativeProfile.palette })
       : null;
@@ -584,18 +587,11 @@ async function processStoryJob(job: StoryJobRow): Promise<void> {
     const sourceUrl = source?.result_url as string | undefined;
     if (!sourceUrl) throw new Error("Arte 3:4 ainda não foi gerada");
 
-    const art = Buffer.from(
-      (await urlToInlineDataPart(sourceUrl)).inlineData.data,
-      "base64"
-    );
-
-    const story = await withTimeout(
-      adaptArtToStory({ art, imageSize: (job.params.image_size as ImageSize) ?? "2K" }),
+    const png = await withTimeout(
+      adaptArtToStory({ artUrl: sourceUrl, imageSize: job.params.image_size ?? "2K" }),
       JOB_TIMEOUT_MS,
       `story ${job.id}`
     );
-
-    const png = await sharp(story).png().toBuffer();
     const versionNumber = await nextVersionNumber(supabase, job.id, "story");
     const { publicUrl, storagePath } = await uploadArtToStorage({
       buffer: png,

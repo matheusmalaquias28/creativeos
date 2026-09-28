@@ -2,7 +2,7 @@
 
 ## V2 (atual) — resumo
 
-A curadoria gera **só pelo Gemini, direto** (nada de Magnific). Por arte:
+A curadoria gera direto, sem agente no meio. Por arte:
 
 1. **Diretor com visão** (`direct-art.ts`, Claude Opus 5 — `ART_DIRECTOR_VISION_MODEL`):
    vê as referências do acervo (até 10, rotuladas r01…), escolhe UMA como
@@ -14,7 +14,7 @@ A curadoria gera **só pelo Gemini, direto** (nada de Magnific). Por arte:
    contínuo), CTA sempre botão centralizado com base em ~89%, lista fechada de
    textos com a caixa original, papéis sem título (`sanitizeBrief` troca
    "contract" por "printed pages").
-3. **Gemini** gera a arte (Imagem 1 = mestre).
+3. **Magnific** (nano-banana-pro) gera a arte (Imagem 1 = mestre).
 4. **Logo** (`lib/ai/imagegen/brand-logo.ts`): fundo removido, contraste WCAG ≥ 3
    (recolore para a cor escura da paleta ou branco), topo central. Mede a
    uniformidade do fundo sob a logo — se ela atravessa uma borda, a arte refaz.
@@ -49,6 +49,12 @@ O que mudou por baixo:
   (`story_status`), e `runStoryWorker` reenquadra cada uma em 9:16 a partir do
   PNG final — referência única, nenhuma direção de arte nova, logo não
   recomposta (ver `lib/ai/imagegen/story.ts`).
+- **A imagem sai da Magnific.** Todo o pipeline (worker, stories, ajuste) chama
+  `generateArtImage()` em `lib/ai/imagegen/provider.ts`, que usa a API REST
+  nano-banana-pro com `MAGNIFIC_API_KEY` — a mesma do /gerador e do Turbo, nada
+  a ver com o OAuth/MCP de `lib/magnific/`. As referências vão como URL pública
+  com o `intent` escrito pelo diretor no campo `text`. O Gemini continua no
+  código e volta com `IMAGE_PROVIDER=gemini`.
 
 ---
 
@@ -56,8 +62,9 @@ Botão "Gerar artes" da curadoria (`/api/art-gen/queue`): diretor em paralelo co
 mestres pré-atribuídos → aprovação automática → worker. Para revisar briefings
 antes de gerar, use a página de prompts (`/api/art-gen/prepare`).
 
-Custo aproximado por arte: direção ~US$0,05–0,08 + geração 2K ~US$0,13 +
-revisão ~US$0,02 (+ uma geração extra quando a revisão reprova).
+Custo aproximado por arte: direção ~US$0,05–0,08 + geração 2K + revisão ~US$0,02
+(+ uma geração extra quando a revisão reprova). A geração é cobrada pela
+Magnific, não mais pela Gemini API.
 
 ---
 
@@ -167,8 +174,10 @@ Com `logo_mode = 'reference'` ela entra na posição 0.
 | `ANTHROPIC_API_KEY` | Obrigatória — direção de arte e anotação de referências |
 | `ART_DIRECTOR_MODEL` | Modelo da direção de arte (default: `claude-sonnet-4-5-20250929`) |
 | `ANTHROPIC_MODEL` | Modelo das tarefas de descrição (default: Haiku) |
-| `GEMINI_API_KEY` | Obrigatória — geração de imagem |
-| `IMAGE_MODEL` | Default: `gemini-3-pro-image` |
+| `MAGNIFIC_API_KEY` | Obrigatória — geração de imagem (API REST nano-banana-pro) |
+| `IMAGE_PROVIDER` | `magnific` (default) ou `gemini` para voltar ao provedor antigo |
+| `GEMINI_API_KEY` | Só com `IMAGE_PROVIDER=gemini` |
+| `IMAGE_MODEL` | Só com `IMAGE_PROVIDER=gemini`. Default: `gemini-3-pro-image` |
 
 ---
 

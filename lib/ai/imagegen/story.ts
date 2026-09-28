@@ -7,10 +7,10 @@
  * catálogo, briefing ou bloco técnico, que reabririam decisões já fechadas.
  */
 
-import { generateArt, type AspectRatio, type ImageSize, type InlineDataPart } from "./client";
+import { generateArtImage } from "./provider";
 
 /** Formato do story. Fixo: é o que a etapa inteira existe para produzir. */
-export const STORY_ASPECT_RATIO: AspectRatio = "9:16";
+export const STORY_ASPECT_RATIO = "9:16" as const;
 
 /** A instrução do operador, literal. É ela que define a etapa. */
 export const STORY_ADAPT_PROMPT =
@@ -37,25 +37,27 @@ export function buildStoryPrompt(extra?: string | null): string {
     .join("\n\n");
 }
 
-export function bufferToInlineData(buffer: Buffer, mimeType = "image/png"): InlineDataPart {
-  return { inlineData: { mimeType, data: buffer.toString("base64") } };
-}
-
 /**
- * Gera o story a partir do PNG final da arte (já com a logo composta — a logo
- * não é recomposta depois, senão ela apareceria duas vezes).
+ * Gera o story a partir da arte FINAL (já com a logo composta — a logo não é
+ * recomposta depois, senão ela apareceria duas vezes).
+ *
+ * Recebe a URL, não os bytes: é o que a Magnific consome direto, e a arte já
+ * está pública no Storage.
  */
 export async function adaptArtToStory(params: {
-  art: Buffer;
-  imageSize?: ImageSize;
+  artUrl: string;
+  imageSize?: string;
   extraInstruction?: string | null;
 }): Promise<Buffer> {
-  const generated = await generateArt({
+  return generateArtImage({
     prompt: buildStoryPrompt(params.extraInstruction),
-    references: [bufferToInlineData(params.art)],
+    references: [
+      {
+        url: params.artUrl,
+        intent: "the finished ad to reframe — keep its design exactly as it is",
+      },
+    ],
     imageSize: params.imageSize ?? "2K",
     aspectRatio: STORY_ASPECT_RATIO,
   });
-
-  return Buffer.from(generated.base64, "base64");
 }
