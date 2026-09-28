@@ -1,12 +1,18 @@
 /**
  * POST /api/art-gen/queue
  *
- * "Gerar artes" direto da curadoria: roda o diretor de arte (em paralelo, um
- * layout mestre distinto por arte), aprova os briefings automaticamente e gera
- * tudo pelo Gemini — sem Magnific. Para revisar os briefings antes de gerar,
- * o caminho é a página de prompts (/api/art-gen/prepare + approve).
+ * "Gerar Criativos": roda o diretor de arte (em paralelo, um layout mestre
+ * distinto por arte), aprova os briefings automaticamente e gera tudo pelo
+ * Gemini — sem Magnific. Para revisar os briefings antes de gerar, o caminho é
+ * /api/art-gen/prepare + approve.
  *
  * A resposta volta na hora; o progresso chega pelo Supabase Realtime.
+ *
+ * `reset` decide o que acontece com o que já existe:
+ *   false (padrão) — retoma: só gera as artes que ainda não existem;
+ *   true           — recomeça: apaga as artes atuais e gera tudo de novo.
+ * Sem esse flag, cada clique criava um conjunto novo ao lado do antigo — era a
+ * origem dos cards duplicados na demanda.
  *
  * O disparo usa `after()` (não `setImmediate`): numa function serverless
  * (Vercel), o processo pode ser congelado assim que a resposta HTTP é
@@ -35,14 +41,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { demandId?: string; skipGenerate?: boolean } = {};
+  let body: { demandId?: string; skipGenerate?: boolean; reset?: boolean } = {};
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { demandId, skipGenerate = false } = body;
+  const { demandId, skipGenerate = false, reset = false } = body;
   if (!demandId) {
     return NextResponse.json({ error: "demandId is required" }, { status: 400 });
   }
@@ -56,15 +62,18 @@ export async function POST(request: Request) {
     .single();
 
   if (demandError || !demand) {
-    return NextResponse.json({ error: "Demand not found" }, { status: 404 });
+    return NextResponse.json({ error: "Demanda não encontrada" }, { status: 404 });
   }
   if (!demand.client_id) {
-    return NextResponse.json({ error: "Demand has no linked client" }, { status: 422 });
+    return NextResponse.json(
+      { error: "Vincule um cliente à demanda antes de gerar" },
+      { status: 422 }
+    );
   }
 
   const artes = Array.isArray(demand.artes) ? demand.artes : [];
   if (artes.length === 0) {
-    return NextResponse.json({ ok: true, jobsCreated: 0, message: "No artes in demand" });
+    return NextResponse.json({ ok: true, jobsCreated: 0, message: "Demanda sem artes" });
   }
 
   // Valida o kit antes de responder, para a UI mostrar o motivo na hora.
@@ -83,16 +92,24 @@ export async function POST(request: Request) {
 
   after(async () => {
     try {
-      await prepareDemandPrompts(demandId, { parallel: true });
+      await prepareDemandPrompts(demandId, { parallel: true, reset });
       if (skipGenerate) return;
       const approved = await approveAllPrompts(demandId, null);
-      if (approved > 0) await runWorker(demandId);
+      if (approved > 0) await runWorker({ demandId });
     } catch (err) {
-      console.error("[art-gen/queue]", (err as Error)?.message ?? err);
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("[art-gen/queue]", message);
+      // Sem isto, uma falha aqui deixa os jobs parados em 'draft' e o estúdio
+      // fica girando para sempre sem dizer o motivo.
+      await supabase
+        .from("art_generation_job")
+        .update({ status: "failed", error: message, updated_at: new Date().toISOString() })
+        .eq("demand_id", demandId)
+        .in("status", ["draft", "writing_prompt"]);
     }
   });
 
-  return NextResponse.json({ ok: true, jobsCreated: artes.length });
+  return NextResponse.json({ ok: true, jobsCreated: artes.length, reset });
 }
 
 export async function GET() {

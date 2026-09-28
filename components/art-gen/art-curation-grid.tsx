@@ -10,7 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ArtCard } from "./art-card";
 import { GenerationProgress } from "@/components/art-director/generation-progress";
 import { ImageLightbox, type LightboxItem } from "@/components/ui/image-lightbox";
-import type { ArtJobWithVersions } from "@/services/art-gen";
+import type { ArtJobWithVersions, ArtVersion } from "@/services/art-gen";
 
 type Props = {
   demandId: string;
@@ -75,16 +75,9 @@ export function ArtCurationGrid({ demandId, initialJobs }: Props) {
         (payload) => {
           if (payload.eventType === "DELETE") return;
 
-          const changedVersion = payload.new as {
-            id: string;
-            job_id: string;
-            version_number: number;
-            result_url: string;
-            storage_path: string;
-            instruction: string | null;
-            is_current: boolean;
-            created_at: string;
-          };
+          const changedVersion = payload.new as ArtVersion;
+          // Esta tela cura a arte de feed; o 9:16 vive no estúdio de criativos.
+          if (changedVersion.format === "story") return;
 
           setJobs((prev) =>
             prev.map((j) => {

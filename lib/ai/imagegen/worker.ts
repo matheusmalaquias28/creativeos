@@ -14,6 +14,14 @@
  *
  * Timeout: IMAGE_JOB_TIMEOUT_MS (padrão 4min — cobre duas gerações + revisões).
  * Cancelamento: ao marcar o job como 'failed' externamente, o worker respeita.
+ *
+ * Versionamento: a numeração corre por FORMATO ('feed' 3:4 e 'story' 9:16).
+ * Regerar uma arte grava v2, v3… em vez de tentar reescrever v1 — era isso que
+ * estourava o unique (job_id, version_number) e derrubava toda regeração.
+ *
+ * `runStoryWorker` faz a segunda etapa: pega a arte aprovada e a reenquadra em
+ * 9:16 (ver lib/ai/imagegen/story.ts). Nenhuma direção de arte nova, nenhuma
+ * logo recomposta — a peça já foi aprovada como está.
  */
 
 import pLimit from "p-limit";
@@ -23,6 +31,7 @@ import { generateArt, type ImageSize, type AspectRatio } from "./client";
 import { urlsToInlineDataParts, urlToInlineDataPart } from "./storage-refs";
 import { compositeBrandLogo, prepareLogo } from "./brand-logo";
 import { compilePrompt } from "./prompt-compiler";
+import { adaptArtToStory } from "./story";
 import {
   appendTechnicalBlock,
   buildStandardsBlock,
@@ -103,9 +112,66 @@ type DirectedRefRow = {
   position: number;
 };
 
+export type ArtFormat = "feed" | "story";
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Próximo número de versão DENTRO do formato. Ler o máximo e somar 1 (em vez de
+ * fixar 1) é o que permite regerar uma arte sem colidir com a versão anterior.
+ */
+async function nextVersionNumber(
+  supabase: ReturnType<typeof createAdminClient>,
+  jobId: string,
+  format: ArtFormat
+): Promise<number> {
+  const { data } = await supabase
+    .from("art_version")
+    .select("version_number")
+    .eq("job_id", jobId)
+    .eq("format", format)
+    .order("version_number", { ascending: false })
+    .limit(1);
+
+  const last = (data ?? [])[0]?.version_number as number | undefined;
+  return (last ?? 0) + 1;
+}
+
+/**
+ * Grava a nova versão e move o `is_current` dentro do formato. Feed e story têm
+ * cada um a sua versão atual — a aba de stories não pode roubar a arte 3:4.
+ */
+async function publishVersion(
+  supabase: ReturnType<typeof createAdminClient>,
+  params: {
+    jobId: string;
+    format: ArtFormat;
+    versionNumber: number;
+    resultUrl: string;
+    storagePath: string;
+    instruction: string | null;
+  }
+): Promise<void> {
+  await supabase
+    .from("art_version")
+    .update({ is_current: false })
+    .eq("job_id", params.jobId)
+    .eq("format", params.format);
+
+  const { error } = await supabase.from("art_version").insert({
+    job_id: params.jobId,
+    version_number: params.versionNumber,
+    format: params.format,
+    result_url: params.resultUrl,
+    storage_path: params.storagePath,
+    instruction: params.instruction,
+    is_current: true,
+  });
+
+  if (error) throw new Error(error.message);
+}
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -127,13 +193,16 @@ async function uploadArtToStorage(params: {
   buffer: Buffer;
   jobId: string;
   versionNumber: number;
+  /** 'feed' (3:4) ou 'story' (9:16). Entra no nome do arquivo. */
+  format?: ArtFormat;
   /** Versão sem logo (insumo dos ajustes). */
   raw?: boolean;
 }): Promise<{ publicUrl: string; storagePath: string }> {
   const supabase = createAdminClient();
-  const { buffer, jobId, versionNumber, raw } = params;
+  const { buffer, jobId, versionNumber, format = "feed", raw } = params;
   const mimeType = "image/png";
-  const storagePath = `${jobId}/v${versionNumber}${raw ? "_raw" : ""}.png`;
+  const prefix = format === "story" ? "story-v" : "v";
+  const storagePath = `${jobId}/${prefix}${versionNumber}${raw ? "_raw" : ""}.png`;
 
   const { error } = await supabase.storage
     .from("art-generations")
@@ -383,12 +452,13 @@ async function runJob(
   const promptFinal = best.prompt;
 
   // Upload ao Storage — final (com logo) e raw (sem logo, insumo dos ajustes).
+  const versionNumber = await nextVersionNumber(supabase, job.id, "feed");
   const { publicUrl, storagePath } = await uploadArtToStorage({
     buffer: best.final,
     jobId: job.id,
-    versionNumber: 1,
+    versionNumber,
   });
-  await uploadArtToStorage({ buffer: best.raw, jobId: job.id, versionNumber: 1, raw: true }).catch(
+  await uploadArtToStorage({ buffer: best.raw, jobId: job.id, versionNumber, raw: true }).catch(
     (err) => console.warn("[worker] upload da versão sem logo falhou:", (err as Error)?.message ?? err)
   );
 
@@ -417,17 +487,15 @@ async function runJob(
     if (error) console.error("[worker] galeria insert falhou:", error.message);
   });
 
-  // Cria art_version v1
-  const { error: versionError } = await supabase.from("art_version").insert({
-    job_id: job.id,
-    version_number: 1,
-    result_url: publicUrl,
-    storage_path: storagePath,
-    instruction: null,
-    is_current: true,
+  // Nova versão do formato feed (v1 na primeira geração, v2+ ao regerar).
+  await publishVersion(supabase, {
+    jobId: job.id,
+    format: "feed",
+    versionNumber,
+    resultUrl: publicUrl,
+    storagePath,
+    instruction: versionNumber > 1 ? "regeração" : null,
   });
-
-  if (versionError) throw new Error(versionError.message);
 
   // Marca job como succeeded
   await supabase
@@ -444,7 +512,17 @@ async function runJob(
 // runWorker — entry point
 // ---------------------------------------------------------------------------
 
-export async function runWorker(demandId?: string): Promise<{ processed: number }> {
+export type RunWorkerOptions = {
+  demandId?: string;
+  /** Roda apenas este job — usado pela regeração de uma arte só. */
+  jobId?: string;
+};
+
+export async function runWorker(
+  options?: string | RunWorkerOptions
+): Promise<{ processed: number }> {
+  const opts: RunWorkerOptions =
+    typeof options === "string" ? { demandId: options } : (options ?? {});
   const supabase = createAdminClient();
 
   let query = supabase
@@ -453,7 +531,8 @@ export async function runWorker(demandId?: string): Promise<{ processed: number 
     .eq("status", "queued")
     .order("created_at", { ascending: true });
 
-  if (demandId) query = query.eq("demand_id", demandId);
+  if (opts.demandId) query = query.eq("demand_id", opts.demandId);
+  if (opts.jobId) query = query.eq("id", opts.jobId);
 
   const { data: jobs, error } = await query;
   if (error) throw new Error(`Worker query failed: ${error.message}`);
@@ -461,6 +540,110 @@ export async function runWorker(demandId?: string): Promise<{ processed: number 
 
   const limit = pLimit(MAX_CONCURRENCY);
   await Promise.all((jobs as JobRow[]).map((job) => limit(() => processJob(job))));
+
+  return { processed: jobs.length };
+}
+
+// ---------------------------------------------------------------------------
+// runStoryWorker — adaptação 9:16 das artes aprovadas
+// ---------------------------------------------------------------------------
+
+type StoryJobRow = {
+  id: string;
+  art_index: number;
+  params: JobRow["params"];
+};
+
+async function processStoryJob(job: StoryJobRow): Promise<void> {
+  const supabase = createAdminClient();
+
+  const { data: state } = await supabase
+    .from("art_generation_job")
+    .select("story_status")
+    .eq("id", job.id)
+    .single();
+
+  // Cancelado ou já pego por outra execução.
+  if (state?.story_status !== "queued") return;
+
+  await supabase
+    .from("art_generation_job")
+    .update({ story_status: "processing", story_error: null, updated_at: new Date().toISOString() })
+    .eq("id", job.id);
+
+  try {
+    // A arte de origem é a versão FEED atual — a peça que o operador aprovou.
+    const { data: source } = await supabase
+      .from("art_version")
+      .select("result_url")
+      .eq("job_id", job.id)
+      .eq("format", "feed")
+      .eq("is_current", true)
+      .maybeSingle();
+
+    const sourceUrl = source?.result_url as string | undefined;
+    if (!sourceUrl) throw new Error("Arte 3:4 ainda não foi gerada");
+
+    const art = Buffer.from(
+      (await urlToInlineDataPart(sourceUrl)).inlineData.data,
+      "base64"
+    );
+
+    const story = await withTimeout(
+      adaptArtToStory({ art, imageSize: (job.params.image_size as ImageSize) ?? "2K" }),
+      JOB_TIMEOUT_MS,
+      `story ${job.id}`
+    );
+
+    const png = await sharp(story).png().toBuffer();
+    const versionNumber = await nextVersionNumber(supabase, job.id, "story");
+    const { publicUrl, storagePath } = await uploadArtToStorage({
+      buffer: png,
+      jobId: job.id,
+      versionNumber,
+      format: "story",
+    });
+
+    await publishVersion(supabase, {
+      jobId: job.id,
+      format: "story",
+      versionNumber,
+      resultUrl: publicUrl,
+      storagePath,
+      instruction: "stories 9:16",
+    });
+
+    await supabase
+      .from("art_generation_job")
+      .update({ story_status: "succeeded", story_error: null, updated_at: new Date().toISOString() })
+      .eq("id", job.id);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await supabase
+      .from("art_generation_job")
+      .update({ story_status: "failed", story_error: message, updated_at: new Date().toISOString() })
+      .eq("id", job.id);
+  }
+}
+
+/** Processa todos os jobs com `story_status = 'queued'` (da demanda, se dada). */
+export async function runStoryWorker(demandId?: string): Promise<{ processed: number }> {
+  const supabase = createAdminClient();
+
+  let query = supabase
+    .from("art_generation_job")
+    .select("id, art_index, params")
+    .eq("story_status", "queued")
+    .order("art_index", { ascending: true });
+
+  if (demandId) query = query.eq("demand_id", demandId);
+
+  const { data: jobs, error } = await query;
+  if (error) throw new Error(`Story worker query failed: ${error.message}`);
+  if (!jobs || jobs.length === 0) return { processed: 0 };
+
+  const limit = pLimit(MAX_CONCURRENCY);
+  await Promise.all((jobs as StoryJobRow[]).map((job) => limit(() => processStoryJob(job))));
 
   return { processed: jobs.length };
 }

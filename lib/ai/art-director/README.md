@@ -25,6 +25,33 @@ A curadoria gera **só pelo Gemini, direto** (nada de Magnific). Por arte:
 6. Salva `vN.png` (final) e `vN_raw.png` (sem logo). Ajustes por instrução editam a
    versão raw e recompõem a logo — ela nunca é redesenhada nem duplicada.
 
+## V3 — o estúdio de criativos
+
+A operação toda mora num modal, aberto pelo botão **Gerar Criativos** da demanda
+(`components/art-studio/`). Dirigir, gerar, apagar, regerar com o prompt alterado,
+aprovar e adaptar para stories acontecem na mesma tela, ao vivo pelo Realtime.
+As páginas `/demands/[id]/prompts` e `/demands/[id]/curation` continuam
+existindo, mas saíram do caminho principal.
+
+O que mudou por baixo:
+
+- **`/api/art-gen/queue` aceita `reset`.** Sem ele, `prepareDemandPrompts` só
+  recria as artes que não estão de pé — gerar duas vezes seguidas virou no-op.
+  Antes, cada clique criava um conjunto novo ao lado do anterior; era a origem
+  dos cards duplicados.
+- **Versões numeradas por formato.** `art_version` ganhou `format`
+  (`feed` 3:4 | `story` 9:16) e o unique passou a ser
+  `(job_id, format, version_number)`. O worker lê o último número e soma 1 em
+  vez de gravar sempre v1 — era o que fazia toda regeração morrer na constraint.
+- **DELETE existe.** `art_generation_job` e `art_version` ganharam policy de
+  delete; `DELETE /api/art-gen/[jobId]` também limpa os PNGs no Storage.
+- **Stories.** `POST /api/art-gen/stories` enfileira as artes aprovadas
+  (`story_status`), e `runStoryWorker` reenquadra cada uma em 9:16 a partir do
+  PNG final — referência única, nenhuma direção de arte nova, logo não
+  recomposta (ver `lib/ai/imagegen/story.ts`).
+
+---
+
 Botão "Gerar artes" da curadoria (`/api/art-gen/queue`): diretor em paralelo com
 mestres pré-atribuídos → aprovação automática → worker. Para revisar briefings
 antes de gerar, use a página de prompts (`/api/art-gen/prepare`).

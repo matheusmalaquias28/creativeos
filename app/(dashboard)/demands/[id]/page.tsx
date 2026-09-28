@@ -1,13 +1,5 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import {
-  AlertTriangle,
-  ExternalLink,
-  FileText,
-  ImageIcon,
-  Images,
-  Sparkles,
-} from "lucide-react";
+import { AlertTriangle, ExternalLink, FileText, ImageIcon } from "lucide-react";
 import { DashboardPage } from "@/components/layout/dashboard-page";
 import { SectionHeader } from "@/components/layout/section-header";
 import { DemandDetailStatusBar } from "@/components/demands/demand-detail-status-bar";
@@ -21,7 +13,7 @@ import {
 import { DemandArteFeed } from "@/components/demands/demand-arte-feed";
 import { DemandReferenceManager } from "@/components/demands/demand-reference-manager";
 import { CreativeBriefPanel } from "@/components/demands/creative-brief-panel";
-import { buttonVariants } from "@/components/ui/button";
+import { CreativeStudioButton } from "@/components/art-studio/creative-studio-button";
 import { Surface } from "@/components/ui/surface";
 import { layout, tones } from "@/lib/design/tokens";
 import { cn } from "@/lib/utils";
@@ -142,22 +134,7 @@ export default async function DemandDetailPage({ params }: PageProps) {
       backHref="/demands"
       backLabel="Demandas"
       headerAction={
-        <>
-          <Link
-            href={`/demands/${id}/curation`}
-            className={cn(buttonVariants({ variant: "outline" }), "gap-2")}
-          >
-            <Images className="size-4" />
-            Curadoria
-          </Link>
-          <Link
-            href={`/demands/${id}/prompts`}
-            className={cn(buttonVariants({ variant: "default" }), "gap-2")}
-          >
-            <Sparkles className="size-4" />
-            Prompts com IA
-          </Link>
-        </>
+        <CreativeStudioButton demandId={id} hasClient={Boolean(demand.client_id)} />
       }
     >
       <MarkDemandReadOnMount demandId={id} isNew={demand.is_new} />
