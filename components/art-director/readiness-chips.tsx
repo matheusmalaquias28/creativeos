@@ -31,8 +31,12 @@ export function ReadinessChips({ readiness }: { readiness: ClientArtReadiness | 
       <Chip ok={readiness.has_palette} label="paleta" />
       <Chip ok={readiness.has_dna} label="DNA visual" />
       <Chip
-        ok={readiness.reference_count >= 4 && readiness.style_reference_count >= 1}
-        label={`${readiness.reference_count} referências`}
+        ok={readiness.reference_count >= 1}
+        label={
+          readiness.reference_count === 1
+            ? "1 referência"
+            : `${readiness.reference_count} referências`
+        }
       />
     </div>
   );

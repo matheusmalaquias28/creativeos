@@ -66,7 +66,7 @@ export async function POST(request: Request) {
 
   if (!readiness?.is_ready) {
     return NextResponse.json(
-      { error: "Cliente sem kit completo (logo, paleta, DNA e 4+ referências)" },
+      { error: "Cliente sem kit completo (logo, paleta, DNA e ao menos 1 referência)" },
       { status: 422 }
     );
   }

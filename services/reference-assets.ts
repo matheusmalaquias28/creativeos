@@ -80,11 +80,9 @@ export function missingForReadiness(readiness: ClientArtReadiness | null): strin
   if (!readiness.has_logo) missing.push("logo");
   if (!readiness.has_palette) missing.push("paleta com ao menos 2 cores");
   if (!readiness.has_dna) missing.push("DNA visual extraído");
-  if (readiness.reference_count < 4) {
-    missing.push(`${4 - readiness.reference_count} referência(s) no acervo`);
-  } else if (readiness.style_reference_count < 1) {
-    missing.push("ao menos 1 referência de estilo");
-  }
+  // Uma referência basta (ver migration 20260928200000): exigir quatro travava
+  // o onboarding de cliente novo, que é quando se quer rodar a primeira demanda.
+  if (readiness.reference_count < 1) missing.push("ao menos 1 referência no acervo");
   return missing;
 }
 

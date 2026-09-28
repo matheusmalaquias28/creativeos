@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Check, Cloud, ImageIcon, Images, Loader2, Sparkles } from "lucide-react";
+import { Check, Cloud, ImageIcon, Images, Library, Loader2, Sparkles } from "lucide-react";
 import {
   completeOnboardingAction,
   saveOnboardingDraft,
@@ -18,6 +18,8 @@ import { isVisualIdentityReady } from "@/lib/schemas/visual-identity";
 import { LogoUploadField } from "@/components/clients/logo-upload-field";
 import { ClientPhotosField } from "@/components/clients/client-photos-field";
 import { VisualIdentityField } from "@/components/clients/visual-identity-field";
+import { ReferenceBank } from "@/components/art-director/reference-bank";
+import type { ReferenceAssetRow } from "@/services/reference-assets";
 import { Button } from "@/components/ui/button";
 import { tones, type Tone } from "@/lib/design/tokens";
 import { cn } from "@/lib/utils";
@@ -26,6 +28,8 @@ type OnboardingFormProps = {
   clientId: string;
   defaultValues: Partial<OnboardingFormValues> & { clientPhotos?: ClientPhotoRow[] };
   visualIdentity: ClientVisualIdentityState;
+  /** Acervo de referências — a única fonte que a geração de artes lê. */
+  referenceAssets: ReferenceAssetRow[];
   completedAt: string | null;
 };
 
@@ -36,6 +40,7 @@ function BriefingColumn({
   description,
   tone = "violet",
   children,
+  className,
 }: {
   icon: typeof ImageIcon;
   step: number;
@@ -43,9 +48,10 @@ function BriefingColumn({
   description: string;
   tone?: Tone;
   children: ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="surface-panel flex min-h-[320px] flex-col gap-4 p-5">
+    <div className={cn("surface-panel flex min-h-[320px] flex-col gap-4 p-5", className)}>
       <div className="flex items-start gap-3">
         <span
           className={cn(
@@ -70,6 +76,7 @@ export function OnboardingForm({
   clientId,
   defaultValues,
   visualIdentity,
+  referenceAssets,
   completedAt,
 }: OnboardingFormProps) {
   const router = useRouter();
@@ -93,6 +100,15 @@ export function OnboardingForm({
   const logoUrl = form.watch("logoUrl");
   const logoStoragePath = form.watch("logoStoragePath");
   const identityReady = isVisualIdentityReady(identityState);
+  const referenceCount = referenceAssets.length;
+  const bankReferenceUrls = referenceAssets.map((a) => a.storage_url);
+  // O que o kit exige para a demanda gerar: logo, 1 referência no acervo e DNA.
+  const missing = [
+    !logoUrl ? "a logo" : null,
+    referenceCount < 1 ? "ao menos 1 referência" : null,
+    !identityReady ? "o DNA visual extraído" : null,
+  ].filter(Boolean) as string[];
+  const canComplete = missing.length === 0;
 
   const persistDraft = useCallback(
     async (values: Partial<OnboardingFormValues>) => {
@@ -123,8 +139,8 @@ export function OnboardingForm({
   }, [form, persistDraft]);
 
   const onComplete = (formData: FormData) => {
-    if (!identityReady) {
-      toast.error("Aguarde a extração do DNA visual antes de concluir");
+    if (!canComplete) {
+      toast.error(`Falta ${missing.join(", ")}`);
       return;
     }
 
@@ -170,13 +186,13 @@ export function OnboardingForm({
         )}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-2">
         <BriefingColumn
           icon={ImageIcon}
           step={1}
           tone="orange"
           title="Logo"
-          description="Logo oficial para composição nas artes."
+          description="Logo oficial, composta no topo de toda arte gerada. Obrigatória."
         >
           <LogoUploadField
             compact
@@ -194,8 +210,8 @@ export function OnboardingForm({
           icon={Images}
           step={2}
           tone="cyan"
-          title="Fotos"
-          description="Produto, espaço ou contexto da marca — até 5 imagens."
+          title="Imagens do cliente"
+          description="Produto, espaço, pessoas — até 5. Opcional: entram só nas artes em que você pedir."
         >
           <ClientPhotosField
             compact
@@ -204,28 +220,40 @@ export function OnboardingForm({
             onChange={(photos) => setClientPhotos(photos)}
           />
         </BriefingColumn>
-
-        <BriefingColumn
-          icon={Sparkles}
-          step={3}
-          tone="pink"
-          title="Extrator de identidade"
-          description="Arte de referência para a IA extrair cores, tipografia e estilo."
-        >
-          <VisualIdentityField
-            compact
-            clientId={clientId}
-            state={identityState}
-            onStateChange={setIdentityState}
-          />
-        </BriefingColumn>
       </div>
+
+      <BriefingColumn
+        icon={Library}
+        step={3}
+        tone="violet"
+        title={`Referências (${referenceCount})`}
+        description="O acervo que o diretor de arte lê para escolher layout, tipografia e acabamento. Cada imagem é anotada por IA no upload. Mínimo 1 — é este acervo, e só ele, que libera a geração."
+        className="min-h-0"
+      >
+        <ReferenceBank clientId={clientId} assets={referenceAssets} />
+      </BriefingColumn>
+
+      <BriefingColumn
+        icon={Sparkles}
+        step={4}
+        tone="pink"
+        title="Extrator de DNA"
+        description="Artes que representam a marca. A IA lê cores, tipografia e mood e grava como memória do cliente. Você pode reaproveitar as referências do acervo."
+        className="min-h-0"
+      >
+        <VisualIdentityField
+          clientId={clientId}
+          state={identityState}
+          onStateChange={setIdentityState}
+          bankReferenceUrls={bankReferenceUrls}
+        />
+      </BriefingColumn>
 
       <input type="hidden" name="logoUrl" value={logoUrl ?? ""} readOnly />
       <input type="hidden" name="logoStoragePath" value={logoStoragePath ?? ""} readOnly />
 
       <div className="flex flex-wrap items-center gap-3 border-t border-border pt-6">
-        <Button type="submit" disabled={isPending || !identityReady}>
+        <Button type="submit" disabled={isPending || !canComplete}>
           {isPending ? (
             <>
               <Loader2 className="size-4 animate-spin" />
@@ -244,13 +272,14 @@ export function OnboardingForm({
         </Button>
       </div>
 
-      {!identityReady && (
+      {!canComplete && (
         <p className="text-xs text-muted-foreground">
           {identityState.identityExtractionStatus === "extracting"
-            ? "Aguarde a extração do DNA visual para concluir."
-            : "Envie uma arte de referência no extrator para concluir."}
+            ? "Extraindo o DNA visual — aguarde para concluir."
+            : `Falta ${missing.join(", ")} para concluir o cadastro.`}
         </p>
       )}
+
     </form>
   );
 }

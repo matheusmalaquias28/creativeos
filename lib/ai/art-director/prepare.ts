@@ -245,7 +245,7 @@ export async function prepareDemandPrompts(
       !readiness?.has_logo ? "logo" : null,
       !readiness?.has_palette ? "paleta" : null,
       !readiness?.has_dna ? "DNA visual" : null,
-      (readiness?.reference_count ?? 0) < 4 ? "pelo menos 4 referências" : null,
+      (readiness?.reference_count ?? 0) < 1 ? "pelo menos 1 referência" : null,
     ].filter(Boolean);
     throw new Error(`Cliente sem kit completo — falta: ${missing.join(", ")}`);
   }
