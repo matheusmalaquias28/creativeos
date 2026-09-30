@@ -235,7 +235,12 @@ function buildMeta(
 
 export async function prepareDemandPrompts(
   demandId: string,
-  options: { parallel?: boolean; visualMode?: VisualMode; visualNotes?: string } = {}
+  options: {
+    parallel?: boolean;
+    reset?: boolean;
+    visualMode?: VisualMode;
+    visualNotes?: string;
+  } = {}
 ): Promise<PrepareResult> {
   const supabase = createAdminClient();
 
@@ -280,13 +285,31 @@ export async function prepareDemandPrompts(
 
   const briefing = (demand.briefing ?? {}) as Record<string, unknown>;
 
-  // Limpa preparos anteriores que ainda não foram aprovados. Jobs já em
-  // queued/processing/succeeded nunca são tocados.
+  // Limpeza antes de criar. Duas políticas, e a diferença entre elas era o bug
+  // que enchia a demanda de cards repetidos: sem isso, cada clique em "gerar"
+  // criava uma arte nova ao lado das que já existiam.
+  //
+  // reset=true  → recomeçar do zero: apaga TUDO (o operador pediu).
+  // reset=false → retomar: apaga o que não vingou (rascunho, prompt esperando
+  //               aprovação, falha) e NÃO recria os art_index que já têm arte
+  //               em pé. Gerar duas vezes seguidas vira no-op, como deve ser.
   await supabase
     .from("art_generation_job")
     .delete()
     .eq("demand_id", demandId)
-    .in("status", ["draft", "writing_prompt", "awaiting_approval"]);
+    .in(
+      "status",
+      options.reset
+        ? ["draft", "writing_prompt", "awaiting_approval", "queued", "processing", "succeeded", "failed"]
+        : ["draft", "writing_prompt", "awaiting_approval", "failed"]
+    );
+
+  const { data: liveJobs } = await supabase
+    .from("art_generation_job")
+    .select("art_index")
+    .eq("demand_id", demandId);
+
+  const alreadyLive = new Set((liveJobs ?? []).map((row) => row.art_index as number));
 
   const dna = (profile.visual_identity_dna as VisualIdentityDna | null) ?? null;
   // A view já resolve a logo do onboarding quando o perfil não sincronizou.
@@ -298,29 +321,36 @@ export async function prepareDemandPrompts(
   // Logo nunca é referência do modelo de imagem (ver cabeçalho).
   const logoAsReference = false;
 
-  const jobRows = artes.map((arte, index) => ({
-    demand_id: demandId,
-    client_id: demand.client_id,
-    art_index: index,
-    status: "draft" as const,
-    params: {
-      flow_logo_url: effectiveLogoUrl,
-      visual_mode: visualMode,
-      visual_mode_override: options.visualMode ?? "inherit",
-      visual_notes: options.visualNotes?.trim() ?? "",
-      client_visual_notes: answers.visualNotes ?? "",
-      visual_observation: typeof arte.observacaoVisual === "string" ? arte.observacaoVisual : "",
-      headline: (arte.headline as string) ?? null,
-      subheadline: (arte.subheadline as string) ?? null,
-      cta: (arte.cta as string) ?? null,
-      informacoesExtras: (arte.informacoesExtras as string) ?? null,
-      aspect_ratio: aspectRatio,
-      image_size: (arte.imageSize as string) ?? imageSize,
-      model: ART_DIRECTOR_IMAGE_MODEL,
-      briefing_titulo: (briefing.titulo as string) ?? null,
-      briefing_tipo: (briefing.tipo as string) ?? null,
-    },
-  }));
+  const jobRows = artes
+    .map((arte, index) => ({ arte, index }))
+    .filter(({ index }) => !alreadyLive.has(index))
+    .map(({ arte, index }) => ({
+      demand_id: demandId,
+      client_id: demand.client_id,
+      art_index: index,
+      status: "draft" as const,
+      params: {
+        flow_logo_url: effectiveLogoUrl,
+        visual_mode: visualMode,
+        visual_mode_override: options.visualMode ?? "inherit",
+        visual_notes: options.visualNotes?.trim() ?? "",
+        client_visual_notes: answers.visualNotes ?? "",
+        visual_observation: typeof arte.observacaoVisual === "string" ? arte.observacaoVisual : "",
+        headline: (arte.headline as string) ?? null,
+        subheadline: (arte.subheadline as string) ?? null,
+        cta: (arte.cta as string) ?? null,
+        informacoesExtras: (arte.informacoesExtras as string) ?? null,
+        aspect_ratio: aspectRatio,
+        image_size: (arte.imageSize as string) ?? imageSize,
+        model: ART_DIRECTOR_IMAGE_MODEL,
+        briefing_titulo: (briefing.titulo as string) ?? null,
+        briefing_tipo: (briefing.tipo as string) ?? null,
+      },
+    }));
+
+  if (jobRows.length === 0) {
+    return { jobsPrepared: 0, jobIds: [], warnings: ["Todas as artes desta demanda já foram geradas"] };
+  }
 
   const { data: inserted, error: insertError } = await supabase
     .from("art_generation_job")

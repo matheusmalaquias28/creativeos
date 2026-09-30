@@ -27,6 +27,28 @@ export type VisualIdentityActionState = {
   status?: string;
 };
 
+/**
+ * Toda action daqui devolve o erro em vez de estourar.
+ *
+ * Um throw numa server action derruba a página inteira ("Application error: a
+ * server-side exception has occurred", só com o digest) e a mensagem real fica
+ * no log do servidor — o operador não tem como saber se faltou coluna, se o
+ * bucket sumiu ou se a chave da Anthropic expirou. `upsertCreativeProfile`
+ * lança em qualquer erro do Postgres, e é o caminho de todas elas.
+ */
+async function guard<T extends VisualIdentityActionState>(
+  label: string,
+  run: () => Promise<T>
+): Promise<T | VisualIdentityActionState> {
+  try {
+    return await run();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[visual-identity/${label}]`, message, err);
+    return { error: message };
+  }
+}
+
 async function runIdentityExtraction(clientId: string, sampleUrls: string[]): Promise<void> {
   const admin = createAdminClient();
 
@@ -77,7 +99,7 @@ async function runIdentityExtraction(clientId: string, sampleUrls: string[]): Pr
   }
 }
 
-export async function uploadIdentitySampleAction(
+async function uploadIdentitySampleActionImpl(
   clientId: string,
   formData: FormData
 ): Promise<VisualIdentityActionState> {
@@ -137,24 +159,24 @@ export async function uploadIdentitySampleAction(
   const sampleUrls = [...existingUrls, ...uploadedUrls];
   const samplePaths = [...existingPaths, ...uploadedPaths];
 
+  // Subir amostra não dispara extração: o operador sobe quantas quiser e clica
+  // em "Extrair DNA" uma vez. Extrair a cada arquivo cobrava várias chamadas de
+  // visão por onboarding para jogar fora todas menos a última. O DNA que já
+  // existe fica de pé até a próxima extração — apagá-lo aqui derrubava a
+  // prontidão do cliente no meio do cadastro.
   await upsertCreativeProfile(clientId, {
     identity_sample_urls: sampleUrls,
     identity_sample_storage_paths: samplePaths,
-    identity_extraction_status: "extracting",
     identity_extraction_error: null,
-    visual_identity_dna: null,
-    identity_extracted_at: null,
   });
-
-  after(() => runIdentityExtraction(clientId, sampleUrls));
 
   revalidatePath(`/clients/${clientId}/onboarding`);
   revalidatePath(`/clients/${clientId}`);
 
-  return { success: true, sampleUrls, status: "extracting" };
+  return { success: true, sampleUrls, status: "idle" };
 }
 
-export async function removeIdentitySampleAction(
+async function removeIdentitySampleActionImpl(
   clientId: string,
   sampleUrl: string
 ): Promise<VisualIdentityActionState> {
@@ -203,22 +225,20 @@ export async function removeIdentitySampleAction(
     return { success: true, sampleUrls: [], status: "idle" };
   }
 
+  // Mesma regra do upload: tirar uma amostra não reextrai. O DNA atual continua
+  // valendo até o operador mandar extrair de novo.
   await upsertCreativeProfile(clientId, {
     identity_sample_urls: nextUrls,
     identity_sample_storage_paths: nextPaths,
-    identity_extraction_status: "extracting",
-    identity_extraction_error: null,
   });
-
-  after(() => runIdentityExtraction(clientId, nextUrls));
 
   revalidatePath(`/clients/${clientId}/onboarding`);
   revalidatePath(`/clients/${clientId}`);
 
-  return { success: true, sampleUrls: nextUrls, status: "extracting" };
+  return { success: true, sampleUrls: nextUrls };
 }
 
-export async function retryIdentityExtractionAction(
+async function retryIdentityExtractionActionImpl(
   clientId: string
 ): Promise<VisualIdentityActionState> {
   const owned = await getOwnedClient(clientId);
@@ -256,7 +276,7 @@ export async function retryIdentityExtractionAction(
  * (`buildBasePromptFromDna`), então editar os campos aqui já é a única forma
  * de mudar o prompt final; ele nunca é editado como texto solto.
  */
-export async function updateVisualIdentityDnaAction(
+async function updateVisualIdentityDnaActionImpl(
   clientId: string,
   patch: Partial<VisualIdentityDna>
 ): Promise<VisualIdentityActionState> {
@@ -301,4 +321,109 @@ export async function syncLogoToCreativeProfile(
   logoUrl: string | null
 ): Promise<void> {
   await upsertCreativeProfile(clientId, { logo_url: logoUrl });
+}
+
+// ---------------------------------------------------------------------------
+// Fachada pública — mesma assinatura, erro devolvido em vez de lançado
+// ---------------------------------------------------------------------------
+
+export async function uploadIdentitySampleAction(
+  clientId: string,
+  formData: FormData
+): Promise<VisualIdentityActionState> {
+  return guard("upload", () => uploadIdentitySampleActionImpl(clientId, formData));
+}
+
+export async function removeIdentitySampleAction(
+  clientId: string,
+  sampleUrl: string
+): Promise<VisualIdentityActionState> {
+  return guard("remove", () => removeIdentitySampleActionImpl(clientId, sampleUrl));
+}
+
+/**
+ * Aponta o extrator para as imagens que já estão no acervo.
+ *
+ * O extrator mantém conjunto próprio (uma arte pode ser boa amostra de marca e
+ * má referência de layout, e vice-versa), mas obrigar a subir o mesmo arquivo
+ * duas vezes é o atrito que fez o cadastro virar uma caça a três uploads. As
+ * URLs são do bucket do acervo — por isso entram sem storage path: remover a
+ * amostra aqui não pode apagar o arquivo de lá.
+ *
+ * O nome não começa com "use": o eslint trata qualquer `useX()` como React Hook
+ * e reprova a chamada dentro de um callback (react-hooks/rules-of-hooks).
+ */
+async function adoptBankReferencesActionImpl(
+  clientId: string,
+  urls: string[]
+): Promise<VisualIdentityActionState> {
+  const owned = await getOwnedClient(clientId);
+  if (!owned) return { error: "Cliente não encontrado" };
+
+  const clean = Array.from(new Set(urls.filter(Boolean))).slice(0, MAX_SAMPLES);
+  if (clean.length === 0) return { error: "Nenhuma referência no acervo" };
+
+  const admin = createAdminClient();
+  const { data: existing } = await admin
+    .from("client_creative_profile")
+    .select("identity_sample_urls, identity_sample_storage_paths")
+    .eq("client_id", clientId)
+    .maybeSingle();
+
+  const existingUrls = Array.isArray(existing?.identity_sample_urls)
+    ? (existing.identity_sample_urls as string[])
+    : [];
+  const existingPaths = Array.isArray(existing?.identity_sample_storage_paths)
+    ? (existing.identity_sample_storage_paths as string[])
+    : [];
+
+  const toAdd = clean.filter((url) => !existingUrls.includes(url));
+  const room = MAX_SAMPLES - existingUrls.length;
+  if (room <= 0 || toAdd.length === 0) {
+    return { success: true, sampleUrls: existingUrls };
+  }
+
+  const added = toAdd.slice(0, room);
+  const sampleUrls = [...existingUrls, ...added];
+  // Path vazio = arquivo de outro dono; removeIdentitySampleAction pula o delete.
+  const samplePaths = [...existingPaths, ...added.map(() => "")];
+
+  await upsertCreativeProfile(clientId, {
+    identity_sample_urls: sampleUrls,
+    identity_sample_storage_paths: samplePaths,
+    identity_extraction_error: null,
+  });
+
+  revalidatePath(`/clients/${clientId}/onboarding`);
+  revalidatePath(`/clients/${clientId}`);
+
+  return { success: true, sampleUrls };
+}
+
+export async function adoptBankReferencesAction(
+  clientId: string,
+  urls: string[]
+): Promise<VisualIdentityActionState> {
+  return guard("use-bank", () => adoptBankReferencesActionImpl(clientId, urls));
+}
+
+/** O botão "Extrair DNA" do onboarding — e o "tentar de novo" quando falha. */
+export async function extractIdentityDnaAction(
+  clientId: string
+): Promise<VisualIdentityActionState> {
+  return guard("extract", () => retryIdentityExtractionActionImpl(clientId));
+}
+
+/** @deprecated Use extractIdentityDnaAction — mesma implementação. */
+export async function retryIdentityExtractionAction(
+  clientId: string
+): Promise<VisualIdentityActionState> {
+  return guard("retry", () => retryIdentityExtractionActionImpl(clientId));
+}
+
+export async function updateVisualIdentityDnaAction(
+  clientId: string,
+  patch: Partial<VisualIdentityDna>
+): Promise<VisualIdentityActionState> {
+  return guard("update-dna", () => updateVisualIdentityDnaActionImpl(clientId, patch));
 }

@@ -6,7 +6,6 @@ import {
   Brain,
   CalendarClock,
   CalendarDays,
-  Camera,
   CheckCircle2,
   ClipboardList,
   ImageIcon,
@@ -29,20 +28,14 @@ import { Surface } from "@/components/ui/surface";
 import { cn } from "@/lib/utils";
 import { layout, tones, type Tone } from "@/lib/design/tokens";
 import { getAuthUser } from "@/lib/auth/session";
-import {
-  getClientById,
-  getClientReferences,
-  getLatestCreativeBrain,
-} from "@/services/clients";
+import { getClientById, getLatestCreativeBrain } from "@/services/clients";
 import {
   getOnboardingAnswers,
   parseOnboardingAnswers,
   isClientBriefingComplete,
 } from "@/services/onboarding";
 import { getClientVisualIdentity, isVisualIdentityReady } from "@/services/visual-identity";
-import { getClientPhotos } from "@/services/client-photos";
-import { getClientArtReadiness } from "@/services/reference-assets";
-import { ClientPhotosPanel } from "@/components/clients/client-photos-panel";
+import { getClientArtReadiness, getReferenceAssets } from "@/services/reference-assets";
 import { ClientDemandsPanel } from "@/components/demands/client-demands-panel";
 import { getDemandsByClientId } from "@/services/demands";
 import type { BrandDna, CreativeBrainStatus } from "@/types";
@@ -67,12 +60,11 @@ export default async function ClientDetailPage({ params }: PageProps) {
   const client = await getClientById(id, user.id);
   if (!client) notFound();
 
-  const [references, creativeBrain, onboarding, clientPhotos, demands, visualIdentity, briefingComplete, readiness] =
+  const [references, creativeBrain, onboarding, demands, visualIdentity, briefingComplete, readiness] =
     await Promise.all([
-    getClientReferences(id),
+    getReferenceAssets(id),
     getLatestCreativeBrain(id),
     getOnboardingAnswers(id),
-    getClientPhotos(id),
     getDemandsByClientId(id),
     getClientVisualIdentity(id),
     isClientBriefingComplete(id),
@@ -81,7 +73,6 @@ export default async function ClientDetailPage({ params }: PageProps) {
 
   const parsedOnboarding = parseOnboardingAnswers(onboarding);
   const onboardingDone = Boolean(onboarding?.completed_at) || isVisualIdentityReady(visualIdentity);
-  const logoUrl = parsedOnboarding.logoUrl ?? visualIdentity.identitySampleUrls[0] ?? null;
   const brandDna = creativeBrain?.brand_dna as BrandDna | undefined;
   const hasBrandDna = Boolean(brandDna);
   const totalDemands = demands.length;
@@ -201,18 +192,27 @@ export default async function ClientDetailPage({ params }: PageProps) {
                 status={
                   onboardingDone
                     ? { label: "Concluído", tone: "green" }
-                    : { label: "Pendente", tone: "amber" }
+                    : { label: "Opcional", tone: "slate" }
                 }
                 actionLabel={onboardingDone ? "Editar briefing" : "Iniciar onboarding"}
                 href={`/clients/${id}/onboarding`}
               />
               <WorkflowModuleCard
                 title="Referências"
-                description={`${references.length} imagem(ns) enviada(s)`}
+                description={
+                  references.length === 0
+                    ? "Nenhuma no acervo — opcional para gerar"
+                    : `${references.length} no acervo, anotada(s) por IA`
+                }
                 icon={ImageIcon}
                 tone="cyan"
-                actionLabel="Gerenciar referências"
-                href={`/clients/${id}/references`}
+                status={
+                  references.length > 0
+                    ? { label: "No acervo", tone: "green" }
+                    : { label: "Pendente", tone: "amber" }
+                }
+                actionLabel="Gerenciar no cadastro"
+                href={`/clients/${id}/onboarding`}
               />
               <WorkflowModuleCard
                 title="Creative Brain"
@@ -367,12 +367,12 @@ export default async function ClientDetailPage({ params }: PageProps) {
           <section className="space-y-4">
             <SectionHeader
               title="Referências visuais"
-              description="Prévia das últimas referências"
+              description="Acervo que o diretor de arte lê para gerar"
               icon={ImageIcon}
               tone="cyan"
               action={
                 <Link
-                  href={`/clients/${id}/references`}
+                  href={`/clients/${id}/onboarding`}
                   className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "text-foreground")}
                 >
                   Ver todas
@@ -388,8 +388,8 @@ export default async function ClientDetailPage({ params }: PageProps) {
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={ref.public_url}
-                    alt={ref.file_name}
+                    src={ref.storage_url}
+                    alt={ref.file_name ?? "Referência"}
                     className="size-full object-cover"
                     loading="lazy"
                     decoding="async"
@@ -400,22 +400,6 @@ export default async function ClientDetailPage({ params }: PageProps) {
           </section>
         )}
 
-        <section className="space-y-4">
-          <SectionHeader
-            title="Fotos do cliente"
-            description="Imagens de produto, espaço e contexto da marca"
-            icon={Camera}
-            tone="orange"
-          />
-          <Surface padding="md">
-            <ClientPhotosPanel
-              clientId={id}
-              clientName={client.name}
-              photos={clientPhotos}
-              logoUrl={logoUrl}
-            />
-          </Surface>
-        </section>
       </div>
     </DashboardPage>
   );

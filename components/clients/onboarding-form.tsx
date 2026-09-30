@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Check, Cloud, ImageIcon, Images, Loader2, Sparkles } from "lucide-react";
+import { Check, Cloud, ImageIcon, Images, Library, Loader2, Sparkles } from "lucide-react";
 import {
   completeOnboardingAction,
   saveOnboardingDraft,
@@ -18,6 +18,8 @@ import { resolveVisualMode } from "@/lib/ai/art-director/visual-policy";
 import { LogoUploadField } from "@/components/clients/logo-upload-field";
 import { ClientPhotosField } from "@/components/clients/client-photos-field";
 import { VisualIdentityField } from "@/components/clients/visual-identity-field";
+import { ReferenceBank } from "@/components/art-director/reference-bank";
+import type { ReferenceAssetRow } from "@/services/reference-assets";
 import { Button } from "@/components/ui/button";
 import { tones, type Tone } from "@/lib/design/tokens";
 import { cn } from "@/lib/utils";
@@ -26,6 +28,8 @@ type OnboardingFormProps = {
   clientId: string;
   defaultValues: Partial<OnboardingFormValues> & { clientPhotos?: ClientPhotoRow[] };
   visualIdentity: ClientVisualIdentityState;
+  /** Acervo de referências — a única fonte que a geração de artes lê. */
+  referenceAssets: ReferenceAssetRow[];
   completedAt: string | null;
 };
 
@@ -36,6 +40,7 @@ function BriefingColumn({
   description,
   tone = "violet",
   children,
+  className,
 }: {
   icon: typeof ImageIcon;
   step: number;
@@ -43,9 +48,10 @@ function BriefingColumn({
   description: string;
   tone?: Tone;
   children: ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="surface-panel flex min-h-[320px] flex-col gap-4 p-5">
+    <div className={cn("surface-panel flex min-h-[320px] flex-col gap-4 p-5", className)}>
       <div className="flex items-start gap-3">
         <span
           className={cn(
@@ -70,6 +76,7 @@ export function OnboardingForm({
   clientId,
   defaultValues,
   visualIdentity,
+  referenceAssets,
   completedAt,
 }: OnboardingFormProps) {
   const router = useRouter();
@@ -95,6 +102,10 @@ export function OnboardingForm({
   const logoUrl = form.watch("logoUrl");
   const logoStoragePath = form.watch("logoStoragePath");
   const visualMode = form.watch("visualMode");
+  const referenceCount = referenceAssets.length;
+  const bankReferenceUrls = referenceAssets.map((a) => a.storage_url);
+  // Só a logo é obrigatória: imagens, referências e DNA são opcionais.
+  const canComplete = Boolean(logoUrl);
 
   const persistDraft = useCallback(
     async (values: Partial<OnboardingFormValues>) => {
@@ -189,13 +200,13 @@ export function OnboardingForm({
           <textarea {...form.register("visualNotes")} maxLength={2000} rows={3} className="w-full rounded-lg border border-border bg-background p-3" placeholder="Ex.: usar azul e creme, tipografia editorial, evitar fotos de pessoas." />
         </label>
       </section>
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-2">
         <BriefingColumn
           icon={ImageIcon}
           step={1}
           tone="orange"
           title="Logo"
-          description="Logo oficial para composição nas artes."
+          description="Logo oficial, composta no topo de toda arte gerada. Obrigatória."
         >
           <LogoUploadField
             compact
@@ -223,29 +234,45 @@ export function OnboardingForm({
             onChange={(photos) => setClientPhotos(photos)}
           />
         </BriefingColumn>
-
-        <BriefingColumn
-          icon={Sparkles}
-          step={3}
-          tone="pink"
-          title="Identidade visual opcional"
-          description="Use artes existentes quando houver uma identidade a seguir. Elas também ficam disponíveis para a geração das demandas."
-        >
-          {visualMode !== "brand" && <p className="mb-3 text-xs text-muted-foreground">Você pode concluir sem enviar referências. A IA cria a direção a partir da copy.</p>}
-          <VisualIdentityField
-            compact
-            clientId={clientId}
-            state={identityState}
-            onStateChange={setIdentityState}
-          />
-        </BriefingColumn>
       </div>
+
+      <BriefingColumn
+        icon={Library}
+        step={3}
+        tone="violet"
+        title={`Referências (${referenceCount})`}
+        description="O acervo que o diretor de arte lê para escolher layout, tipografia e acabamento. Cada imagem é anotada por IA no upload. Opcional — a IA cria a direção a partir da copy quando o acervo está vazio."
+        className="min-h-0"
+      >
+        <ReferenceBank clientId={clientId} assets={referenceAssets} />
+      </BriefingColumn>
+
+      <BriefingColumn
+        icon={Sparkles}
+        step={4}
+        tone="pink"
+        title="Extrator de DNA"
+        description="Artes que representam a marca. A IA lê cores, tipografia e mood e grava como memória do cliente. Você pode reaproveitar as referências do acervo."
+        className="min-h-0"
+      >
+        {visualMode !== "brand" && (
+          <p className="mb-3 text-xs text-muted-foreground">
+            Opcional: só é usado quando a direção visual é “Seguir identidade existente”.
+          </p>
+        )}
+        <VisualIdentityField
+          clientId={clientId}
+          state={identityState}
+          onStateChange={setIdentityState}
+          bankReferenceUrls={bankReferenceUrls}
+        />
+      </BriefingColumn>
 
       <input type="hidden" name="logoUrl" value={logoUrl ?? ""} readOnly />
       <input type="hidden" name="logoStoragePath" value={logoStoragePath ?? ""} readOnly />
 
       <div className="flex flex-wrap items-center gap-3 border-t border-border pt-6">
-        <Button type="submit" disabled={isPending || !logoUrl}>
+        <Button type="submit" disabled={isPending || !canComplete}>
           {isPending ? (
             <>
               <Loader2 className="size-4 animate-spin" />
@@ -264,6 +291,11 @@ export function OnboardingForm({
         </Button>
       </div>
 
+      {!canComplete && (
+        <p className="text-xs text-muted-foreground">
+          Cadastre a logo do cliente para concluir.
+        </p>
+      )}
 
     </form>
   );

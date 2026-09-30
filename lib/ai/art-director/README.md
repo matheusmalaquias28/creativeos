@@ -2,7 +2,7 @@
 
 ## V2 (atual) — resumo
 
-A curadoria gera **só pelo Gemini, direto** (nada de Magnific). Por arte:
+A curadoria gera direto, sem agente no meio. Por arte:
 
 1. **Diretor com visão** (`direct-art.ts`, Claude Opus 5 — `ART_DIRECTOR_VISION_MODEL`):
    vê as referências do acervo (até 10, rotuladas r01…), escolhe UMA como
@@ -14,7 +14,7 @@ A curadoria gera **só pelo Gemini, direto** (nada de Magnific). Por arte:
    contínuo), CTA sempre botão centralizado com base em ~89%, lista fechada de
    textos com a caixa original, papéis sem título (`sanitizeBrief` troca
    "contract" por "printed pages").
-3. **Gemini** gera a arte (Imagem 1 = mestre).
+3. **Magnific** (nano-banana-pro) gera a arte (Imagem 1 = mestre).
 4. **Logo** (`lib/ai/imagegen/brand-logo.ts`): fundo removido, contraste WCAG ≥ 3
    (recolore para a cor escura da paleta ou branco), topo central. Mede a
    uniformidade do fundo sob a logo — se ela atravessa uma borda, a arte refaz.
@@ -25,12 +25,46 @@ A curadoria gera **só pelo Gemini, direto** (nada de Magnific). Por arte:
 6. Salva `vN.png` (final) e `vN_raw.png` (sem logo). Ajustes por instrução editam a
    versão raw e recompõem a logo — ela nunca é redesenhada nem duplicada.
 
+## V3 — o estúdio de criativos
+
+A operação toda mora num modal, aberto pelo botão **Gerar Criativos** da demanda
+(`components/art-studio/`). Dirigir, gerar, apagar, regerar com o prompt alterado,
+aprovar e adaptar para stories acontecem na mesma tela, ao vivo pelo Realtime.
+As páginas `/demands/[id]/prompts` e `/demands/[id]/curation` continuam
+existindo, mas saíram do caminho principal.
+
+O que mudou por baixo:
+
+- **`/api/art-gen/queue` aceita `reset`.** Sem ele, `prepareDemandPrompts` só
+  recria as artes que não estão de pé — gerar duas vezes seguidas virou no-op.
+  Antes, cada clique criava um conjunto novo ao lado do anterior; era a origem
+  dos cards duplicados.
+- **Versões numeradas por formato.** `art_version` ganhou `format`
+  (`feed` 3:4 | `story` 9:16) e o unique passou a ser
+  `(job_id, format, version_number)`. O worker lê o último número e soma 1 em
+  vez de gravar sempre v1 — era o que fazia toda regeração morrer na constraint.
+- **DELETE existe.** `art_generation_job` e `art_version` ganharam policy de
+  delete; `DELETE /api/art-gen/[jobId]` também limpa os PNGs no Storage.
+- **Stories.** `POST /api/art-gen/stories` enfileira as artes aprovadas
+  (`story_status`), e `runStoryWorker` reenquadra cada uma em 9:16 a partir do
+  PNG final — referência única, nenhuma direção de arte nova, logo não
+  recomposta (ver `lib/ai/imagegen/story.ts`).
+- **A imagem sai da Magnific.** Todo o pipeline (worker, stories, ajuste) chama
+  `generateArtImage()` em `lib/ai/imagegen/provider.ts`, que usa a API REST
+  nano-banana-pro com `MAGNIFIC_API_KEY` — a mesma do /gerador e do Turbo, nada
+  a ver com o OAuth/MCP de `lib/magnific/`. As referências vão como URL pública
+  com o `intent` escrito pelo diretor no campo `text`. O Gemini continua no
+  código e volta com `IMAGE_PROVIDER=gemini`.
+
+---
+
 Botão "Gerar artes" da curadoria (`/api/art-gen/queue`): diretor em paralelo com
 mestres pré-atribuídos → aprovação automática → worker. Para revisar briefings
 antes de gerar, use a página de prompts (`/api/art-gen/prepare`).
 
-Custo aproximado por arte: direção ~US$0,05–0,08 + geração 2K ~US$0,13 +
-revisão ~US$0,02 (+ uma geração extra quando a revisão reprova).
+Custo aproximado por arte: direção ~US$0,05–0,08 + geração 2K + revisão ~US$0,02
+(+ uma geração extra quando a revisão reprova). A geração é cobrada pela
+Magnific, não mais pela Gemini API.
 
 ---
 
@@ -140,8 +174,10 @@ Com `logo_mode = 'reference'` ela entra na posição 0.
 | `ANTHROPIC_API_KEY` | Obrigatória — direção de arte e anotação de referências |
 | `ART_DIRECTOR_MODEL` | Modelo da direção de arte (default: `claude-sonnet-4-5-20250929`) |
 | `ANTHROPIC_MODEL` | Modelo das tarefas de descrição (default: Haiku) |
-| `GEMINI_API_KEY` | Obrigatória — geração de imagem |
-| `IMAGE_MODEL` | Default: `gemini-3-pro-image` |
+| `MAGNIFIC_API_KEY` | Obrigatória — geração de imagem (API REST nano-banana-pro) |
+| `IMAGE_PROVIDER` | `magnific` (default) ou `gemini` para voltar ao provedor antigo |
+| `GEMINI_API_KEY` | Só com `IMAGE_PROVIDER=gemini` |
+| `IMAGE_MODEL` | Só com `IMAGE_PROVIDER=gemini`. Default: `gemini-3-pro-image` |
 
 ---
 

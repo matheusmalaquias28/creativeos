@@ -25,6 +25,20 @@ export const ART_JOB_STATUSES = [
 
 export type ArtJobStatus = (typeof ART_JOB_STATUSES)[number];
 
+/** Ciclo de vida da adaptação 9:16, paralelo ao da arte 3:4. */
+export const ART_STORY_STATUSES = [
+  "idle",
+  "queued",
+  "processing",
+  "succeeded",
+  "failed",
+] as const;
+
+export type ArtStoryStatus = (typeof ART_STORY_STATUSES)[number];
+
+/** Formato da versão gravada: feed 3:4 ou story 9:16. */
+export type ArtVersionFormat = "feed" | "story";
+
 export type ReferenceAssetKind =
   | "estilo"
   | "layout"
@@ -791,6 +805,8 @@ export type Database = {
           attempts: number;
           art_index: number;
           approved: boolean;
+          story_status: ArtStoryStatus;
+          story_error: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -811,6 +827,8 @@ export type Database = {
           attempts?: number;
           art_index?: number;
           approved?: boolean;
+          story_status?: ArtStoryStatus;
+          story_error?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -827,6 +845,8 @@ export type Database = {
           error: string | null;
           attempts: number;
           approved: boolean;
+          story_status: ArtStoryStatus;
+          story_error: string | null;
           updated_at: string;
         }>;
         Relationships: [];
@@ -836,6 +856,7 @@ export type Database = {
           id: string;
           job_id: string;
           version_number: number;
+          format: ArtVersionFormat;
           result_url: string;
           storage_path: string;
           instruction: string | null;
@@ -846,6 +867,7 @@ export type Database = {
           id?: string;
           job_id: string;
           version_number?: number;
+          format?: ArtVersionFormat;
           result_url: string;
           storage_path: string;
           instruction?: string | null;
@@ -855,6 +877,7 @@ export type Database = {
         Update: Partial<{
           is_current: boolean;
           instruction: string | null;
+          format: ArtVersionFormat;
         }>;
         Relationships: [];
       };

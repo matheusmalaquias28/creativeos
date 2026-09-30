@@ -8,7 +8,6 @@ import {
   Palette,
   Pencil,
   Plus,
-  RefreshCw,
   Sparkles,
   Trash2,
   Type,
@@ -17,10 +16,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import {
+  extractIdentityDnaAction,
   removeIdentitySampleAction,
-  retryIdentityExtractionAction,
   updateVisualIdentityDnaAction,
   uploadIdentitySampleAction,
+  adoptBankReferencesAction,
 } from "@/actions/visual-identity";
 import { createClient } from "@/lib/supabase/client";
 import { ImageDropzone } from "@/components/ui/image-dropzone";
@@ -191,6 +191,12 @@ type Props = {
   onStateChange?: (state: ClientVisualIdentityState) => void;
   compact?: boolean;
   showDnaDetails?: boolean;
+  /**
+   * URLs do acervo de referências do cliente. Habilita "Usar o acervo", que
+   * aponta o extrator para imagens já enviadas em vez de pedir o mesmo arquivo
+   * de novo.
+   */
+  bankReferenceUrls?: string[];
 };
 
 export function VisualIdentityField({
@@ -199,6 +205,7 @@ export function VisualIdentityField({
   onStateChange,
   compact = false,
   showDnaDetails = true,
+  bankReferenceUrls = [],
 }: Props) {
   const [local, setLocal] = useState(state);
   const [isPending, startTransition] = useTransition();
@@ -268,11 +275,9 @@ export function VisualIdentityField({
       }
       patch({
         identitySampleUrls: result.sampleUrls ?? local.identitySampleUrls,
-        identityExtractionStatus: "extracting",
         identityExtractionError: null,
-        visualIdentityDna: null,
       });
-      toast.success("Arte(s) enviada(s) — extraindo identidade visual...");
+      toast.success('Arte(s) enviada(s) — clique em "Extrair DNA" quando terminar');
     });
   }
 
@@ -295,26 +300,34 @@ export function VisualIdentityField({
               basePrompt: "",
               palette: [],
             }
-          : {
-              identitySampleUrls: remaining,
-              identityExtractionStatus: "extracting",
-              identityExtractionError: null,
-              visualIdentityDna: null,
-            }
+          : { identitySampleUrls: remaining }
       );
       toast.success("Amostra removida");
     });
   }
 
-  function handleRetry() {
+  function handleExtract() {
     startTransition(async () => {
-      const result = await retryIdentityExtractionAction(clientId);
+      const result = await extractIdentityDnaAction(clientId);
       if (result.error) {
         toast.error(result.error);
         return;
       }
       patch({ identityExtractionStatus: "extracting", identityExtractionError: null });
-      toast.info("Reextraindo identidade visual...");
+      toast.info("Extraindo identidade visual...");
+    });
+  }
+
+  function handleUseBank() {
+    if (bankReferenceUrls.length === 0) return;
+    startTransition(async () => {
+      const result = await adoptBankReferencesAction(clientId, bankReferenceUrls);
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      patch({ identitySampleUrls: result.sampleUrls ?? local.identitySampleUrls });
+      toast.success("Referências do acervo adicionadas como amostra");
     });
   }
 
@@ -416,13 +429,41 @@ export function VisualIdentityField({
             />
           )}
 
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {!extracting && (
+              <Button
+                type="button"
+                size="sm"
+                variant={ready ? "outline" : "default"}
+                disabled={isPending}
+                onClick={handleExtract}
+                className="h-7 text-xs"
+              >
+                <Sparkles className="size-3" />
+                {ready ? "Reextrair DNA" : "Extrair DNA"}
+              </Button>
+            )}
             {extracting && (
               <span className="inline-flex items-center gap-1 rounded-full border border-tone-blue/25 bg-tone-blue/12 px-2 py-0.5 text-[0.6875rem] font-semibold text-tone-blue">
                 <Loader2 className="size-3 animate-spin" />
                 Extraindo...
               </span>
             )}
+            {bankReferenceUrls.length > 0 &&
+              local.identitySampleUrls.length < MAX_SAMPLES && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={isPending}
+                  onClick={handleUseBank}
+                  className="h-7 text-xs"
+                  title="Usa as imagens já enviadas no acervo como amostra, sem subir de novo"
+                >
+                  <Plus className="size-3" />
+                  Usar o acervo
+                </Button>
+              )}
             {ready && (
               <span className="inline-flex items-center gap-1 rounded-full border border-tone-green/25 bg-tone-green/12 px-2 py-0.5 text-[0.6875rem] font-semibold text-tone-green">
                 <Sparkles className="size-3" />
@@ -433,12 +474,6 @@ export function VisualIdentityField({
               <span className="inline-flex items-center gap-1 rounded-full border border-tone-red/25 bg-tone-red/12 px-2 py-0.5 text-[0.6875rem] font-semibold text-tone-red">
                 Falhou
               </span>
-            )}
-            {failed && (
-              <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={handleRetry} className="h-7 text-xs">
-                <RefreshCw className="size-3" />
-                Tentar novamente
-              </Button>
             )}
           </div>
 
@@ -654,19 +689,34 @@ export function VisualIdentityField({
           )}
         </div>
       ) : (
-        <ImageDropzone
-          variant="neon"
-          accept={ACCEPT}
-          multiple
-          disabled={isPending}
-          isUploading={isPending}
-          onFiles={handleUpload}
-          icon={<Sparkles className="size-6 text-muted-foreground/70" strokeWidth={1.25} />}
-          title="Clique ou arraste uma ou mais artes"
-          subtitle="PNG, JPG ou WebP"
-          minHeight={compact ? "md" : "sm"}
-          className="flex-1"
-        />
+        <div className={cn("space-y-2", compact && "flex flex-1 flex-col")}>
+          <ImageDropzone
+            variant="neon"
+            accept={ACCEPT}
+            multiple
+            disabled={isPending}
+            isUploading={isPending}
+            onFiles={handleUpload}
+            icon={<Sparkles className="size-6 text-muted-foreground/70" strokeWidth={1.25} />}
+            title="Clique ou arraste uma ou mais artes"
+            subtitle="PNG, JPG ou WebP"
+            minHeight={compact ? "md" : "sm"}
+            className="flex-1"
+          />
+          {bankReferenceUrls.length > 0 && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={isPending}
+              onClick={handleUseBank}
+              className="w-full text-xs"
+            >
+              <Plus className="size-3" />
+              Usar as {bankReferenceUrls.length} referência(s) do acervo
+            </Button>
+          )}
+        </div>
       )}
     </div>
   );
