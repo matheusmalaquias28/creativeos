@@ -594,6 +594,9 @@ export type Database = {
           file_size: number | null;
           role: string | null;
           position: number;
+          arte_index: number | null;
+          category: "subject" | "brand" | "style" | "environment" | null;
+          library_image_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -606,12 +609,59 @@ export type Database = {
           file_size?: number | null;
           role?: string | null;
           position?: number;
+          arte_index?: number | null;
+          category?: "subject" | "brand" | "style" | "environment" | null;
+          library_image_id?: string | null;
           created_at?: string;
         };
         Update: Partial<{
           role: string | null;
           position: number;
+          arte_index: number | null;
+          category: "subject" | "brand" | "style" | "environment" | null;
         }>;
+        Relationships: [];
+      };
+      image_library: {
+        Row: {
+          id: string;
+          storage_url: string;
+          storage_path: string;
+          file_name: string | null;
+          width: number | null;
+          height: number | null;
+          ai_description: string | null;
+          ai_tags: string[];
+          suggested_category: "subject" | "brand" | "style" | "environment" | null;
+          annotation_status: "idle" | "annotating" | "ready" | "failed";
+          annotation_error: string | null;
+          usage_count: number;
+          last_used_at: string | null;
+          active: boolean;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          storage_url: string;
+          storage_path: string;
+          file_name?: string | null;
+          width?: number | null;
+          height?: number | null;
+          ai_description?: string | null;
+          ai_tags?: string[];
+          suggested_category?: "subject" | "brand" | "style" | "environment" | null;
+          annotation_status?: "idle" | "annotating" | "ready" | "failed";
+          annotation_error?: string | null;
+          usage_count?: number;
+          last_used_at?: string | null;
+          active?: boolean;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["image_library"]["Insert"]>;
         Relationships: [];
       };
       client_creative_profile: {

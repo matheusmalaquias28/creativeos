@@ -5,7 +5,6 @@ import {
   buildStandardsBlock,
   buildTextBlock,
   CONTENT_TOP,
-  CTA_BOTTOM,
   LOGO_ZONE_BAND,
   sanitizeBrief,
 } from "../technical-block";
@@ -17,18 +16,18 @@ describe("buildReferenceBlock", () => {
       { role: "layout", intent: "a divisão de quadro" },
       { role: "textura", intent: "o grão do papel" },
     ]);
-    expect(out).toContain("- Image 1 is the LAYOUT & TYPOGRAPHY MASTER");
+    expect(out).toContain("- Image 1 is the LAYOUT REFERENCE");
     expect(out).toContain("Focus: a divisão de quadro");
     expect(out).toContain("- Image 2 is a supporting reference (textura) — use it only for: o grão do papel.");
   });
 
-  it("foto real do cliente vem antes e não vira mestre", () => {
+  it("foto real e referência de estilo preservam seus papéis", () => {
     const out = buildReferenceBlock([
       { role: "personagem", intent: null },
       { role: "estilo", intent: null },
     ]);
-    expect(out).toContain("- Image 1 is a real photo of the client");
-    expect(out).toContain("- Image 2 is the LAYOUT & TYPOGRAPHY MASTER");
+    expect(out).toContain("- Image 1 is a real subject supplied by the client");
+    expect(out).toContain("- Image 2 is a supporting reference (estilo)");
   });
 
   it("ignora a logo e retorna vazio sem referências", () => {
@@ -52,15 +51,15 @@ describe("buildTextBlock", () => {
 });
 
 describe("buildStandardsBlock", () => {
-  it("impõe área segura, zona da logo e botão centralizado na base", () => {
+  it("impõe área segura e preserva a posição do CTA escolhida no briefing", () => {
     const out = buildStandardsBlock({ headline: "oi", cta: "Saiba mais", aspectRatio: ART_ASPECT_RATIO });
     expect(out).toContain("3:4 portrait");
     expect(out).toContain("Meta");
     expect(out).toContain(`${Math.round(LOGO_ZONE_BAND.to * 100)}% of the height`);
     expect(out).toContain(`starts below ${Math.round(CONTENT_TOP * 100)}%`);
     expect(out).toContain("Do NOT draw any logo");
-    expect(out).toContain("horizontally centred");
-    expect(out).toContain(`${Math.round(CTA_BOTTOM * 100)}% of the canvas height`);
+    expect(out).not.toContain("horizontally centred");
+    expect(out).toContain("positioned according to the brief");
   });
 
   it("não fala de botão quando não há CTA", () => {
@@ -105,5 +104,19 @@ describe("appendTechnicalBlock", () => {
     const spec = { headline: "oi", cta: "clique", aspectRatio: "3:4" };
     const refs = [{ role: "estilo" as const, intent: "x" }];
     expect(appendTechnicalBlock(prompt, spec, refs)).toBe(appendTechnicalBlock(prompt, spec, refs));
+  });
+});
+
+
+describe("role and negative constraints", () => {
+  it("does not turn a product or texture into a layout template", () => {
+    const block = buildReferenceBlock([{ role: "produto", intent: "preserve packaging" }, { role: "textura", intent: "paper grain" }]);
+    expect(block).not.toContain("LAYOUT REFERENCE");
+    expect(block).toContain("supporting reference (produto)");
+  });
+  it("sends negative constraints to the final generator alongside revision notes", () => {
+    const block = appendTechnicalBlock("An editorial scene", { headline: "Copy" }, [], ["Increase type contrast"], ["No gavels"]);
+    expect(block).toContain("AVOID IN THIS AD:\n- No gavels");
+    expect(block).toContain("Increase type contrast");
   });
 });

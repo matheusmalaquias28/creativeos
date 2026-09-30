@@ -79,6 +79,8 @@ export type ArtDirectionClient = {
   basePrompt: string;
   palette: string[];
   directionNotes: DirectionNote[];
+  visualMode?: import("./visual-policy").VisualMode;
+  visualNotes?: string;
 };
 
 export type ArtDirectionDemand = {

@@ -122,6 +122,7 @@ function parseArteItem(item: unknown): DemandArte | null {
     headline,
     subheadline,
     informacoesExtras,
+    observacaoVisual: asString(record.observacaoVisual ?? record.observacoesVisuais ?? record.visualNotes),
     cta,
     linkReferencias,
     imagensReferencias,

@@ -7,7 +7,6 @@ import { getOwnedClient } from "@/lib/auth/verify-client";
 import { buildLogoStoragePath } from "@/lib/utils/logo-filename";
 import { isAllowedLogoFile, isSvgLogoFile } from "@/lib/utils/logo-file";
 import { syncLogoToCreativeProfile } from "@/actions/visual-identity";
-import { isClientBriefingComplete } from "@/services/onboarding";
 
 type StoredAnswers = Partial<OnboardingFormValues>;
 
@@ -33,6 +32,8 @@ function parseFormToAnswers(formData: FormData): Partial<OnboardingFormValues> {
   return {
     logoUrl: logoUrl || undefined,
     logoStoragePath: logoStoragePath || undefined,
+    visualMode: onboardingSchema.shape.visualMode.safeParse(formData.get("visualMode") || undefined).data,
+    visualNotes: String(formData.get("visualNotes") ?? "").trim().slice(0, 2000),
   };
 }
 
@@ -113,7 +114,11 @@ export async function saveOnboardingDraft(
   clientId: string,
   answers: Partial<OnboardingFormValues>
 ): Promise<OnboardingActionState> {
-  const merged = await mergeWithExistingAnswers(clientId, answers);
+  const owned = await getOwnedClient(clientId);
+  if (!owned) return { error: "Cliente não encontrado" };
+  const checked = onboardingSchema.safeParse(answers);
+  if (!checked.success) return { error: "Preferências inválidas" };
+  const merged = await mergeWithExistingAnswers(clientId, checked.data);
   return persistAnswers(clientId, merged);
 }
 
@@ -125,13 +130,8 @@ export async function completeOnboardingAction(
   const owned = await getOwnedClient(clientId);
   if (!owned) return { error: "Cliente não encontrado" };
 
-  if (!(await isClientBriefingComplete(clientId))) {
-    return {
-      error: "Extraia a identidade visual antes de concluir o briefing",
-    };
-  }
-
   const answers = await mergeWithExistingAnswers(clientId, parseFormToAnswers(formData));
+  if (!answers.logoUrl) return { error: "Cadastre a logo do cliente para concluir" };
   const parsed = onboardingSchema.safeParse(answers);
 
   if (!parsed.success) {
@@ -141,7 +141,8 @@ export async function completeOnboardingAction(
   }
 
   const now = new Date().toISOString();
-  await persistAnswers(clientId, parsed.data, now);
+  const saved = await persistAnswers(clientId, parsed.data, now);
+  if (saved.error) return saved;
 
   const supabase = await createClient();
   await supabase.from("clients").update({ status: "onboarding" }).eq("id", clientId);

@@ -279,7 +279,23 @@ export default async function DemandDetailPage({ params }: PageProps) {
             title={`Briefing das artes (${demand.artes.length})`}
             description="Headlines e CTAs no formato 3:4"
           />
-          <DemandArteFeed demandId={id} artes={demand.artes} />
+          <DemandArteFeed
+            demandId={id}
+            artes={demand.artes}
+            arteReferences={demandRefs.flatMap((ref) =>
+              ref.arte_index === null
+                ? []
+                : [
+                    {
+                      id: ref.id,
+                      storage_url: ref.storage_url,
+                      file_name: ref.file_name,
+                      arte_index: ref.arte_index,
+                      category: ref.category ?? "style",
+                    },
+                  ]
+            )}
+          />
         </section>
 
         <Surface padding="md" className="space-y-6">
@@ -301,7 +317,7 @@ export default async function DemandDetailPage({ params }: PageProps) {
           )}
           <DemandReferenceManager
             demandId={id}
-            initialRefs={demandRefs}
+            initialRefs={demandRefs.filter((ref) => ref.arte_index === null)}
             showClientRefs={false}
             clientRefs={
               clientAssets?.references.map((r) => ({

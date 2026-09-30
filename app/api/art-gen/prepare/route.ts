@@ -9,6 +9,9 @@
  */
 
 import { NextResponse, after } from "next/server";
+import { z } from "zod";
+import { approvePrompt } from "@/services/art-director";
+import { runWorker } from "@/lib/ai/imagegen/worker";
 import { createClient } from "@/lib/supabase/server";
 import { prepareDemandPrompts } from "@/lib/ai/art-director/prepare";
 
@@ -21,26 +24,18 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
 
-  let body: { demandId?: string; wait?: boolean } = {};
+  const schema = z.object({ demandId: z.string().uuid(), wait: z.boolean().optional(), generate: z.boolean().optional(), visualMode: z.enum(["free", "guided", "brand"]).optional(), visualNotes: z.string().max(2000).optional() });
+  let body: z.infer<typeof schema>;
   try {
-    body = await request.json();
+    body = schema.parse(await request.json());
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
   const { demandId, wait = false } = body;
+  const options = { visualMode: body.visualMode, visualNotes: body.visualNotes };
   if (!demandId) {
     return NextResponse.json({ error: "demandId é obrigatório" }, { status: 400 });
-  }
-
-  if (wait) {
-    try {
-      const result = await prepareDemandPrompts(demandId);
-      return NextResponse.json({ ok: true, ...result });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Erro desconhecido";
-      return NextResponse.json({ error: message }, { status: 422 });
-    }
   }
 
   // Valida o que é barato de validar antes de responder, para o operador não
@@ -60,25 +55,33 @@ export async function POST(request: Request) {
 
   const { data: readiness } = await supabase
     .from("client_art_readiness")
-    .select("is_ready")
+    .select("has_logo")
     .eq("client_id", demand.client_id)
     .maybeSingle();
 
-  if (!readiness?.is_ready) {
+  if (!readiness?.has_logo) {
     return NextResponse.json(
-      { error: "Cliente sem kit completo (logo, paleta, DNA e 4+ referências)" },
+      { error: "Cadastre a logo do cliente. Identidade visual e referências são opcionais." },
       { status: 422 }
     );
   }
 
-  // `after()`, não `setImmediate` — numa function serverless o processo pode
-  // ser congelado assim que a resposta é enviada, e um setImmediate agendado
-  // depois disso nunca roda (job fica preso sem erro nenhum).
-  after(() =>
-    prepareDemandPrompts(demandId).catch((err) => {
-      console.error("[art-gen/prepare]", (err as Error)?.message ?? err);
-    })
-  );
+  const { count: activeCount, error: activeError } = await supabase.from("art_generation_job").select("id", { count: "exact", head: true }).eq("demand_id", demandId).in("status", ["draft", "writing_prompt", "queued", "processing"]);
+  if (activeError) return NextResponse.json({ error: "Não foi possível verificar a geração atual" }, { status: 500 });
+  if (activeCount) return NextResponse.json({ error: "Esta demanda já tem uma geração em andamento" }, { status: 409 });
 
+  const execute = async () => {
+    const result = await prepareDemandPrompts(demandId, options);
+    if (body.generate) {
+      for (const id of result.jobIds) await approvePrompt(id, user.id);
+      if (result.jobIds.length) await runWorker(demandId);
+    }
+    return result;
+  };
+  if (wait) {
+    try { return NextResponse.json({ ok: true, ...await execute() }); }
+    catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Erro ao gerar" }, { status: 422 }); }
+  }
+  after(() => execute().catch((error) => console.error("[art-gen/prepare]", error)));
   return NextResponse.json({ ok: true, started: true });
 }

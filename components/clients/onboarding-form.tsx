@@ -14,7 +14,7 @@ import {
 import { onboardingSchema, type OnboardingFormValues } from "@/lib/schemas/client";
 import type { ClientPhotoRow } from "@/types/client-photos";
 import type { ClientVisualIdentityState } from "@/lib/schemas/visual-identity";
-import { isVisualIdentityReady } from "@/lib/schemas/visual-identity";
+import { resolveVisualMode } from "@/lib/ai/art-director/visual-policy";
 import { LogoUploadField } from "@/components/clients/logo-upload-field";
 import { ClientPhotosField } from "@/components/clients/client-photos-field";
 import { VisualIdentityField } from "@/components/clients/visual-identity-field";
@@ -86,13 +86,15 @@ export function OnboardingForm({
     defaultValues: {
       logoUrl: defaultValues.logoUrl,
       logoStoragePath: defaultValues.logoStoragePath,
+      visualMode: resolveVisualMode(defaultValues.visualMode, Boolean(visualIdentity.visualIdentityDna)),
+      visualNotes: defaultValues.visualNotes ?? "",
     },
     mode: "onChange",
   });
 
   const logoUrl = form.watch("logoUrl");
   const logoStoragePath = form.watch("logoStoragePath");
-  const identityReady = isVisualIdentityReady(identityState);
+  const visualMode = form.watch("visualMode");
 
   const persistDraft = useCallback(
     async (values: Partial<OnboardingFormValues>) => {
@@ -123,8 +125,9 @@ export function OnboardingForm({
   }, [form, persistDraft]);
 
   const onComplete = (formData: FormData) => {
-    if (!identityReady) {
-      toast.error("Aguarde a extração do DNA visual antes de concluir");
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!logoUrl) {
+      toast.error("Cadastre a logo do cliente para concluir");
       return;
     }
 
@@ -170,6 +173,22 @@ export function OnboardingForm({
         )}
       </div>
 
+      <section className="surface-panel space-y-4 p-5">
+        <h2 className="text-sm font-bold">Como criar para este cliente?</h2>
+        <p className="text-sm text-muted-foreground">Cadastre a logo e escolha a liberdade visual. A copy vem da demanda; fotos e referências são opcionais.</p>
+        <label className="block space-y-2 text-sm">
+          <span>Direção visual</span>
+          <select {...form.register("visualMode")} className="w-full rounded-lg border border-border bg-background p-3">
+            <option value="free">Criação livre — a IA decide o visual a partir da copy</option>
+            <option value="guided">Seguir minhas orientações — cores, preferências e restrições</option>
+            <option value="brand">Seguir identidade existente — usar as referências da marca</option>
+          </select>
+        </label>
+        <label className="block space-y-2 text-sm">
+          <span>Preferências do cliente (opcional)</span>
+          <textarea {...form.register("visualNotes")} maxLength={2000} rows={3} className="w-full rounded-lg border border-border bg-background p-3" placeholder="Ex.: usar azul e creme, tipografia editorial, evitar fotos de pessoas." />
+        </label>
+      </section>
       <div className="grid gap-4 lg:grid-cols-3">
         <BriefingColumn
           icon={ImageIcon}
@@ -194,7 +213,7 @@ export function OnboardingForm({
           icon={Images}
           step={2}
           tone="cyan"
-          title="Fotos"
+          title="Fotos opcionais"
           description="Produto, espaço ou contexto da marca — até 5 imagens."
         >
           <ClientPhotosField
@@ -209,9 +228,10 @@ export function OnboardingForm({
           icon={Sparkles}
           step={3}
           tone="pink"
-          title="Extrator de identidade"
-          description="Arte de referência para a IA extrair cores, tipografia e estilo."
+          title="Identidade visual opcional"
+          description="Use artes existentes quando houver uma identidade a seguir. Elas também ficam disponíveis para a geração das demandas."
         >
+          {visualMode !== "brand" && <p className="mb-3 text-xs text-muted-foreground">Você pode concluir sem enviar referências. A IA cria a direção a partir da copy.</p>}
           <VisualIdentityField
             compact
             clientId={clientId}
@@ -225,14 +245,14 @@ export function OnboardingForm({
       <input type="hidden" name="logoStoragePath" value={logoStoragePath ?? ""} readOnly />
 
       <div className="flex flex-wrap items-center gap-3 border-t border-border pt-6">
-        <Button type="submit" disabled={isPending || !identityReady}>
+        <Button type="submit" disabled={isPending || !logoUrl}>
           {isPending ? (
             <>
               <Loader2 className="size-4 animate-spin" />
               Finalizando...
             </>
           ) : (
-            "Concluir briefing"
+            "Salvar cliente"
           )}
         </Button>
         <Button
@@ -244,13 +264,7 @@ export function OnboardingForm({
         </Button>
       </div>
 
-      {!identityReady && (
-        <p className="text-xs text-muted-foreground">
-          {identityState.identityExtractionStatus === "extracting"
-            ? "Aguarde a extração do DNA visual para concluir."
-            : "Envie uma arte de referência no extrator para concluir."}
-        </p>
-      )}
+
     </form>
   );
 }

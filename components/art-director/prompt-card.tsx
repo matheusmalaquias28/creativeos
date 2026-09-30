@@ -186,6 +186,11 @@ export function PromptCard({
             </div>
           ) : (
             <>
+              <p className="text-xs text-muted-foreground">
+                Direção: {job.params.visual_mode === "free" ? "criação livre" : job.params.visual_mode === "guided" ? "orientações do cliente" : "identidade do cliente"}. {job.references.length} imagem(ns) selecionada(s).
+                {typeof job.params.visual_observation === "string" && job.params.visual_observation && <span className="block mt-1">Observação recebida: {job.params.visual_observation}</span>}
+                {typeof job.params.visual_notes === "string" && job.params.visual_notes && <span className="block mt-1">Nesta demanda: {job.params.visual_notes}</span>}
+              </p>
               {job.direction?.concept && (
                 <div className="space-y-1 rounded-xl border border-tone-pink/20 bg-tone-pink/8 p-3.5">
                   <p className="text-sm leading-snug text-foreground">
@@ -199,6 +204,8 @@ export function PromptCard({
                 </div>
               )}
 
+              <details>
+                <summary className="mb-3 cursor-pointer text-xs text-muted-foreground">Ver ou editar instruções de geração</summary>
               <Textarea
                 value={prompt}
                 onChange={(e) => {
@@ -211,6 +218,9 @@ export function PromptCard({
                 className="font-mono text-xs leading-relaxed"
               />
 
+              </details>
+
+              {job.direction?.review && !job.direction.review.pass && <p className="text-xs text-tone-amber">A revisão automática encontrou problemas. Confira a arte antes de aprovar: {job.direction.review.fixes.join("; ")}</p>}
               <ReferenceStrip
                 jobId={job.id}
                 references={job.references}

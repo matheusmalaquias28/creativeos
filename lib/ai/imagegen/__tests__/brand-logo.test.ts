@@ -110,3 +110,15 @@ describe("compositeBrandLogo", () => {
     expect(res.variant).toBe("#FFFFFF");
   });
 });
+
+
+describe("missing logo protection", () => {
+  it("rejects a fully transparent logo before composition", async () => {
+    const empty = await sharp({ create: { width: 100, height: 50, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).png().toBuffer();
+    await expect(prepareLogo(empty)).rejects.toThrow("Logo sem conteúdo visível");
+    await expect(compositeBrandLogo({ art: await solid(400, 600, [10, 20, 30]), logo: empty })).rejects.toThrow("Logo sem conteúdo visível");
+  });
+  it("rejects background removal that would erase the whole logo", async () => {
+    await expect(prepareLogo(await solid(100, 50, [240, 240, 240]))).rejects.toThrow("Logo sem conteúdo visível");
+  });
+});

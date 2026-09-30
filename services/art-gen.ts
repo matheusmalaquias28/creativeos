@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Database } from "@/types/database";
+import type { ReferenceCategory } from "@/lib/image-library/categories";
 
 export type ArtJob = Database["public"]["Tables"]["art_generation_job"]["Row"];
 export type ArtVersion = Database["public"]["Tables"]["art_version"]["Row"];
@@ -78,6 +79,9 @@ export type DemandReferenceImage = {
   file_name: string;
   role: string | null;
   position: number;
+  /** null = referência geral da demanda; número = só daquela arte. */
+  arte_index: number | null;
+  category: ReferenceCategory | null;
 };
 
 export async function getDemandReferenceImages(
@@ -86,7 +90,7 @@ export async function getDemandReferenceImages(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("demand_reference_image")
-    .select("id, storage_url, file_name, role, position")
+    .select("id, storage_url, file_name, role, position, arte_index, category")
     .eq("demand_id", demandId)
     .order("position", { ascending: true });
   if (error) throw new Error(error.message);

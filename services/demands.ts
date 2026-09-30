@@ -141,7 +141,7 @@ export function parseArtes(value: unknown): DemandArte[] {
   if (!Array.isArray(value)) return [];
 
   return value
-    .map((item) => {
+    .map((item): DemandArte | null => {
       if (!item || typeof item !== "object") return null;
       const record = item as Record<string, unknown>;
       return {
@@ -149,6 +149,7 @@ export function parseArtes(value: unknown): DemandArte[] {
         subheadline: typeof record.subheadline === "string" ? record.subheadline : "",
         informacoesExtras:
           typeof record.informacoesExtras === "string" ? record.informacoesExtras : "",
+        observacaoVisual: typeof record.observacaoVisual === "string" ? record.observacaoVisual : "",
         cta: typeof record.cta === "string" ? record.cta : "",
         linkReferencias:
           typeof record.linkReferencias === "string" ? record.linkReferencias : "",
@@ -239,10 +240,10 @@ export const getDemandsForUser = cache(
     if (clientIds.length > 0) {
       const { data: readinessRows } = await supabase
         .from("client_art_readiness")
-        .select("client_id, is_ready")
+        .select("client_id, has_logo")
         .in("client_id", clientIds);
       for (const r of readinessRows ?? []) {
-        readinessByClient.set(r.client_id as string, Boolean(r.is_ready));
+        readinessByClient.set(r.client_id as string, Boolean(r.has_logo));
       }
     }
 

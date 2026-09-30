@@ -18,6 +18,7 @@ import {
   type ArtDirectorOutput,
 } from "./system-prompt";
 import { isReferenceKind } from "./types";
+import { resolveVisualMode, visualPolicy } from "./visual-policy";
 import { urlToVisionBlock } from "./vision";
 import { describeUsage } from "./catalog";
 import type { ArtDirection, ArtDirectionInput, ChosenReference } from "./types";
@@ -79,6 +80,8 @@ export function buildUserPrompt(input: ArtDirectionInput): string {
 
   const blocks = [
     section("## CLIENT", client.name),
+    section("## VISUAL FREEDOM", visualPolicy(resolveVisualMode(client.visualMode, Boolean(client.dna)))),
+    section("## CLIENT PREFERENCES", client.visualNotes),
     section("## BRAND PALETTE", client.palette.join(", ")),
     section("## BRAND NOTES (from the visual identity)", dna),
     client.directionNotes.length
@@ -100,13 +103,13 @@ export function buildUserPrompt(input: ArtDirectionInput): string {
     section("## FORMAT", `${art.aspectRatio} portrait, ${art.imageSize}`),
     clientPhotos.length
       ? section(
-          "## REAL CLIENT PHOTO",
-          `${clientPhotos.length} real photo(s) of the client are attached (labelled FOTO). That person is the subject of this ad.`
+          "## CLIENT MATERIAL",
+          `${clientPhotos.length} real photo(s) of the client are attached (labelled FOTO). Preserve the actual subject shown (person, product or place).`
         )
       : null,
     siblings.length
       ? section(
-          "## SIBLING ADS ALREADY DIRECTED IN THIS CAMPAIGN (use a different master and hero)",
+          "## SIBLING ADS ALREADY DIRECTED IN THIS CAMPAIGN (use a different concept, composition and hero)",
           siblings
             .map((s) => `- Ad ${s.index + 1}${s.master ? ` (master ${s.master})` : ""}: ${s.concept}`)
             .join("\n")
@@ -154,7 +157,7 @@ async function buildContent(
     const photos = await Promise.all(input.clientPhotos.map((p) => urlToVisionBlock(p.url, 800)));
     photos.forEach((photo, i) => {
       if (!photo) return;
-      content.push({ type: "text", text: `FOTO ${i + 1} (real client photo):` });
+      content.push({ type: "text", text: `FOTO ${i + 1} (client-supplied subject):` });
       content.push(photo);
     });
   }
@@ -183,8 +186,8 @@ export function resolveReferences(
     out.push({
       assetId: asset.id,
       storageUrl: asset.storageUrl,
-      // A primeira escolhida é o mestre, sempre com papel de layout.
-      role: out.length === 0 ? "layout" : isReferenceKind(ref.role) ? ref.role : asset.kind,
+      // Preserve the chosen role: products and textures are not layout templates.
+      role: isReferenceKind(ref.role) ? ref.role : asset.kind,
       intent: ref.intent.trim().slice(0, 240),
     });
     if (out.length >= 3) break;
@@ -235,7 +238,7 @@ function sleep(ms: number): Promise<void> {
 export async function directArt(input: ArtDirectionInput): Promise<ArtDirection> {
   const anthropic = getAnthropicClient();
   const model = getArtDirectorModel();
-  const { content } = await buildContent(input);
+  const { content, sentTokens } = await buildContent(input);
 
   let lastError: Error | null = null;
 
@@ -256,10 +259,7 @@ export async function directArt(input: ArtDirectionInput): Promise<ArtDirection>
       const parsed = parseOutput(response);
       validate(parsed);
 
-      const references = resolveReferences(parsed.references ?? [], input);
-      if (references.length === 0 && input.catalog.entries.length > 0) {
-        throw new ArtDirectionError("Nenhuma referência válida escolhida");
-      }
+      const references = resolveReferences((parsed.references ?? []).filter((ref) => sentTokens.includes(ref.token.trim().toLowerCase())), input);
 
       return {
         concept: parsed.concept.trim(),

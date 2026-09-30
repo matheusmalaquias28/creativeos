@@ -1,4 +1,7 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
+import Image from "next/image";
+import { getClientVisualIdentity } from "@/services/visual-identity";
 import { Camera, ImageIcon, Library, Upload } from "lucide-react";
 import { DashboardPage } from "@/components/layout/dashboard-page";
 import { SectionHeader } from "@/components/layout/section-header";
@@ -26,21 +29,27 @@ export default async function ReferencesPage({ params }: PageProps) {
   const client = await getClientById(id, user.id);
   if (!client) notFound();
 
-  const [references, clientPhotos, bankAssets, readiness] = await Promise.all([
+  const [references, clientPhotos, bankAssets, readiness, identity] = await Promise.all([
     getClientReferences(id),
     getClientPhotos(id),
     getReferenceAssets(id),
     getClientArtReadiness(id),
+    getClientVisualIdentity(id),
   ]);
 
   return (
     <DashboardPage
       title="Referências visuais"
-      description="Inspirações, acervo anotado por IA e fotos do cliente usados no Brand DNA e na geração de artes."
+      description="Materiais opcionais. As imagens do onboarding e desta página ficam disponíveis na geração das demandas; você não precisa reenviá-las."
       backHref={`/clients/${id}`}
       backLabel={client.name}
     >
       <div className={layout.sectionGap}>
+        {identity.identitySampleUrls.length > 0 && <section className="space-y-3">
+          <SectionHeader title="Identidade cadastrada no onboarding" description="Já disponível para a IA. Não precisa fazer outro upload." icon={ImageIcon} tone="cyan" />
+          <div className="flex flex-wrap gap-3">{identity.identitySampleUrls.map((url) => <div key={url} className="relative size-24 overflow-hidden rounded-lg"><Image src={url} alt="Referência de identidade do cliente" fill unoptimized className="object-cover" sizes="96px" /></div>)}</div>
+          <Link href={"/clients/" + id + "/onboarding"} className="text-sm underline">Editar identidade e liberdade visual</Link>
+        </section>}
         <section className="space-y-4">
           <SectionHeader
             title={`Acervo para geração com IA (${bankAssets.length})`}
@@ -57,8 +66,8 @@ export default async function ReferencesPage({ params }: PageProps) {
         <div className="grid gap-8 lg:grid-cols-2">
           <section className="space-y-4">
             <SectionHeader
-              title="Upload de referências"
-              description="Imagens do Behance ou outras fontes, usadas na geração do Creative Brain."
+              title="Outras inspirações (opcional)"
+              description="Também disponíveis para a geração de demandas. Não é obrigatório preencher este acervo."
               icon={Upload}
               tone="cyan"
             />

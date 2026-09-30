@@ -34,19 +34,19 @@ export default async function PromptsPage({ params }: PageProps) {
   return (
     <DashboardPage
       title={title}
-      description="Revise a direção de arte antes de gerar as imagens"
+      description="Gere a partir da copy ou personalize a direção visual desta demanda"
       backHref={`/demands/${id}`}
       backLabel="Voltar para demanda"
       eyebrow={
         <Badge variant="pink" className="gap-1">
           <Sparkles />
-          Prompts
+          Criar artes
         </Badge>
       }
       headerContent={
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[0.8125rem] font-semibold text-muted-foreground">
-            Kit do cliente
+            Materiais disponíveis
           </span>
           <ReadinessChips readiness={readiness} />
         </div>

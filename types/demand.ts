@@ -12,6 +12,7 @@ export type DemandArte = {
   headline: string;
   subheadline: string;
   informacoesExtras: string;
+  observacaoVisual?: string;
   cta: string;
   linkReferencias: string;
   /** URLs de imagens de referência específicas desta arte (enviadas no webhook). */

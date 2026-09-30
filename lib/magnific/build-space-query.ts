@@ -1,5 +1,6 @@
 import type { DemandArte } from "@/types/demand";
 import { IMAGE_GEN_DEFAULTS } from "@/lib/ai/imagegen/defaults";
+import { CATEGORY_META, type ReferenceCategory } from "@/lib/image-library/categories";
 
 export type CreativeProfileBrief = {
   basePrompt: string;
@@ -12,6 +13,13 @@ export type CreativeProfileBrief = {
 // a parte de tamanho variável — é ela que é cortada quando o texto fixo já
 // preenche boa parte do orçamento.
 const QUERY_CHAR_BUDGET = 3600;
+
+/** Imagem escolhida para uma arte específica, já subida no Space. */
+export type ArteReferenceMention = {
+  arteIndex: number;
+  category: ReferenceCategory;
+  identifier: string;
+};
 
 /**
  * Instrução em linguagem natural para `spaces_edit`, seguindo o modelo de
@@ -33,11 +41,16 @@ const QUERY_CHAR_BUDGET = 3600;
  * `logoIdentifier` é o creation identifier retornado pelo upload da logo —
  * a menção `@[id:Logo:output]` é como o spaces_edit referencia um node
  * específico do Space.
+ *
+ * `arteReferences` são as imagens do acervo escolhidas pelo operador para cada
+ * arte, com a categoria de uso — cada uma vira uma menção ao node dela seguida
+ * da instrução fixa da categoria (ver CATEGORY_META).
  */
 export function buildMagnificSpaceQuery(
   artes: DemandArte[],
   profile: CreativeProfileBrief | null,
-  logoIdentifier: string | null
+  logoIdentifier: string | null,
+  arteReferences: ArteReferenceMention[] = []
 ): string {
   const parts: string[] = [];
 
@@ -96,6 +109,28 @@ export function buildMagnificSpaceQuery(
     const label = artes.length > 1 ? `Arte ${index + 1}` : "Arte";
     textLines.push(`${label} — ${copyParts.join("  ")}.`);
   });
+
+  const referenceLines: string[] = [];
+  artes.forEach((_, index) => {
+    const refs = arteReferences.filter((ref) => ref.arteIndex === index);
+    if (refs.length === 0) return;
+
+    const label = artes.length > 1 ? `Arte ${index + 1}` : "Arte";
+    const uses = refs.map((ref) => {
+      const meta = CATEGORY_META[ref.category];
+      return `@[${ref.identifier}:${meta.mentionName}:output] ${meta.instruction}`;
+    });
+    referenceLines.push(`${label} — ${uses.join("; ")}.`);
+  });
+
+  if (referenceLines.length) {
+    parts.push(
+      [
+        "Imagens de referência de cada arte (use cada uma SOMENTE na arte indicada):",
+        ...referenceLines,
+      ].join("\n")
+    );
+  }
 
   if (textLines.length) {
     parts.push(

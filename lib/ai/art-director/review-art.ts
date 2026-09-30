@@ -12,7 +12,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getAnthropicClient } from "@/lib/ai/client";
 import { getArtDirectorModel } from "./direct-art";
 import { bufferToVisionBlock } from "./vision";
-import { CONTENT_TOP, CTA_BOTTOM, LOGO_ZONE_BAND, type TechnicalBlockSpec } from "./technical-block";
+import { CONTENT_TOP, LOGO_ZONE_BAND, type TechnicalBlockSpec } from "./technical-block";
 
 export type ArtReview = {
   pass: boolean;
@@ -27,6 +27,7 @@ const REVIEW_SCHEMA = {
   properties: {
     text_exact: { type: "boolean" },
     extra_text: { type: "array", items: { type: "string" } },
+    logo_present: { type: "boolean" },
     logo_zone_clean: { type: "boolean" },
     cta_ok: { type: "boolean" },
     drawn_logo_or_brand: { type: "boolean" },
@@ -37,6 +38,7 @@ const REVIEW_SCHEMA = {
   required: [
     "text_exact",
     "extra_text",
+    "logo_present",
     "logo_zone_clean",
     "cta_ok",
     "drawn_logo_or_brand",
@@ -50,6 +52,7 @@ const REVIEW_SCHEMA = {
 type ReviewOutput = {
   text_exact: boolean;
   extra_text: string[];
+  logo_present: boolean;
   logo_zone_clean: boolean;
   cta_ok: boolean;
   drawn_logo_or_brand: boolean;
@@ -59,7 +62,7 @@ type ReviewOutput = {
 };
 
 /** Nota mínima de acabamento para aprovar sem nova tentativa. */
-export const MIN_REVIEW_SCORE = 6;
+export const MIN_REVIEW_SCORE = 7;
 
 function reviewPrompt(spec: TechnicalBlockSpec): string {
   const allowed = [spec.headline, spec.subheadline, spec.informacoesExtras, spec.cta]
@@ -67,21 +70,22 @@ function reviewPrompt(spec: TechnicalBlockSpec): string {
     .map((t) => `"${t}"`)
     .join(", ");
   const pct = (n: number) => `${Math.round(n * 100)}%`;
-  return `You are the QA lead of a design agency. Review this finished Instagram/Facebook ad before it goes to the client. The client's real logo was composited at the top centre on purpose — that logo is correct and allowed.
+  return `You are the QA lead of a design agency. Review this finished Instagram/Facebook ad before it goes to the client. The client's real logo is expected at the top centre. Verify that a visible, legible logo is actually present; do not assume compositing succeeded. The real composited logo is allowed.
 
 Allowed text (exact strings, exact letter case): ${allowed || "none"}.
 
-Only flag real defects — this review decides whether the ad is regenerated, which costs time and money. Do not flag stylistic preferences.
+Check execution of hierarchy, typography and spacing as well as technical defects. Intentional negative space is not a defect. Do not enforce a single aesthetic or layout.
 
 Check:
 - text_exact: every allowed string appears exactly (same words, accents, letter case). Line breaks and emphasis styling are fine.
-- extra_text: list only READABLE words that are not in the allowed strings (e.g. "CONTRACT" on a paper, a word on a screen or sign, an invented phrase, a watermark). NOT extra text: the composited logo at the top; soft illegible lines on papers; ONE oversized decorative echo of a word that appears in the headline (a deliberate layout device).
+- extra_text: list only READABLE words that are not in the allowed strings (e.g. "CONTRACT" on a paper, a word on a screen or sign, an invented phrase, a watermark). NOT extra text: the composited logo at the top; soft illegible lines on papers.
+- logo_present: true only if an actual visible, legible logo is present at the top centre. An empty reserved band is false.
 - logo_zone_clean: false if the composited logo is not fully legible on ONE uniform background — e.g. it straddles an edge between two colour areas or a photo border, or text/objects collide with or crowd it (band ${pct(LOGO_ZONE_BAND.from)}–${pct(LOGO_ZONE_BAND.to)} of the height at the centre). Text starting at ~${pct(CONTENT_TOP)} is fine.
-- cta_ok: ${spec.cta ? `"${spec.cta}" is a clear button, horizontally centred, in the lower part, with its bottom edge anywhere between 84% and 95% of the height (target ${pct(CTA_BOTTOM)}). Only fail if it is missing, not a button, off-centre, or touching/cut by the edge` : "true when there is no button (none was requested)"}.
+- cta_ok: ${spec.cta ? `"${spec.cta}" is legible as a clear button, follows the layout grid, and has breathing room inside safe margins. Any alignment or position is acceptable; fail only if missing, unreadable, crowded or clipped` : "true when no CTA was requested"}.
 - drawn_logo_or_brand: the image model drew some OTHER logo, monogram, brand name or car/product badge.
 - garbled_glyphs: clearly distorted, merged or duplicated letters in the ad's text.
-- score: 1–10 for agency-grade finish (composition, typography, lighting, cohesion). 7 = publishable, 9 = excellent.
-- fixes: one short, objective correction in English per defect found above (empty if none). No stylistic suggestions.`;
+- score: 1–10 for finish. Assess distinct headline/support/CTA hierarchy, legibility at phone size, coherent type pairing, line spacing, alignment, negative space and purposeful imagery. Penalize cramped type, competing focal points and decorative clutter. 7 = publishable, 9 = excellent.
+- fixes: one short, objective correction in English per defect found above (empty if none). Give concrete layout or type corrections for execution defects; preserve intentional negative space.`;
 }
 
 export async function reviewArt(params: {
@@ -120,6 +124,7 @@ export async function reviewArt(params: {
 
   const out = JSON.parse(text) as ReviewOutput;
   const fixes = [...(out.fixes ?? [])];
+  if (!out.logo_present) fixes.push("The final composited logo is missing or illegible. Check the logo asset and compositing; do not ask the image model to invent one.");
   if (out.extra_text?.length) {
     fixes.push(`Remove these words that must not appear: ${out.extra_text.map((t) => `"${t}"`).join(", ")}.`);
   }
@@ -127,6 +132,7 @@ export async function reviewArt(params: {
   const pass =
     out.text_exact &&
     (out.extra_text?.length ?? 0) === 0 &&
+    out.logo_present &&
     out.logo_zone_clean &&
     out.cta_ok &&
     !out.drawn_logo_or_brand &&

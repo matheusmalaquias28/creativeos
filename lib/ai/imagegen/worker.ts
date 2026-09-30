@@ -35,6 +35,7 @@ import type { DirectionMeta, ReferenceRole } from "@/lib/ai/art-director/types";
 import { IMAGE_GEN_DEFAULTS } from "./defaults";
 import type { LogoPlacement } from "./logo-composite";
 import type { CreativeProfile, ArtSpec, BriefingCopy, DemandReference } from "./prompt-compiler";
+import { CATEGORY_META, isReferenceCategory } from "@/lib/image-library/categories";
 
 // ---------------------------------------------------------------------------
 // Config
@@ -93,6 +94,8 @@ type DemandRefRow = {
   storage_url: string;
   role: string | null;
   position: number;
+  arte_index: number | null;
+  category: string | null;
 };
 
 /** Referência resolvida pela camada de direção de arte — fonte única da ordem. */
@@ -211,14 +214,20 @@ async function runJob(
   // Carrega referências pontuais da demanda (ordenadas por position)
   const { data: demandRefRows } = await supabase
     .from("demand_reference_image")
-    .select("storage_url, role, position")
+    .select("storage_url, role, position, arte_index, category")
     .eq("demand_id", job.demand_id)
     .order("position", { ascending: true });
 
-  const demandRefs: DemandReference[] = (demandRefRows ?? []).map((r: DemandRefRow) => ({
-    url: r.storage_url,
-    role: r.role,
-  }));
+  // Imagens do acervo escolhidas para uma arte específica só entram no job
+  // dessa arte, com a instrução da categoria como papel.
+  const demandRefs: DemandReference[] = (demandRefRows ?? [])
+    .filter((r: DemandRefRow) => r.arte_index === null || r.arte_index === job.art_index)
+    .map((r: DemandRefRow) => ({
+      url: r.storage_url,
+      role: isReferenceCategory(r.category)
+        ? `${CATEGORY_META[r.category].label}: ${CATEGORY_META[r.category].instruction}`
+        : r.role,
+    }));
 
   // Referências escolhidas pelo diretor de arte, já ordenadas. Quando existem,
   // elas são a ordem canônica — não há espelhamento com buildOrderedRefs.
@@ -279,7 +288,17 @@ async function runJob(
       : ((profile?.style_reference_urls as string[]) ?? []),
   };
 
-  const effectiveLogoUrl = flowLogoUrl ?? profile?.logo_url ?? null;
+  let effectiveLogoUrl = flowLogoUrl?.trim() || profile?.logo_url?.trim() || null;
+  if (!effectiveLogoUrl && job.client_id) {
+    const { data: onboarding, error: logoError } = await supabase
+      .from("onboarding_answers").select("answers").eq("client_id", job.client_id).maybeSingle();
+    if (logoError) throw new Error("Não foi possível carregar a logo do cliente");
+    const answers = onboarding?.answers as { logoUrl?: unknown } | null;
+    effectiveLogoUrl = typeof answers?.logoUrl === "string" ? answers.logoUrl.trim() || null : null;
+  }
+  if (!effectiveLogoUrl) {
+    throw new Error("Logo do cliente não encontrada. Cadastre a logo antes de gerar; a arte não será entregue sem ela.");
+  }
 
   const textSpec: TechnicalBlockSpec = {
     headline: artSpec.headline,
@@ -304,7 +323,8 @@ async function runJob(
         approvedPrompt,
         textSpec,
         styleRefs.map((r) => ({ role: r.role, intent: r.intent })),
-        fixNotes
+        fixNotes,
+        job.direction?.negative
       );
     }
     // Sem diretor (canvas de fluxo): prompt compilado + os mesmos padrões.
@@ -371,7 +391,8 @@ async function runJob(
       };
     }
 
-    if (!best || (review?.score ?? 0) > (best.review?.score ?? 0)) {
+    if (!best || (review?.pass && !best.review?.pass) ||
+        (Boolean(review?.pass) === Boolean(best.review?.pass) && (review?.score ?? 0) > (best.review?.score ?? 0))) {
       best = { raw, final, prompt, review };
     }
 

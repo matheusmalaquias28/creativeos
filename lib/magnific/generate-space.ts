@@ -2,9 +2,18 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { parseOnboardingAnswers } from "@/services/onboarding";
 import { MagnificMcpSession, MagnificToolError } from "./mcp-client";
 import { firstString } from "./extract";
-import { buildMagnificSpaceQuery, type CreativeProfileBrief } from "./build-space-query";
+import {
+  buildMagnificSpaceQuery,
+  type ArteReferenceMention,
+  type CreativeProfileBrief,
+} from "./build-space-query";
 import { parseSpaceStateNodes } from "./space-state";
 import type { DemandArte, MagnificSpaceNode } from "@/types/demand";
+import {
+  MAX_REFERENCES_PER_ARTE,
+  isReferenceCategory,
+  type ReferenceCategory,
+} from "@/lib/image-library/categories";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ADD_CREATIONS_BATCH = 20; // limite do spaces_add_creations
@@ -96,15 +105,44 @@ async function fetchClientReferenceUrls(clientId: string): Promise<string[]> {
   return (data ?? []).map((row) => row.public_url);
 }
 
-async function fetchDemandReferenceUrls(demandId: string): Promise<string[]> {
+type DemandReferences = {
+  /** Referências gerais da demanda (sem arte) — sobem no Space sem menção no prompt. */
+  generalUrls: string[];
+  /** Imagens escolhidas por arte, com a categoria de uso — mencionadas no prompt. */
+  perArte: { arteIndex: number; category: ReferenceCategory; url: string }[];
+};
+
+async function fetchDemandReferences(demandId: string, arteCount: number): Promise<DemandReferences> {
   const supabase = createAdminClient();
   const { data } = await supabase
     .from("demand_reference_image")
-    .select("storage_url")
+    .select("storage_url, arte_index, category")
     .eq("demand_id", demandId)
     .order("position", { ascending: true });
 
-  return (data ?? []).map((row) => row.storage_url);
+  const generalUrls: string[] = [];
+  const perArte: DemandReferences["perArte"] = [];
+  const perArteCount = new Map<number, number>();
+
+  for (const row of data ?? []) {
+    const arteIndex = row.arte_index;
+    if (arteIndex === null || arteIndex === undefined) {
+      generalUrls.push(row.storage_url);
+      continue;
+    }
+    // Arte removida do briefing depois da escolha: a imagem fica órfã e não entra.
+    if (arteIndex >= arteCount) continue;
+    const used = perArteCount.get(arteIndex) ?? 0;
+    if (used >= MAX_REFERENCES_PER_ARTE) continue;
+    perArteCount.set(arteIndex, used + 1);
+    perArte.push({
+      arteIndex,
+      category: isReferenceCategory(row.category) ? row.category : "style",
+      url: row.storage_url,
+    });
+  }
+
+  return { generalUrls, perArte };
 }
 
 async function fetchCreativeProfile(
@@ -194,11 +232,11 @@ export async function generateMagnificSpace(
   opts: { signal?: AbortSignal } = {}
 ): Promise<GenerateSpaceOutcome> {
   const { signal } = opts;
-  const [clientPhotoUrls, clientReferenceUrls, demandRefUrls, profile, onboardingLogoUrl] =
+  const [clientPhotoUrls, clientReferenceUrls, demandRefs, profile, onboardingLogoUrl] =
     await Promise.all([
       fetchClientPhotoUrls(input.clientId),
       fetchClientReferenceUrls(input.clientId),
-      fetchDemandReferenceUrls(input.demandId),
+      fetchDemandReferences(input.demandId, input.artes.length),
       fetchCreativeProfile(input.clientId),
       fetchOnboardingLogoUrl(input.clientId),
     ]);
@@ -210,7 +248,8 @@ export async function generateMagnificSpace(
       ...clientPhotoUrls,
       ...clientReferenceUrls,
       ...(profile?.styleUrls ?? []),
-      ...demandRefUrls,
+      ...demandRefs.generalUrls,
+      ...demandRefs.perArte.map((ref) => ref.url),
     ])
   );
 
@@ -230,17 +269,30 @@ export async function generateMagnificSpace(
     // 2. Upload das imagens → identifiers → nós no Space
     step = "upload-references";
     const identifiers: string[] = [];
-    let logoIdentifier: string | null = null;
+    const identifierByUrl = new Map<string, string>();
     for (const url of imageUrls) {
       const uploaded = await session.callTool("creations_upload_image", { url }, signal);
       const id = firstString(uploaded, ["identifier", "creationIdentifier"]);
       if (id) {
         identifiers.push(id);
-        if (logoUrl && url === logoUrl) logoIdentifier = id;
+        identifierByUrl.set(url, id);
       } else console.warn(`[generate-space] upload sem identifier: ${url}`);
     }
 
-    const brief = buildMagnificSpaceQuery(input.artes, profile?.brief ?? null, logoIdentifier);
+    const logoIdentifier = logoUrl ? identifierByUrl.get(logoUrl) ?? null : null;
+    // Sem identifier o node não pode ser mencionado — a imagem ainda entra no
+    // Space, só não ganha instrução de uso no prompt.
+    const arteReferences: ArteReferenceMention[] = demandRefs.perArte.flatMap((ref) => {
+      const identifier = identifierByUrl.get(ref.url);
+      return identifier ? [{ arteIndex: ref.arteIndex, category: ref.category, identifier }] : [];
+    });
+
+    const brief = buildMagnificSpaceQuery(
+      input.artes,
+      profile?.brief ?? null,
+      logoIdentifier,
+      arteReferences
+    );
 
     step = "spaces_add_creations";
     await addCreationsInBatches(session, space.spaceId, identifiers, signal);

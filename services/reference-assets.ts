@@ -69,7 +69,7 @@ export async function getClientArtReadiness(
     .maybeSingle();
 
   if (error) throw new Error(error.message);
-  return (data as ClientArtReadiness | null) ?? null;
+  return data ? { ...(data as ClientArtReadiness), is_ready: Boolean(data.has_logo) } : null;
 }
 
 /** Motivos legíveis do que falta — o operador não deve descobrir isso só após clicar. */
@@ -78,13 +78,6 @@ export function missingForReadiness(readiness: ClientArtReadiness | null): strin
 
   const missing: string[] = [];
   if (!readiness.has_logo) missing.push("logo");
-  if (!readiness.has_palette) missing.push("paleta com ao menos 2 cores");
-  if (!readiness.has_dna) missing.push("DNA visual extraído");
-  if (readiness.reference_count < 4) {
-    missing.push(`${4 - readiness.reference_count} referência(s) no acervo`);
-  } else if (readiness.style_reference_count < 1) {
-    missing.push("ao menos 1 referência de estilo");
-  }
   return missing;
 }
 

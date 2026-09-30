@@ -53,11 +53,11 @@ export const CTA_BOTTOM = 0.89;
 function roleSentence(ref: TechnicalBlockRef, index: number, masterIndex: number): string {
   const intent = ref.intent?.trim();
   if (ref.role === "personagem") {
-    return `is a real photo of the client — this exact person appears in the ad; never alter face, body, age or identity.${intent ? ` ${intent}` : ""}`;
+    return `is a real subject supplied by the client — preserve the actual person, product or place; do not invent or replace its identity.${intent ? ` ${intent}` : ""}`;
   }
   if (index === masterIndex) {
     return (
-      "is the LAYOUT & TYPOGRAPHY MASTER: recreate its design language — grid, alignment, " +
+      "is the LAYOUT REFERENCE: adapt only its stated design attributes — grid, alignment, " +
       "type pairing and scale contrast, emphasis treatment, graphic devices and finishing — " +
       "for the new content. Never copy its words, logo or brand." +
       (intent ? ` Focus: ${intent}` : "")
@@ -71,7 +71,7 @@ export function buildReferenceBlock(refs: TechnicalBlockRef[]): string {
   if (usable.length === 0) return "";
 
   // O mestre é a primeira referência de estilo/layout (fotos do cliente vêm antes).
-  const masterIndex = usable.findIndex((r) => r.role !== "personagem");
+  const masterIndex = usable.findIndex((r) => r.role === "layout");
   const lines = usable.map(
     (ref, i) => `- Image ${i + 1} ${roleSentence(ref, i, masterIndex)}`
   );
@@ -92,7 +92,7 @@ export function buildTextBlock(spec: TechnicalBlockSpec): string {
   return [
     "- TEXT: render ONLY these strings, exactly as written — same letter case (never convert to ALL CAPS unless already written so), correct Brazilian Portuguese accents and punctuation — and nothing else:",
     ...strings,
-    "  No other words anywhere: no invented phrases, prices, dates, seals, signatures or watermarks. The only allowed extra is one oversized decorative echo of a single word taken from the headline, if the layout calls for it.",
+    "  No other words anywhere: no invented phrases, prices, dates, seals, signatures or watermarks. Do not duplicate headline words as decoration.",
     "  Props carry no readable text and never any English words: documents and papers have NO title or heading (never \"CONTRACT\", \"CONTRATO\" or similar) — only soft grey illegible lines; screens and signs are blank or blurred; vehicles and products show no brand badges.",
   ].join("\n");
 }
@@ -105,7 +105,7 @@ export function buildStandardsBlock(spec: TechnicalBlockSpec): string {
   ];
   if (spec.cta) {
     lines.push(
-      `- BUTTON: render "${spec.cta}" as a refined button (filled or outlined, generous padding), horizontally centred, its bottom edge at about ${pct(CTA_BOTTOM)} of the canvas height. It must read unmistakably as a tappable button.`
+      `- BUTTON: render "${spec.cta}" as a refined button (filled or outlined, generous padding), positioned according to the brief and aligned with its grid, at least 7% from the sides and 9% from the bottom. Preserve breathing room around it; it must not compete with the headline.`
     );
   }
   lines.push(buildTextBlock(spec));
@@ -135,7 +135,8 @@ export function appendTechnicalBlock(
   approvedPrompt: string,
   spec: TechnicalBlockSpec,
   refs: TechnicalBlockRef[],
-  fixNotes?: string[]
+  fixNotes?: string[],
+  negative?: string[]
 ): string {
   const parts: string[] = [];
 
@@ -144,6 +145,7 @@ export function appendTechnicalBlock(
 
   parts.push(sanitizeBrief(approvedPrompt.trim()));
   parts.push(buildStandardsBlock(spec));
+  if (negative?.length) parts.push(["AVOID IN THIS AD:", ...negative.map((n) => `- ${n}`)].join("\n"));
 
   if (fixNotes?.length) {
     parts.push(

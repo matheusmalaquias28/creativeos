@@ -28,12 +28,8 @@ export function ReadinessChips({ readiness }: { readiness: ClientArtReadiness | 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       <Chip ok={readiness.has_logo} label="logo" />
-      <Chip ok={readiness.has_palette} label="paleta" />
-      <Chip ok={readiness.has_dna} label="DNA visual" />
-      <Chip
-        ok={readiness.reference_count >= 4 && readiness.style_reference_count >= 1}
-        label={`${readiness.reference_count} referências`}
-      />
+      <Badge variant="outline">{readiness.has_dna ? "Identidade disponível" : "Sem identidade fixa"}</Badge>
+      <Badge variant="outline">{readiness.reference_count} inspirações opcionais</Badge>
     </div>
   );
 }

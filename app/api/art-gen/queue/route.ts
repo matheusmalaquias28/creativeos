@@ -70,20 +70,20 @@ export async function POST(request: Request) {
   // Valida o kit antes de responder, para a UI mostrar o motivo na hora.
   const { data: readiness } = await supabase
     .from("client_art_readiness")
-    .select("is_ready")
+    .select("has_logo")
     .eq("client_id", demand.client_id)
     .maybeSingle();
 
-  if (!readiness?.is_ready) {
+  if (!readiness?.has_logo) {
     return NextResponse.json(
-      { error: "Cliente sem kit completo (logo, paleta, DNA e 4+ referências)" },
+      { error: "Cadastre a logo do cliente. Identidade visual e referências são opcionais." },
       { status: 422 }
     );
   }
 
   after(async () => {
     try {
-      await prepareDemandPrompts(demandId, { parallel: true });
+      await prepareDemandPrompts(demandId);
       if (skipGenerate) return;
       const approved = await approveAllPrompts(demandId, null);
       if (approved > 0) await runWorker(demandId);

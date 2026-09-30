@@ -39,6 +39,9 @@ export function PromptReviewBoard({
   const [jobs, setJobs] = useState<PromptJob[]>(initialJobs);
   const [arts, setArts] = useState<Record<string, string>>(initialArts);
   const [preparing, setPreparing] = useState(false);
+  const [visualMode, setVisualMode] = useState(String(initialJobs[0]?.params.visual_mode_override ?? "inherit"));
+  const [visualNotes, setVisualNotes] = useState(String(initialJobs[0]?.params.visual_notes ?? ""));
+  const [reviewFirst, setReviewFirst] = useState(false);
   const [approvingAll, setApprovingAll] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
@@ -131,15 +134,15 @@ export function PromptReviewBoard({
       const res = await fetch("/api/art-gen/prepare", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ demandId }),
+        body: JSON.stringify({ demandId, generate: !reviewFirst, visualMode: visualMode === "inherit" ? undefined : visualMode, visualNotes }),
       });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) {
         toast.error(data.error ?? "Erro ao gerar prompts");
         return;
       }
-      setArts({});
-      toast.success("Dirigindo as artes — os prompts aparecem conforme ficam prontos");
+
+      toast.success(reviewFirst ? "Preparando conceitos para revisão" : "Criando as artes a partir da copy");
     } catch {
       toast.error("Erro ao gerar prompts");
     } finally {
@@ -217,10 +220,29 @@ export function PromptReviewBoard({
     [arts, lightboxItems]
   );
 
-  const busy = writingCounts.working > 0;
+  const busy = writingCounts.working > 0 || renderCounts.working > 0;
 
   return (
     <div className="space-y-6">
+      <section className="surface-panel space-y-4 p-5">
+        <h2 className="text-sm font-semibold">A copy já está aqui. A IA cuida da direção visual.</h2>
+        <p className="text-sm text-muted-foreground">Pode gerar agora ou personalizar esta demanda. As preferências do cliente continuam salvas.</p>
+        <label className="block space-y-2 text-sm">
+          <span>Liberdade visual desta demanda</span>
+          <select value={visualMode} onChange={(e) => setVisualMode(e.target.value)} disabled={preparing || busy} className="w-full rounded-lg border border-border bg-background p-3">
+            <option value="inherit">Usar preferência do cliente</option>
+            <option value="free">Criação livre</option>
+            <option value="guided">Seguir as orientações abaixo</option>
+            <option value="brand">Seguir identidade existente</option>
+          </select>
+        </label>
+        <label className="block space-y-2 text-sm">
+          <span>Observação visual (opcional; não aparece como texto na arte)</span>
+          <textarea value={visualNotes} onChange={(e) => setVisualNotes(e.target.value)} disabled={preparing || busy} maxLength={2000} rows={2} className="w-full rounded-lg border border-border bg-background p-3" placeholder="Ex.: composição editorial, fundo claro, título marcante e bastante respiro." />
+        </label>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={reviewFirst} onChange={(e) => setReviewFirst(e.target.checked)} disabled={preparing || busy} />Revisar conceitos antes de gerar imagens</label>
+        {!reviewFirst && <p className="text-xs text-muted-foreground">Ao gerar, a IA prepara os conceitos e gera as imagens automaticamente, usando os créditos de geração.</p>}
+      </section>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <Button
@@ -233,7 +255,7 @@ export function PromptReviewBoard({
             ) : (
               <Wand2 className="size-4" />
             )}
-            {jobs.length > 0 ? "Gerar prompts de novo" : "Gerar prompts"}
+            {reviewFirst ? "Preparar conceitos" : jobs.length > 0 ? "Gerar novas artes" : "Gerar artes"}
           </Button>
 
           {awaiting > 0 && (
@@ -274,7 +296,7 @@ export function PromptReviewBoard({
           )}
         >
           <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-          <span>Cliente sem kit completo — falta: {missing.join(", ")}.</span>
+          <span>Para começar, falta: {missing.join(", ")}.</span>
         </p>
       )}
 
@@ -282,8 +304,8 @@ export function PromptReviewBoard({
         <EmptyState
           icon={Wand2}
           tone="pink"
-          title="Nenhum prompt ainda"
-          description="Gere os prompts para revisar antes de queimar crédito de imagem."
+          title="Pronto para criar a partir da copy"
+          description="Identidade e referências são opcionais. A IA define conceito, tipografia, hierarquia e composição."
         />
       ) : (
         <div className="space-y-5">

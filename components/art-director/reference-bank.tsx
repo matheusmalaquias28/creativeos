@@ -167,7 +167,7 @@ export function ReferenceBank({ clientId, assets }: Props) {
           icon={ImageIcon}
           tone="violet"
           title="Acervo vazio"
-          description="São necessárias 4 referências (pelo menos 1 de estilo) para gerar prompts com IA para este cliente."
+          description="Referências são opcionais. Você pode gerar a partir da copy; as imagens do onboarding já ficam disponíveis para a IA."
         />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

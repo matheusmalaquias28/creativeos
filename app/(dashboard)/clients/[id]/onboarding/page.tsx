@@ -29,7 +29,7 @@ export default async function OnboardingPage({ params }: PageProps) {
   return (
     <DashboardPage
       title="Briefing do cliente"
-      description="Envie a logo, fotos do cliente e uma arte de referência. A IA extrai a identidade visual e usa como memória em todas as demandas."
+      description="Cadastre a logo e escolha a liberdade visual. A copy vem da demanda; fotos, referências e identidade são opcionais."
       backHref={`/clients/${id}`}
       backLabel={client.name}
     >

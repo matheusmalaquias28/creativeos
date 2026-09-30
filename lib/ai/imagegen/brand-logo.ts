@@ -96,7 +96,16 @@ const BG_RAMP = 70;
  * Devolve a logo em PNG com fundo transparente e recortada rente ao desenho.
  * Logos que já têm transparência significativa só são recortadas.
  */
+async function requireVisibleLogo(input: Buffer): Promise<Buffer> {
+  const { data } = await sharp(input).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  let visiblePixels = 0;
+  for (let i = 3; i < data.length; i += 4) if (data[i] >= 32) visiblePixels++;
+  if (visiblePixels < 4) throw new Error("Logo sem conteúdo visível. Envie uma versão legível da logo, preferencialmente PNG transparente.");
+  return input;
+}
+
 export async function prepareLogo(input: Buffer): Promise<Buffer> {
+  await requireVisibleLogo(input);
   const { data, info } = await sharp(input)
     .ensureAlpha()
     .raw()
@@ -106,7 +115,7 @@ export async function prepareLogo(input: Buffer): Promise<Buffer> {
   let transparent = 0;
   for (let i = 3; i < data.length; i += 4) if (data[i] < 250) transparent++;
   if (transparent / (w * h) > 0.05) {
-    return sharp(input).ensureAlpha().trim().png().toBuffer();
+    return requireVisibleLogo(await sharp(input).ensureAlpha().trim().png().toBuffer());
   }
 
   // Cor de fundo = mediana dos pixels da borda (resiste a ruído e gradiente leve).
@@ -132,7 +141,9 @@ export async function prepareLogo(input: Buffer): Promise<Buffer> {
     }
   }
 
-  return sharp(out, { raw: { width: w, height: h, channels: 4 } }).trim().png().toBuffer();
+  const result = await sharp(out, { raw: { width: w, height: h, channels: 4 } }).png().toBuffer();
+  await requireVisibleLogo(result);
+  return requireVisibleLogo(await sharp(result).trim().png().toBuffer());
 }
 
 async function recolor(logo: Buffer, [r, g, b]: [number, number, number]): Promise<Buffer> {
@@ -171,6 +182,7 @@ export async function compositeBrandLogo(params: {
   logo: Buffer;
   palette?: string[];
 }): Promise<BrandLogoResult> {
+  await requireVisibleLogo(params.logo);
   const meta = await sharp(params.art).metadata();
   const W = meta.width ?? 1024;
   const H = meta.height ?? 1365;

@@ -183,7 +183,7 @@ export default async function ClientDetailPage({ params }: PageProps) {
         <section className="space-y-4">
           <SectionHeader
             title="Fluxo de trabalho"
-            description="Do briefing ao prompt — cada etapa libera a próxima"
+            description="Logo e copy bastam para criar nas demandas. Identidade e referências são opcionais."
             icon={Workflow}
             tone="violet"
           />
@@ -193,8 +193,8 @@ export default async function ClientDetailPage({ params }: PageProps) {
                 title="Onboarding"
                 description={
                   onboardingDone
-                    ? "Logo, fotos e DNA visual configurados"
-                    : "Logo, fotos e extrator de identidade visual"
+                    ? "Cadastro e materiais do cliente"
+                    : "Logo e preferências visuais; referências opcionais"
                 }
                 icon={ClipboardList}
                 tone="orange"
@@ -221,7 +221,7 @@ export default async function ClientDetailPage({ params }: PageProps) {
                     {creativeBrain ? "Brand DNA estruturado do cliente" : "Brand DNA ainda não gerado"}
                     {!briefingComplete && (
                       <span className="mt-1 block text-xs">
-                        Extraia a identidade visual no briefing para habilitar a geração.
+                        A extração de identidade habilita o Creative Brain; ela é opcional para gerar artes nas demandas.
                       </span>
                     )}
                   </>

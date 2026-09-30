@@ -17,6 +17,8 @@ export type CreateClientFormValues = z.infer<typeof createClientSchema>;
 export const onboardingSchema = z.object({
   logoUrl: z.string().optional(),
   logoStoragePath: z.string().optional(),
+  visualMode: z.enum(["free", "guided", "brand"]).optional(),
+  visualNotes: z.string().max(2000).optional(),
 });
 
 export type OnboardingFormValues = z.infer<typeof onboardingSchema>;

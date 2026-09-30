@@ -14,7 +14,7 @@ import type { Database } from "@/types/database";
 import { ART_ASPECT_RATIO, ART_IMAGE_SIZE_FALLBACK } from "./constants";
 import type { VisualIdentityDna } from "@/lib/schemas/visual-identity";
 import { buildReferenceCatalog } from "./catalog";
-import { enforceDistinctReferenceSets, type ArtReferenceSet } from "./dedupe";
+import { resolveVisualMode, type VisualMode } from "./visual-policy";
 import { directArt } from "./direct-art";
 import type {
   ArtDirection,
@@ -35,6 +35,7 @@ type Supabase = ReturnType<typeof createAdminClient>;
 
 export type PrepareResult = {
   jobsPrepared: number;
+  jobIds: string[];
   warnings: string[];
 };
 
@@ -66,7 +67,7 @@ export async function loadReferenceAssets(
 
   if (error) throw new Error(`Falha ao carregar o acervo: ${error.message}`);
 
-  return (data ?? []).map((row) => ({
+  const assets: ReferenceAsset[] = (data ?? []).map((row) => ({
     id: row.id as string,
     kind: row.kind as ReferenceKind,
     storageUrl: row.storage_url as string,
@@ -76,6 +77,19 @@ export async function loadReferenceAssets(
     lastUsedAt: (row.last_used_at as string | null) ?? null,
     isWinner: Boolean(row.is_winner),
   }));
+  const [{ data: profile, error: profileError }, { data: legacy, error: legacyError }] = await Promise.all([
+    supabase.from("client_creative_profile").select("identity_sample_urls, style_reference_urls").eq("client_id", clientId).maybeSingle(),
+    supabase.from("client_references").select("public_url").eq("client_id", clientId).order("sort_order", { ascending: true }),
+  ]);
+  if (profileError || legacyError) throw new Error("Falha ao carregar referências do cliente");
+  const urls = [...(Array.isArray(profile?.identity_sample_urls) ? profile.identity_sample_urls : []), ...(Array.isArray(profile?.style_reference_urls) ? profile.style_reference_urls : []), ...(legacy ?? []).map((r) => r.public_url)];
+  const seen = new Set((data ?? []).map((r) => r.storage_url));
+  for (const url of urls) {
+    if (typeof url !== "string" || !url || seen.has(url)) continue;
+    seen.add(url);
+    assets.push({ id: `inherited:${assets.length}`, kind: "estilo", storageUrl: url, aiDescription: "Referência cadastrada no cliente", aiTags: [], usageCount: 0, lastUsedAt: null, isWinner: false });
+  }
+  return assets;
 }
 
 /**
@@ -166,7 +180,7 @@ async function persistReferences(
       storage_url: photo.url,
       role: "personagem",
       intent:
-        "foto real do cliente — é esta pessoa que aparece na arte, sem alterar rosto, corpo ou identidade",
+        "material real do cliente — preserve a pessoa, produto ou ambiente retratado sem alterar sua identidade",
       position: rows.length,
       source: "client_fixed",
     });
@@ -175,7 +189,7 @@ async function persistReferences(
   for (const ref of direction.references) {
     rows.push({
       job_id: jobId,
-      asset_id: ref.assetId,
+      asset_id: ref.assetId.startsWith("inherited:") ? null : ref.assetId,
       storage_url: ref.storageUrl,
       role: ref.role,
       intent: ref.intent,
@@ -191,7 +205,7 @@ async function persistReferences(
 }
 
 function masterToken(direction: ArtDirection, catalog: ReferenceCatalog): string | null {
-  const master = direction.references[0];
+  const master = direction.references.find((r) => r.role === "layout");
   if (!master) return null;
   return catalog.entries.find((e) => e.asset.id === master.assetId)?.token ?? null;
 }
@@ -221,7 +235,7 @@ function buildMeta(
 
 export async function prepareDemandPrompts(
   demandId: string,
-  options: { parallel?: boolean } = {}
+  options: { parallel?: boolean; visualMode?: VisualMode; visualNotes?: string } = {}
 ): Promise<PrepareResult> {
   const supabase = createAdminClient();
 
@@ -234,21 +248,17 @@ export async function prepareDemandPrompts(
   if (demandError || !demand) throw new Error("Demanda não encontrada");
   if (!demand.client_id) throw new Error("Demanda sem cliente vinculado");
 
+  const { count: activeCount, error: activeError } = await supabase.from("art_generation_job").select("id", { count: "exact", head: true }).eq("demand_id", demandId).in("status", ["draft", "writing_prompt", "queued", "processing"]);
+  if (activeError) throw new Error(activeError.message);
+  if (activeCount) throw new Error("Esta demanda já tem uma geração em andamento");
+
   const { data: readiness } = await supabase
     .from("client_art_readiness")
     .select("is_ready, has_logo, has_palette, has_dna, reference_count, logo_url")
     .eq("client_id", demand.client_id)
     .maybeSingle();
 
-  if (!readiness?.is_ready) {
-    const missing = [
-      !readiness?.has_logo ? "logo" : null,
-      !readiness?.has_palette ? "paleta" : null,
-      !readiness?.has_dna ? "DNA visual" : null,
-      (readiness?.reference_count ?? 0) < 4 ? "pelo menos 4 referências" : null,
-    ].filter(Boolean);
-    throw new Error(`Cliente sem kit completo — falta: ${missing.join(", ")}`);
-  }
+  if (!readiness?.has_logo) throw new Error("Cadastre a logo do cliente antes de gerar");
 
   const { data: profileRow } = await supabase
     .from("client_creative_profile")
@@ -259,11 +269,14 @@ export async function prepareDemandPrompts(
     .maybeSingle();
 
   const profile = (profileRow ?? {}) as ProfileRow;
+  const { data: onboarding } = await supabase.from("onboarding_answers").select("answers").eq("client_id", demand.client_id).maybeSingle();
+  const answers = (onboarding?.answers ?? {}) as { visualMode?: string; visualNotes?: string };
+  const visualMode = options.visualMode ?? resolveVisualMode(answers.visualMode, Boolean(profile.visual_identity_dna));
   const assets = await loadReferenceAssets(supabase, demand.client_id);
   const catalog = buildReferenceCatalog(assets);
 
   const artes = Array.isArray(demand.artes) ? (demand.artes as Record<string, unknown>[]) : [];
-  if (artes.length === 0) return { jobsPrepared: 0, warnings: ["Demanda sem artes"] };
+  if (artes.length === 0) return { jobsPrepared: 0, jobIds: [], warnings: ["Demanda sem artes"] };
 
   const briefing = (demand.briefing ?? {}) as Record<string, unknown>;
 
@@ -291,6 +304,12 @@ export async function prepareDemandPrompts(
     art_index: index,
     status: "draft" as const,
     params: {
+      flow_logo_url: effectiveLogoUrl,
+      visual_mode: visualMode,
+      visual_mode_override: options.visualMode ?? "inherit",
+      visual_notes: options.visualNotes?.trim() ?? "",
+      client_visual_notes: answers.visualNotes ?? "",
+      visual_observation: typeof arte.observacaoVisual === "string" ? arte.observacaoVisual : "",
       headline: (arte.headline as string) ?? null,
       subheadline: (arte.subheadline as string) ?? null,
       cta: (arte.cta as string) ?? null,
@@ -316,10 +335,12 @@ export async function prepareDemandPrompts(
 
   const clientContext: ArtDirectionInput["client"] = {
     name: String((demand as { client_name_external?: string }).client_name_external ?? "cliente"),
-    dna,
-    basePrompt: profile.base_prompt ?? "",
-    palette: resolvePalette(profile.palette, dna),
-    directionNotes: parseDirectionNotes(profile.direction_notes),
+    dna: visualMode === "brand" ? dna : null,
+    basePrompt: visualMode === "brand" ? profile.base_prompt ?? "" : "",
+    palette: visualMode === "brand" ? resolvePalette(profile.palette, dna) : [],
+    visualMode,
+    visualNotes: answers.visualNotes ?? "",
+    directionNotes: visualMode === "brand" ? parseDirectionNotes(profile.direction_notes) : [],
   };
 
   const siblings: SiblingConcept[] = [];
@@ -358,7 +379,7 @@ export async function prepareDemandPrompts(
         siblings: extra.siblings,
         assignedMaster: extra.assignedMaster,
         clientPhotos: [],
-        steer: null,
+        steer: [options.visualNotes, params.visual_observation].filter(Boolean).join("\n") || null,
       });
       directions.push({ jobId: job.id as string, artIndex, direction });
       return direction;
@@ -377,12 +398,10 @@ export async function prepareDemandPrompts(
     // Em paralelo, a variedade vem de mestres distintos pré-atribuídos (do menos
     // usado para o mais usado), já que as irmãs ainda não existem.
     await Promise.all(
-      jobs.map((job, i) =>
+      jobs.map((job) =>
         directJob(job, {
           siblings: [],
-          assignedMaster: catalog.entries.length
-            ? catalog.entries[i % catalog.entries.length].token
-            : null,
+          assignedMaster: null,
         })
       )
     );
@@ -400,20 +419,10 @@ export async function prepareDemandPrompts(
     }
   }
 
-  // Rede de anti-repetição: instrução não é garantia, e 5 artes iguais é o
-  // pior modo de falha para quem revisa.
-  const sets: ArtReferenceSet[] = directions.map((d) => ({
-    artIndex: d.artIndex,
-    references: d.direction.references,
-  }));
-  const deduped = enforceDistinctReferenceSets(sets, catalog);
-  warnings.push(...deduped.warnings);
-
-  for (const [i, entry] of directions.entries()) {
-    const direction: ArtDirection = {
-      ...entry.direction,
-      references: deduped.sets[i]?.references ?? entry.direction.references,
-    };
+  // Preserve the references used to write each concept. Swapping them later
+  // makes the visual brief contradict the images sent to the image model.
+  for (const entry of directions) {
+    const direction = entry.direction;
 
     await persistReferences(
       supabase,
@@ -436,7 +445,7 @@ export async function prepareDemandPrompts(
       .eq("id", entry.jobId);
   }
 
-  return { jobsPrepared: directions.length, warnings };
+  return { jobsPrepared: directions.length, jobIds: directions.map((d) => d.jobId), warnings };
 }
 
 // ---------------------------------------------------------------------------
@@ -506,15 +515,18 @@ export async function rewriteJobPrompt(
     .eq("id", jobId);
 
   const params = job.params as Record<string, unknown>;
+  const visualMode = resolveVisualMode(params.visual_mode, Boolean(dna));
 
   try {
     const direction = await directArt({
       client: {
         name: "cliente",
-        dna,
-        basePrompt: profile.base_prompt ?? "",
-        palette: resolvePalette(profile.palette, dna),
-        directionNotes: parseDirectionNotes(profile.direction_notes),
+        dna: visualMode === "brand" ? dna : null,
+        basePrompt: visualMode === "brand" ? profile.base_prompt ?? "" : "",
+        palette: visualMode === "brand" ? resolvePalette(profile.palette, dna) : [],
+        visualMode,
+        visualNotes: String(params.client_visual_notes ?? ""),
+        directionNotes: visualMode === "brand" ? parseDirectionNotes(profile.direction_notes) : [],
       },
       catalog,
       demand: {
@@ -532,7 +544,7 @@ export async function rewriteJobPrompt(
       },
       siblings,
       clientPhotos,
-      steer,
+      steer: [params.visual_notes, params.visual_observation, steer].filter(Boolean).join("\n") || null,
     });
 
     await persistReferences(

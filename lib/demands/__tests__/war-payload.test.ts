@@ -71,3 +71,12 @@ describe("WAR direct payload", () => {
     expect(parsed.briefing.driveMateriais).toBe(FOLDER);
   });
 });
+
+
+describe("visual observation import", () => {
+  it("keeps visual direction separate from additional printed copy", () => {
+    const parsed = parseMakeDemandPayload({ id: "demand", clientName: "Cliente", artes: [{ headline: "Título", informacoesExtras: "Oferta válida hoje", observacaoVisual: "Fundo claro e bastante respiro" }] });
+    expect(parsed?.artes[0].observacaoVisual).toBe("Fundo claro e bastante respiro");
+    expect(parsed?.artes[0].informacoesExtras).toBe("Oferta válida hoje");
+  });
+});
