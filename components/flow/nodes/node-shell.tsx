@@ -13,6 +13,8 @@ export const FLOW_NODE_TONE = {
   gerarImagem: "pink",
   saidaArte: "green",
   referenciaImagem: "orange",
+  listaImagens: "cyan",
+  arte: "pink",
 } as const satisfies Record<string, Tone>;
 
 /** Handle padrão dos nós (conector em violeta de marca). */

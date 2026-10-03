@@ -1,7 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { runWorker } from "@/lib/ai/imagegen/worker";
-import { extractFlowJobParams } from "@/lib/flow/extract-flow-jobs";
+import { extractFlowJobParams, flowJobParamsToRow } from "@/lib/flow/extract-flow-jobs";
 import { enrichFlowGraphWithProfile } from "@/lib/flow/enrich-graph";
 import { loadFlowCreativeProfile } from "@/lib/flow/load-creative-profile";
 import { getClientFlowGraph } from "@/services/flow";
@@ -65,20 +65,8 @@ export async function POST(_req: Request, { params }: Params) {
     client_id: demand.client_id,
     art_index: p.art_index,
     status: "queued" as const,
-    params: {
-      headline: p.headline,
-      subheadline: p.subheadline,
-      cta: p.cta,
-      informacoesExtras: p.informacoesExtras,
-      aspect_ratio: p.aspect_ratio,
-      image_size: p.image_size,
-      model: p.model,
-      quality: p.quality,
-      briefing_titulo: p.briefing_titulo,
-      briefing_tipo: p.briefing_tipo,
-      flow_logo_url: p.flow_logo_url,
-      flow_references: p.flow_references,
-    },
+    ephemeral: true,
+    params: flowJobParamsToRow(p),
   }));
 
   const { error: insertError } = await supabase
@@ -89,6 +77,8 @@ export async function POST(_req: Request, { params }: Params) {
     return NextResponse.json({ error: insertError.message }, { status: 500 });
   }
 
+  // Só as artes feed rodam no "Executar" geral. Stories é disparado manualmente
+  // no próprio node (run-node) — ver extractFlowJobParams(includeStory).
   after(() =>
     runWorker(demandId).catch((err: unknown) => {
       console.error("[flow/run] worker error:", err instanceof Error ? err.message : err);

@@ -70,6 +70,8 @@ type JobRow = {
   /** Edição do operador sobre o rascunho. Vence o rascunho quando existe. */
   prompt_edited?: string | null;
   direction?: DirectionMeta | null;
+  /** Job do Space/flow — suas versões expiram (TTL de 15 dias). */
+  ephemeral?: boolean;
   params: {
     headline?: string | null;
     subheadline?: string | null;
@@ -79,6 +81,9 @@ type JobRow = {
     image_size?: string;
     model?: string;
     quality?: "low" | "medium" | "high";
+    count?: number;
+    fanout_reference_urls?: string[] | null;
+    skip_logo?: boolean;
     briefing_titulo?: string | null;
     briefing_tipo?: string | null;
     extra_reference_urls?: string[] | null;
@@ -154,6 +159,8 @@ async function publishVersion(
     resultUrl: string;
     storagePath: string;
     instruction: string | null;
+    /** TTL: quando setado, a imagem é apagada pela limpeza do Space (jobs efêmeros). */
+    expiresAt?: string | null;
   }
 ): Promise<void> {
   await supabase
@@ -170,9 +177,17 @@ async function publishVersion(
     storage_path: params.storagePath,
     instruction: params.instruction,
     is_current: true,
+    expires_at: params.expiresAt ?? null,
   });
 
   if (error) throw new Error(error.message);
+}
+
+/** TTL do Space: 15 dias a partir de agora (ISO), ou null quando não efêmero. */
+const SPACE_TTL_DAYS = 15;
+function ttlExpiresAt(ephemeral: boolean | undefined): string | null {
+  if (!ephemeral) return null;
+  return new Date(Date.now() + SPACE_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
@@ -356,17 +371,21 @@ async function runJob(
       : ((profile?.style_reference_urls as string[]) ?? []),
   };
 
+  // Stories reenquadra uma arte que JÁ tem a logo — recompor duplicaria.
+  const skipLogo = job.params.skip_logo === true;
+
   let effectiveLogoUrl = flowLogoUrl?.trim() || profile?.logo_url?.trim() || null;
-  if (!effectiveLogoUrl && job.client_id) {
+  if (!skipLogo && !effectiveLogoUrl && job.client_id) {
     const { data: onboarding, error: logoError } = await supabase
       .from("onboarding_answers").select("answers").eq("client_id", job.client_id).maybeSingle();
     if (logoError) throw new Error("Não foi possível carregar a logo do cliente");
     const answers = onboarding?.answers as { logoUrl?: unknown } | null;
     effectiveLogoUrl = typeof answers?.logoUrl === "string" ? answers.logoUrl.trim() || null : null;
   }
-  if (!effectiveLogoUrl) {
+  if (!skipLogo && !effectiveLogoUrl) {
     throw new Error("Logo do cliente não encontrada. Cadastre a logo antes de gerar; a arte não será entregue sem ela.");
   }
+  if (skipLogo) effectiveLogoUrl = null;
 
   const textSpec: TechnicalBlockSpec = {
     headline: artSpec.headline,
@@ -420,106 +439,135 @@ async function runJob(
       )
     : null;
 
-  type Candidate = { raw: Buffer; final: Buffer; prompt: string; review: ArtReview | null };
-  let best: Candidate | null = null;
-  let fixNotes: string[] | undefined;
-  let attempts = 0;
+  type Candidate = { raw: Buffer; final: Buffer; prompt: string; review: ArtReview | null; attempts: number };
 
-  while (attempts < MAX_ATTEMPTS) {
-    attempts += 1;
-    const prompt = buildPrompt(fixNotes);
+  // Gera UMA arte (com o loop de revisão/retry escolhendo o melhor candidato).
+  // `extraRef`, quando presente, é o item da Lista em modo fan-out — entra como
+  // referência principal daquela geração.
+  const generateBestCandidate = async (
+    extraRef: { url: string; intent: string } | null
+  ): Promise<Candidate> => {
+    const candidateRefs = extraRef ? [extraRef, ...references] : references;
+    let best: Candidate | null = null;
+    let fixNotes: string[] | undefined;
+    let attempts = 0;
 
-    const raw = await generateArtImage({
-      prompt,
-      references,
-      imageSize: artSpec.image_size ?? "2K",
-      aspectRatio: artSpec.aspect_ratio ?? IMAGE_GEN_DEFAULTS.aspectRatio,
-    });
-    const logoResult = cleanLogo
-      ? await compositeBrandLogo({ art: raw, logo: cleanLogo, palette: creativeProfile.palette })
-      : null;
-    const final = logoResult?.buffer ?? raw;
+    while (attempts < MAX_ATTEMPTS) {
+      attempts += 1;
+      const prompt = buildPrompt(fixNotes);
 
-    let review: ArtReview | null = null;
-    if (REVIEW_ENABLED) {
-      try {
-        review = await reviewArt({ image: final, spec: textSpec });
-      } catch (err) {
-        // Revisão é filtro de qualidade: se falhar, a arte segue para a curadoria.
-        console.warn("[worker] revisão falhou:", (err as Error)?.message ?? err);
+      const raw = await generateArtImage({
+        prompt,
+        references: candidateRefs,
+        imageSize: artSpec.image_size ?? "2K",
+        aspectRatio: artSpec.aspect_ratio ?? IMAGE_GEN_DEFAULTS.aspectRatio,
+        // Esforço do GPT Image vindo do node (ignorado por Magnific/Gemini).
+        quality: job.params.quality ?? "medium",
+      });
+      const logoResult = cleanLogo
+        ? await compositeBrandLogo({ art: raw, logo: cleanLogo, palette: creativeProfile.palette })
+        : null;
+      const final = logoResult?.buffer ?? raw;
+
+      let review: ArtReview | null = null;
+      if (REVIEW_ENABLED) {
+        try {
+          review = await reviewArt({ image: final, spec: textSpec });
+        } catch (err) {
+          // Revisão é filtro de qualidade: se falhar, a arte segue para a curadoria.
+          console.warn("[worker] revisão falhou:", (err as Error)?.message ?? err);
+        }
       }
+
+      // Checagem objetiva: logo atravessando borda/objeto reprova mesmo que a
+      // revisão visual tenha passado.
+      if (logoResult && !logoResult.backgroundOk) {
+        review = {
+          pass: false,
+          score: Math.min(review?.score ?? 6, 6),
+          fixes: [
+            ...(review?.fixes ?? []),
+            `The top band from 0% to ${Math.round(LOGO_ZONE_BAND.to * 100)}% of the height, across the middle 60% of the width, must be ONE uniform calm background area — move any edge, colour block, photo border, paper, tape, object or text out of it.`,
+          ],
+        };
+      }
+
+      if (!best || (review?.pass && !best.review?.pass) ||
+          (Boolean(review?.pass) === Boolean(best.review?.pass) && (review?.score ?? 0) > (best.review?.score ?? 0))) {
+        best = { raw, final, prompt, review, attempts };
+      }
+
+      if (!review || review.pass) break;
+      fixNotes = review.fixes;
     }
 
-    // Checagem objetiva: logo atravessando borda/objeto reprova mesmo que a
-    // revisão visual tenha passado.
-    if (logoResult && !logoResult.backgroundOk) {
-      review = {
-        pass: false,
-        score: Math.min(review?.score ?? 6, 6),
-        fixes: [
-          ...(review?.fixes ?? []),
-          `The top band from 0% to ${Math.round(LOGO_ZONE_BAND.to * 100)}% of the height, across the middle 60% of the width, must be ONE uniform calm background area — move any edge, colour block, photo border, paper, tape, object or text out of it.`,
-        ],
-      };
-    }
+    if (!best) throw new Error("Nenhuma arte gerada");
+    return best;
+  };
 
-    if (!best || (review?.pass && !best.review?.pass) ||
-        (Boolean(review?.pass) === Boolean(best.review?.pass) && (review?.score ?? 0) > (best.review?.score ?? 0))) {
-      best = { raw, final, prompt, review };
-    }
+  // Lote de gerações para este node: fan-out (1 por item da Lista) OU `count`
+  // variações do mesmo prompt. Cada uma vira uma versão na pilha do saidaArte.
+  const fanout = job.params.fanout_reference_urls ?? null;
+  const batch: ({ url: string; intent: string } | null)[] =
+    fanout && fanout.length > 0
+      ? fanout.map((url) => ({ url, intent: "item da lista — base principal desta arte" }))
+      : Array.from({ length: Math.min(6, Math.max(1, job.params.count ?? 1)) }, () => null);
 
-    if (!review || review.pass) break;
-    fixNotes = review.fixes;
+  let lastBest: Candidate | null = null;
+  for (const item of batch) {
+    const best = await generateBestCandidate(item);
+    lastBest = best;
+
+    // Upload ao Storage — final (com logo) e raw (sem logo, insumo dos ajustes).
+    const versionNumber = await nextVersionNumber(supabase, job.id, "feed");
+    const { publicUrl, storagePath } = await uploadArtToStorage({
+      buffer: best.final,
+      jobId: job.id,
+      versionNumber,
+    });
+    await uploadArtToStorage({ buffer: best.raw, jobId: job.id, versionNumber, raw: true }).catch(
+      (err) => console.warn("[worker] upload da versão sem logo falhou:", (err as Error)?.message ?? err)
+    );
+
+    // Registra na Galeria (não-fatal)
+    await supabase.from("generated_images").insert({
+      source: "artes",
+      prompt: artSpec.headline ?? briefing.titulo ?? "",
+      aspect_ratio: artSpec.aspect_ratio ?? "1:1",
+      resolution: artSpec.image_size ?? "2K",
+      storage_path: storagePath,
+      url: publicUrl,
+    }).then(({ error }) => {
+      if (error) console.error("[worker] galeria insert falhou:", error.message);
+    });
+
+    // Nova versão do formato feed — empilha (v1, v2, …); a última fica is_current.
+    await publishVersion(supabase, {
+      jobId: job.id,
+      format: "feed",
+      versionNumber,
+      resultUrl: publicUrl,
+      storagePath,
+      instruction: versionNumber > 1 ? "variação" : null,
+      expiresAt: ttlExpiresAt(job.ephemeral),
+    });
   }
 
-  if (!best) throw new Error("Nenhuma arte gerada");
-  const promptFinal = best.prompt;
+  if (!lastBest) throw new Error("Nenhuma arte gerada");
+  const promptFinal = lastBest.prompt;
 
-  // Upload ao Storage — final (com logo) e raw (sem logo, insumo dos ajustes).
-  const versionNumber = await nextVersionNumber(supabase, job.id, "feed");
-  const { publicUrl, storagePath } = await uploadArtToStorage({
-    buffer: best.final,
-    jobId: job.id,
-    versionNumber,
-  });
-  await uploadArtToStorage({ buffer: best.raw, jobId: job.id, versionNumber, raw: true }).catch(
-    (err) => console.warn("[worker] upload da versão sem logo falhou:", (err as Error)?.message ?? err)
-  );
-
-  if (job.direction && best.review) {
+  if (job.direction && lastBest.review) {
     const direction: DirectionMeta = {
       ...job.direction,
       review: {
-        pass: best.review.pass,
-        score: best.review.score,
-        attempts,
-        fixes: best.review.fixes,
+        pass: lastBest.review.pass,
+        score: lastBest.review.score,
+        attempts: lastBest.attempts,
+        fixes: lastBest.review.fixes,
       },
     };
     await supabase.from("art_generation_job").update({ direction }).eq("id", job.id);
   }
-
-  // Registra na Galeria (não-fatal)
-  await supabase.from("generated_images").insert({
-    source: "artes",
-    prompt: artSpec.headline ?? briefing.titulo ?? "",
-    aspect_ratio: artSpec.aspect_ratio ?? "1:1",
-    resolution: artSpec.image_size ?? "2K",
-    storage_path: storagePath,
-    url: publicUrl,
-  }).then(({ error }) => {
-    if (error) console.error("[worker] galeria insert falhou:", error.message);
-  });
-
-  // Nova versão do formato feed (v1 na primeira geração, v2+ ao regerar).
-  await publishVersion(supabase, {
-    jobId: job.id,
-    format: "feed",
-    versionNumber,
-    resultUrl: publicUrl,
-    storagePath,
-    instruction: versionNumber > 1 ? "regeração" : null,
-  });
 
   // Marca job como succeeded
   await supabase
@@ -551,7 +599,7 @@ export async function runWorker(
 
   let query = supabase
     .from("art_generation_job")
-    .select("id, demand_id, client_id, art_index, params, prompt_draft, prompt_edited, direction")
+    .select("id, demand_id, client_id, art_index, params, prompt_draft, prompt_edited, direction, ephemeral")
     .eq("status", "queued")
     .order("created_at", { ascending: true });
 
@@ -583,7 +631,7 @@ async function processStoryJob(job: StoryJobRow): Promise<void> {
 
   const { data: state } = await supabase
     .from("art_generation_job")
-    .select("story_status")
+    .select("story_status, ephemeral")
     .eq("id", job.id)
     .single();
 
@@ -628,6 +676,7 @@ async function processStoryJob(job: StoryJobRow): Promise<void> {
       resultUrl: publicUrl,
       storagePath,
       instruction: "stories 9:16",
+      expiresAt: ttlExpiresAt(state.ephemeral ?? undefined),
     });
 
     await supabase

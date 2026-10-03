@@ -172,7 +172,7 @@ export function PromptArteNode({ id, data, selected }: Props) {
       <div className="relative">
         <textarea
           ref={textareaRef}
-          className="nodrag w-full resize-none rounded-xl border border-border bg-input p-2.5 font-mono text-[0.6875rem] leading-relaxed text-foreground placeholder:text-muted-foreground/60 transition-premium hover:border-border-strong focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-ring/20"
+          className="nodrag nowheel w-full resize-none rounded-xl border border-border bg-input p-2.5 font-mono text-[0.6875rem] leading-relaxed text-foreground placeholder:text-muted-foreground/60 transition-premium hover:border-border-strong focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-ring/20"
           rows={5}
           value={draft}
           placeholder={"Headline: texto\nSubheadline: texto\nCTA: texto\nExtras: @referencia"}

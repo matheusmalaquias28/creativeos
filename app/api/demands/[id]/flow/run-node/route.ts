@@ -1,7 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { runWorker } from "@/lib/ai/imagegen/worker";
-import { extractFlowJobParams } from "@/lib/flow/extract-flow-jobs";
+import { extractFlowJobParams, flowJobParamsToRow } from "@/lib/flow/extract-flow-jobs";
 import { enrichFlowGraphWithProfile } from "@/lib/flow/enrich-graph";
 import { loadFlowCreativeProfile } from "@/lib/flow/load-creative-profile";
 import { getClientFlowGraph } from "@/services/flow";
@@ -59,9 +59,10 @@ export async function POST(req: Request, { params }: Params) {
 
   const enrichedGraph = enrichFlowGraphWithProfile(graph, profile);
   const briefing = (demand.briefing as { titulo?: string; tipo?: string }) ?? {};
-  const job = extractFlowJobParams(enrichedGraph, briefing, { demandId }).find(
-    (entry) => entry.art_index === body.artIndex
-  );
+  const job = extractFlowJobParams(enrichedGraph, briefing, {
+    demandId,
+    includeStory: true,
+  }).find((entry) => entry.art_index === body.artIndex);
 
   if (!job) {
     return NextResponse.json(
@@ -82,20 +83,8 @@ export async function POST(req: Request, { params }: Params) {
     client_id: demand.client_id,
     art_index: job.art_index,
     status: "queued",
-    params: {
-      headline: job.headline,
-      subheadline: job.subheadline,
-      cta: job.cta,
-      informacoesExtras: job.informacoesExtras,
-      aspect_ratio: job.aspect_ratio,
-      image_size: job.image_size,
-      model: job.model,
-      quality: job.quality,
-      briefing_titulo: job.briefing_titulo,
-      briefing_tipo: job.briefing_tipo,
-      flow_logo_url: job.flow_logo_url,
-      flow_references: job.flow_references,
-    },
+    ephemeral: true,
+    params: flowJobParamsToRow(job),
   });
 
   if (error) {

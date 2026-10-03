@@ -1,6 +1,6 @@
-import type { PromptArteData } from "@/lib/flow/types";
+import type { PromptArteData, PromptFields } from "@/lib/flow/types";
 
-export function formatPromptArteData(d: PromptArteData): string {
+export function formatPromptArteData(d: PromptFields): string {
   const lines: string[] = [];
   if (d.headline) lines.push(`Headline: ${d.headline}`);
   if (d.subheadline) lines.push(`Subheadline: ${d.subheadline}`);
@@ -9,7 +9,7 @@ export function formatPromptArteData(d: PromptArteData): string {
   return lines.join("\n");
 }
 
-export function getPromptArteEditorText(d: PromptArteData): string {
+export function getPromptArteEditorText(d: PromptFields): string {
   if (typeof d.promptText === "string") return d.promptText;
   return formatPromptArteData(d);
 }
@@ -51,7 +51,7 @@ export function parsePromptArteText(
   return result;
 }
 
-export function resolvePromptArteFields(data: PromptArteData): PromptArteData {
+export function resolvePromptArteFields(data: PromptFields): PromptArteData {
   const text = getPromptArteEditorText(data);
   return parsePromptArteText(text, data.artIndex, data);
 }

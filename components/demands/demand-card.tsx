@@ -5,7 +5,6 @@ import Link from "next/link";
 import { AlertTriangle, Calendar, Sparkles, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DemandStatusSelector } from "@/components/demands/demand-status-selector";
-import { MagnificSpaceButton } from "@/components/demands/magnific-space-button";
 import {
   DemandClientLinker,
   type DemandClientOption,
@@ -199,14 +198,6 @@ export function DemandCard({
           >
             Ver demanda
           </Link>
-          {!clientNotFound && (
-            <MagnificSpaceButton
-              demandId={demand.id}
-              status={demand.magnific_space_status}
-              spaceUrl={demand.magnific_space_url}
-              errorMessage={demand.magnific_space_error}
-            />
-          )}
         </div>
       </div>
     </article>

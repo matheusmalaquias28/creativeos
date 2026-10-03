@@ -3,7 +3,7 @@ import { AlertTriangle, ExternalLink, FileText, ImageIcon } from "lucide-react";
 import { DashboardPage } from "@/components/layout/dashboard-page";
 import { SectionHeader } from "@/components/layout/section-header";
 import { DemandDetailStatusBar } from "@/components/demands/demand-detail-status-bar";
-import { MagnificSpaceButton } from "@/components/demands/magnific-space-button";
+import { DemandSpaceSection } from "@/components/demands/demand-space-section";
 import { DemandDeliverDialog } from "@/components/demands/demand-deliver-dialog";
 import { MarkDemandReadOnMount } from "@/components/demands/mark-demand-read-on-mount";
 import {
@@ -157,14 +157,6 @@ export default async function DemandDetailPage({ params }: PageProps) {
               />
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {!demand.client_not_found && (
-                <MagnificSpaceButton
-                  demandId={demand.id}
-                  status={demand.magnific_space_status}
-                  spaceUrl={demand.magnific_space_url}
-                  errorMessage={demand.magnific_space_error}
-                />
-              )}
               <DemandDeliverDialog
                 demandId={demand.id}
                 artes={demand.artes}
@@ -248,6 +240,8 @@ export default async function DemandDetailPage({ params }: PageProps) {
             </div>
           </div>
         </Surface>
+
+        {!demand.client_not_found && <DemandSpaceSection demand={demand} />}
 
         <section className="space-y-4">
           <SectionHeader

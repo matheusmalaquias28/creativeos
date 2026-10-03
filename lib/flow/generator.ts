@@ -5,6 +5,90 @@ import { IMAGE_GEN_DEFAULTS } from '@/lib/ai/imagegen/defaults';
 const COL_W = 280;
 export const ROW_H = 200;
 
+// Padrão do "Space" por demanda: feed 4:5 medium 2K. (Não mexe no
+// IMAGE_GEN_DEFAULTS global — outros caminhos ainda usam 3:4.)
+const FEED_ASPECT = "4:5";
+const FEED_QUALITY = "medium" as const;
+const STORY_ASPECT = "9:16";
+// Instrução de reenquadramento (espelha STORY_ADAPT_PROMPT de lib/ai/imagegen/
+// story.ts — inline aqui para o generator não puxar o provider/sharp pro client).
+const STORY_PROMPT = "Adapte essas artes para o formato stories 9:16, sem adicionar textos e distorcer imagens";
+
+/** Dados do node unificado `arte` (feed) — prompt + controles + saída. */
+function feedArteData(
+  demanda: Pick<CreativeDemand, "id" | "client_id" | "artes" | "briefing">,
+  i: number
+): import("./types").ArteData {
+  const arte = demanda.artes[i];
+  return {
+    artIndex: i,
+    label: `Arte ${i + 1}`,
+    format: "feed",
+    headline: arte?.headline ?? null,
+    subheadline: arte?.subheadline ?? null,
+    cta: arte?.cta ?? null,
+    informacoesExtras: arte?.informacoesExtras ?? null,
+    aspectRatio: FEED_ASPECT,
+    imageSize: IMAGE_GEN_DEFAULTS.imageSize,
+    model: IMAGE_GEN_DEFAULTS.model,
+    quality: FEED_QUALITY,
+    count: 1,
+    demandId: demanda.id,
+    clientId: demanda.client_id ?? "",
+    briefingTitulo: demanda.briefing?.titulo ?? null,
+    briefingTipo: demanda.briefing?.tipo ?? null,
+  };
+}
+
+/**
+ * Anexa o bloco de Stories ao grafo: Lista(modo list) ← todas as saídas feed →
+ * node stories 9:16 → saída "story". A geração de stories em si é feita pelo
+ * worker de 2 fases (runStoryWorker), disparado após o feed; a saída "story"
+ * acumula 1 story por arte (pilha).
+ */
+function appendStoriesBlock(
+  nodes: FlowNode[],
+  edges: FlowEdge[],
+  feedArteIds: string[],
+  ids: { lista: string; arte: string },
+  demanda: Pick<CreativeDemand, "id" | "client_id" | "briefing">,
+  storyArtIndex: number,
+  yTop: number
+): void {
+  if (feedArteIds.length === 0) return;
+
+  nodes.push({
+    id: ids.lista,
+    type: "listaImagens",
+    data: { label: "Feed", mode: "list" },
+    position: { x: COL_W * 3, y: yTop },
+  });
+  nodes.push({
+    id: ids.arte,
+    type: "arte",
+    data: {
+      artIndex: storyArtIndex,
+      label: "Stories",
+      format: "story",
+      promptText: STORY_PROMPT,
+      aspectRatio: STORY_ASPECT,
+      imageSize: IMAGE_GEN_DEFAULTS.imageSize,
+      model: IMAGE_GEN_DEFAULTS.model,
+      quality: FEED_QUALITY,
+      count: 1,
+      demandId: demanda.id,
+      clientId: demanda.client_id ?? "",
+    },
+    position: { x: COL_W * 4, y: yTop },
+  });
+
+  // Cada node de feed alimenta a Lista; a Lista (modo list) alimenta o node de stories.
+  for (const arteId of feedArteIds) {
+    edges.push({ id: `e-${arteId}-${ids.lista}`, source: arteId, target: ids.lista });
+  }
+  edges.push({ id: `e-${ids.lista}-${ids.arte}`, source: ids.lista, target: ids.arte, targetHandle: "refs" });
+}
+
 
 /**
  * Gera um FlowGraph padrão para uma demanda com `numArtes` artes.
@@ -46,61 +130,31 @@ export function gerarFluxoDaDemanda(
   });
 
   for (let i = 0; i < numArtes; i++) {
-    const arte = demanda.artes[i];
     const y = i * ROW_H;
-
-    const promptId = `prompt_${i}`;
-    const gerarId = `gerar_${i}`;
-    const saidaId = `saida_${i}`;
+    const arteId = `arte_${i}`;
 
     nodes.push({
-      id: promptId,
-      type: 'promptArte',
-      data: {
-        artIndex: i,
-        headline: arte?.headline ?? null,
-        subheadline: arte?.subheadline ?? null,
-        cta: arte?.cta ?? null,
-        informacoesExtras: arte?.informacoesExtras ?? null,
-      },
+      id: arteId,
+      type: 'arte',
+      data: feedArteData(demanda, i),
       position: { x: COL_W, y },
     });
 
-    nodes.push({
-      id: gerarId,
-      type: 'gerarImagem',
-      data: {
-        aspectRatio: IMAGE_GEN_DEFAULTS.aspectRatio,
-        imageSize: IMAGE_GEN_DEFAULTS.imageSize,
-        model: IMAGE_GEN_DEFAULTS.model,
-        quality: IMAGE_GEN_DEFAULTS.quality,
-        demandId: demanda.id,
-        clientId: demanda.client_id ?? '',
-        briefingTitulo: demanda.briefing?.titulo ?? null,
-        briefingTipo: demanda.briefing?.tipo ?? null,
-      },
-      position: { x: COL_W * 2, y },
-    });
-
-    nodes.push({
-      id: saidaId,
-      type: 'saidaArte',
-      data: { artIndex: i, label: `Arte ${i + 1}` },
-      position: { x: COL_W * 3, y },
-    });
-
-    // Logo e refs entram em gerarImagem
-    edges.push({ id: `e-logo-${gerarId}`, source: logoId, target: gerarId, targetHandle: 'logo' });
-    edges.push({ id: `e-refs-${gerarId}`, source: refsId, target: gerarId, targetHandle: 'refs' });
-
-    // Prompt → gerarImagem
-    edges.push({ id: `e-${promptId}-${gerarId}`, source: promptId, target: gerarId, targetHandle: 'prompt' });
-
-    // gerarImagem → saidaArte
-    edges.push({ id: `e-${gerarId}-${saidaId}`, source: gerarId, target: saidaId });
-    // Nota: sem edges entre artes distintas no fluxo padrão.
-    // Para usar @imgN em promptArte_i, conecte manualmente gerar_{i-1} → prompt_i.
+    // Logo e refs entram direto no node unificado.
+    edges.push({ id: `e-logo-${arteId}`, source: logoId, target: arteId, targetHandle: 'logo' });
+    edges.push({ id: `e-refs-${arteId}`, source: refsId, target: arteId, targetHandle: 'refs' });
   }
+
+  const feedArteIds = Array.from({ length: numArtes }, (_, i) => `arte_${i}`);
+  appendStoriesBlock(
+    nodes,
+    edges,
+    feedArteIds,
+    { lista: "lista_stories", arte: "arte_stories" },
+    demanda,
+    numArtes,
+    0
+  );
 
   return { nodes, edges };
 }
@@ -120,58 +174,30 @@ export function gerarSubfluxoDaDemanda(
   const edges: FlowEdge[] = [];
 
   for (let i = 0; i < numArtes; i++) {
-    const arte = demanda.artes[i];
     const y = yOffset + i * ROW_H;
-
-    const promptId = `prompt_${demanda.id}_${i}`;
-    const gerarId = `gerar_${demanda.id}_${i}`;
-    const saidaId = `saida_${demanda.id}_${i}`;
+    const arteId = `arte_${demanda.id}_${i}`;
 
     nodes.push({
-      id: promptId,
-      type: 'promptArte',
-      data: {
-        artIndex: i,
-        headline: arte?.headline ?? null,
-        subheadline: arte?.subheadline ?? null,
-        cta: arte?.cta ?? null,
-        informacoesExtras: arte?.informacoesExtras ?? null,
-      },
+      id: arteId,
+      type: 'arte',
+      data: { ...feedArteData(demanda, i), demandId: demanda.id },
       position: { x: COL_W, y },
     });
 
-    nodes.push({
-      id: gerarId,
-      type: 'gerarImagem',
-      data: {
-        aspectRatio: IMAGE_GEN_DEFAULTS.aspectRatio,
-        imageSize: IMAGE_GEN_DEFAULTS.imageSize,
-        model: IMAGE_GEN_DEFAULTS.model,
-        quality: IMAGE_GEN_DEFAULTS.quality,
-        demandId: demanda.id,
-        clientId: demanda.client_id ?? '',
-        briefingTitulo: demanda.briefing?.titulo ?? null,
-        briefingTipo: demanda.briefing?.tipo ?? null,
-      },
-      position: { x: COL_W * 2, y },
-    });
-
-    nodes.push({
-      id: saidaId,
-      type: 'saidaArte',
-      data: { artIndex: i, label: `Arte ${i + 1}`, demandId: demanda.id },
-      position: { x: COL_W * 3, y },
-    });
-
-    edges.push({ id: `e-logo-${gerarId}`, source: logoId, target: gerarId, targetHandle: 'logo' });
-    edges.push({ id: `e-refs-${gerarId}`, source: refsId, target: gerarId, targetHandle: 'refs' });
-    edges.push({ id: `e-${promptId}-${gerarId}`, source: promptId, target: gerarId, targetHandle: 'prompt' });
-    edges.push({ id: `e-${gerarId}-${saidaId}`, source: gerarId, target: saidaId });
-
-    // Logo/refs também linkados ao node de texto — habilita @(logo) no promptArte.
-    edges.push({ id: `e-logo-${promptId}`, source: logoId, target: promptId });
-    edges.push({ id: `e-refs-${promptId}`, source: refsId, target: promptId });
+    edges.push({ id: `e-logo-${arteId}`, source: logoId, target: arteId, targetHandle: 'logo' });
+    edges.push({ id: `e-refs-${arteId}`, source: refsId, target: arteId, targetHandle: 'refs' });
   }
+
+  const feedArteIds = Array.from({ length: numArtes }, (_, i) => `arte_${demanda.id}_${i}`);
+  appendStoriesBlock(
+    nodes,
+    edges,
+    feedArteIds,
+    { lista: `lista_stories_${demanda.id}`, arte: `arte_stories_${demanda.id}` },
+    demanda,
+    numArtes,
+    yOffset
+  );
 
   return { nodes, edges };
 }
@@ -195,7 +221,7 @@ export function mergeDemandIntoClientGraph(
   numArtes: number
 ): FlowGraph {
   const alreadyPresent = clientGraph?.nodes.some(
-    (n) => n.type === 'gerarImagem' && n.data.demandId === demanda.id
+    (n) => n.type === 'arte' && n.data.demandId === demanda.id
   );
   if (clientGraph && alreadyPresent) return clientGraph;
 

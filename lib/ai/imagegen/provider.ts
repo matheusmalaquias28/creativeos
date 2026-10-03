@@ -12,10 +12,11 @@
 
 import { generateArt, type AspectRatio, type ImageSize } from "./client";
 import { generateMagnificImage } from "./magnific";
+import { generateOpenAIImage, type OpenAIImageQuality } from "./openai";
 import { urlsToInlineDataParts } from "./storage-refs";
 import sharp from "sharp";
 
-export type ImageProvider = "magnific" | "gemini";
+export type ImageProvider = "magnific" | "gemini" | "openai";
 
 export type ArtReference = {
   url: string;
@@ -28,12 +29,15 @@ export type GenerateArtImageParams = {
   references?: ArtReference[];
   aspectRatio?: string;
   imageSize?: string;
+  /** Esforço do GPT Image (low/medium/high…). Ignorado por Magnific/Gemini. */
+  quality?: OpenAIImageQuality;
 };
 
 export function getImageProvider(): ImageProvider {
-  return process.env.IMAGE_PROVIDER?.trim().toLowerCase() === "gemini"
-    ? "gemini"
-    : "magnific";
+  const provider = process.env.IMAGE_PROVIDER?.trim().toLowerCase();
+  if (provider === "gemini") return "gemini";
+  if (provider === "openai") return "openai";
+  return "magnific";
 }
 
 /** Gera a imagem e devolve os bytes em PNG, pronto para compor a logo. */
@@ -41,8 +45,20 @@ export async function generateArtImage(
   params: GenerateArtImageParams
 ): Promise<Buffer> {
   const references = params.references ?? [];
+  const provider = getImageProvider();
 
-  if (getImageProvider() === "gemini") {
+  if (provider === "openai") {
+    const { buffer } = await generateOpenAIImage({
+      prompt: params.prompt,
+      references: references.map((r) => ({ url: r.url, text: r.intent })),
+      aspectRatio: params.aspectRatio ?? "3:4",
+      resolution: params.imageSize ?? "2K",
+      quality: params.quality ?? "medium",
+    });
+    return buffer;
+  }
+
+  if (provider === "gemini") {
     const parts = await urlsToInlineDataParts(references.map((r) => r.url));
     const generated = await generateArt({
       prompt: params.prompt,

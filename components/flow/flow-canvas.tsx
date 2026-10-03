@@ -29,12 +29,13 @@ import {
   Pause,
   Loader2,
   ImageIcon,
-  GitBranch,
   Sparkles,
-  FileText,
   Layers,
+  ListChecks,
   Plus,
   Check,
+  Copy,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
@@ -44,6 +45,8 @@ import { PromptArteNode } from "@/components/flow/nodes/prompt-arte-node";
 import { GerarImagemNode } from "@/components/flow/nodes/gerar-imagem-node";
 import { SaidaArteNode } from "@/components/flow/nodes/saida-arte-node";
 import { ReferenciaImagemNode } from "@/components/flow/nodes/referencia-imagem-node";
+import { ListaImagensNode } from "@/components/flow/nodes/lista-imagens-node";
+import { ArteNode } from "@/components/flow/nodes/arte-node";
 import { DeletableEdge } from "@/components/flow/edges/deletable-edge";
 import { FlowCanvasContext } from "@/components/flow/flow-canvas-context";
 import { FLOW_NODE_TONE } from "@/components/flow/nodes/node-shell";
@@ -64,6 +67,8 @@ const nodeTypes: NodeTypes = {
   gerarImagem: GerarImagemNode,
   saidaArte: SaidaArteNode,
   referenciaImagem: ReferenciaImagemNode,
+  listaImagens: ListaImagensNode,
+  arte: ArteNode,
 };
 
 const edgeTypes: EdgeTypes = {
@@ -118,9 +123,9 @@ function graphToRF(graph: FlowGraph): { nodes: Node[]; edges: Edge[] } {
 function rfToGraph(nodes: Node[], edges: Edge[]): FlowGraph {
   return {
     nodes: nodes.map((n) => {
-      if (n.type === "saidaArte") {
-        // resultUrl and generatingStatus are runtime-only — never persist them
-        const { resultUrl: _r, generatingStatus: _g, ...data } =
+      if (n.type === "saidaArte" || n.type === "arte") {
+        // resultUrl(s) and generatingStatus are runtime-only — never persist them
+        const { resultUrl: _r, resultUrls: _rs, generatingStatus: _g, jobId: _j, ...data } =
           n.data as SaidaArteData;
         return { ...n, data };
       }
@@ -141,10 +146,9 @@ function rfToGraph(nodes: Node[], edges: Edge[]): FlowGraph {
 const PALETTE_ITEMS = [
   { type: "clienteLogo", label: "Logo", icon: ImageIcon },
   { type: "clienteReferencias", label: "Refs", icon: Layers },
-  { type: "promptArte", label: "Prompt", icon: FileText },
-  { type: "gerarImagem", label: "Gerar", icon: Sparkles },
-  { type: "saidaArte", label: "Saída", icon: GitBranch },
+  { type: "arte", label: "Arte", icon: Sparkles },
   { type: "referenciaImagem", label: "Imagem", icon: ImageIcon },
+  { type: "listaImagens", label: "Lista", icon: ListChecks },
 ] as const;
 
 function minimapNodeColor(type: string | undefined): string {
@@ -173,6 +177,7 @@ type JobRow = {
   id: string;
   art_index: number;
   status: string;
+  story_status?: string;
 };
 
 function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: InnerProps) {
@@ -189,6 +194,8 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
   const [running, setRunning] = useState(false);
   // "✓" indicator that briefly flashes after a silent auto-save
   const [autoSavedFlash, setAutoSavedFlash] = useState(false);
+  // Menu de contexto (botão direito num node): posição em tela + id do node.
+  const [nodeMenu, setNodeMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null);
 
   const busy = saving || running;
 
@@ -270,6 +277,75 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
     [setEdges, scheduleAutoSave]
   );
 
+  // URLs atuais (pilha completa) de um node que produz imagem.
+  const stackUrlsOf = useCallback((n: Node): string[] => {
+    if (n.type === "arte" || n.type === "saidaArte") {
+      const d = n.data as SaidaArteData;
+      if (d.resultUrls?.length) return d.resultUrls.map((r) => r.url);
+      return d.resultUrl ? [d.resultUrl] : [];
+    }
+    if (n.type === "referenciaImagem") {
+      const u = (n.data as { imageUrl?: string | null }).imageUrl;
+      return u ? [u] : [];
+    }
+    if (n.type === "clienteReferencias") {
+      return ((n.data as { referenceUrls?: string[] }).referenceUrls ?? []);
+    }
+    if (n.type === "clienteLogo") {
+      const u = (n.data as { logoUrl?: string | null }).logoUrl;
+      return u ? [u] : [];
+    }
+    return [];
+  }, []);
+
+  // Depois que um node termina de gerar: materializa as listas conectadas (para
+  // o servidor fazer o fan-out) e, se o node gerou várias imagens sem nenhuma
+  // lista conectada, cria uma lista automaticamente com elas.
+  const syncListsAfterGeneration = useCallback(
+    (finishedNodeId: string) => {
+      const curNodes = getNodes();
+      const curEdges = getEdges();
+
+      // 1. Materializa `items` de cada lista a partir das fontes conectadas.
+      const materialized = curNodes.map((n) => {
+        if (n.type !== "listaImagens") return n;
+        const items = curEdges
+          .filter((e) => e.target === n.id)
+          .flatMap((e) => {
+            const src = curNodes.find((x) => x.id === e.source);
+            return src ? stackUrlsOf(src) : [];
+          });
+        return { ...n, data: { ...n.data, items } };
+      });
+
+      // 2. Auto-cria lista se o node terminou com >1 imagem e não há lista a jusante.
+      const finished = curNodes.find((x) => x.id === finishedNodeId);
+      const stack = finished ? stackUrlsOf(finished) : [];
+      const hasListDownstream = curEdges.some(
+        (e) => e.source === finishedNodeId && curNodes.find((x) => x.id === e.target)?.type === "listaImagens"
+      );
+
+      if (stack.length > 1 && !hasListDownstream && finished) {
+        const listId = `listaImagens-${Date.now()}`;
+        const listNode: Node = {
+          id: listId,
+          type: "listaImagens",
+          position: { x: finished.position.x + 300, y: finished.position.y },
+          data: { label: "Geradas", mode: "list", items: stack },
+        };
+        setNodes([...materialized, listNode]);
+        setEdges((es) => [
+          ...es,
+          { id: `e-${finishedNodeId}-${listId}`, source: finishedNodeId, target: listId, ...EDGE_DEFAULTS },
+        ]);
+      } else {
+        setNodes(materialized);
+      }
+      scheduleAutoSave();
+    },
+    [getNodes, getEdges, setNodes, setEdges, scheduleAutoSave, stackUrlsOf]
+  );
+
   // ─── Real-time: art_generation_job ────────────────────────────────────
 
   useEffect(() => {
@@ -294,37 +370,52 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
           // Immediately reflect status change in the node
           setNodes((ns) =>
             ns.map((n) => {
-              if (n.type !== "saidaArte") return n;
+              if (n.type !== "saidaArte" && n.type !== "arte") return n;
               if ((n.data as SaidaArteData).artIndex !== job.art_index) return n;
               return { ...n, data: { ...n.data, generatingStatus: status } };
             })
           );
 
           if (job.status === "succeeded") {
-            // art_version is inserted before the job is marked succeeded, so it's
-            // safe to query immediately
-            const { data: version } = await supabase
+            // art_version é inserido antes do job virar succeeded — seguro ler já.
+            // Buscamos TODAS as versões (a pilha), não só a current.
+            const { data: versions } = await supabase
               .from("art_version")
-              .select("result_url")
+              .select("id, result_url, is_current, version_number")
               .eq("job_id", job.id)
-              .eq("is_current", true)
-              .maybeSingle();
+              .eq("format", "feed")
+              .order("version_number", { ascending: true });
 
-            if (version?.result_url) {
+            const stack = (versions ?? [])
+              .filter((v) => v.result_url)
+              .map((v) => ({ versionId: v.id as string, url: v.result_url as string }));
+
+            if (stack.length > 0) {
+              const current = (versions ?? []).find((v) => v.is_current);
+              const resultUrl = (current?.result_url as string | undefined) ?? stack[stack.length - 1].url;
+              let finishedNodeId: string | null = null;
               setNodes((ns) =>
                 ns.map((n) => {
-                  if (n.type !== "saidaArte") return n;
+                  if (n.type !== "saidaArte" && n.type !== "arte") return n;
                   if ((n.data as SaidaArteData).artIndex !== job.art_index) return n;
+                  finishedNodeId = n.id;
                   return {
                     ...n,
                     data: {
                       ...n.data,
-                      resultUrl: version.result_url,
+                      resultUrl,
+                      resultUrls: stack,
+                      jobId: job.id,
                       generatingStatus: "succeeded" as const,
                     },
                   };
                 })
               );
+              // Materializa listas conectadas + auto-cria lista se gerou várias.
+              if (finishedNodeId) {
+                const nodeId = finishedNodeId;
+                setTimeout(() => syncListsAfterGeneration(nodeId), 60);
+              }
             }
           }
         }
@@ -334,7 +425,7 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [demanda.id, setNodes]);
+  }, [demanda.id, setNodes, syncListsAfterGeneration]);
 
   // ─── Connections ──────────────────────────────────────────────────────
 
@@ -383,29 +474,29 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
     const cy = (window.innerHeight / 2 - y) / zoom;
     const id = `${type}-${Date.now()}`;
 
+    const arteCount = nodes.filter((n) => n.type === "arte").length;
     const data: Record<string, unknown> =
       type === "clienteLogo"
         ? { clientId: demanda.client_id ?? "", logoUrl: clientProfile?.logoUrl ?? null }
         : type === "clienteReferencias"
         ? { clientId: demanda.client_id ?? "", referenceUrls: clientProfile?.referenceUrls ?? [] }
-        : type === "promptArte"
-        ? { artIndex: nodes.filter((n) => n.type === "promptArte").length }
-        : type === "saidaArte"
-        ? {
-            artIndex: nodes.filter((n) => n.type === "saidaArte").length,
-            label: `Arte ${nodes.filter((n) => n.type === "saidaArte").length + 1}`,
-          }
         : type === "referenciaImagem"
         ? { imageUrl: null, label: "Imagem" }
-        : type === "gerarImagem"
+        : type === "arte"
         ? {
-            aspectRatio: IMAGE_GEN_DEFAULTS.aspectRatio,
+            artIndex: arteCount,
+            label: `Arte ${arteCount + 1}`,
+            format: "feed",
+            aspectRatio: "4:5",
             imageSize: IMAGE_GEN_DEFAULTS.imageSize,
             model: IMAGE_GEN_DEFAULTS.model,
-            quality: IMAGE_GEN_DEFAULTS.quality,
+            quality: "medium",
+            count: 1,
             demandId: demanda.id,
             clientId: demanda.client_id ?? "",
           }
+        : type === "listaImagens"
+        ? { mode: "reference" }
         : {};
 
     setNodes((ns) => [
@@ -425,7 +516,9 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
       // Optimistically mark all saidaArte nodes as queued
       setNodes((ns) =>
         ns.map((n) => {
-          if (n.type !== "saidaArte") return n;
+          if (n.type !== "saidaArte" && n.type !== "arte") return n;
+          // Stories não roda no "Executar" geral — disparo é no próprio node.
+          if ((n.data as SaidaArteData).format === "story") return n;
           return { ...n, data: { ...n.data, generatingStatus: "queued" as const } };
         })
       );
@@ -453,7 +546,7 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
   }
 
   const hasActiveJobs = nodes.some((n) => {
-    if (n.type !== "saidaArte") return false;
+    if (n.type !== "saidaArte" && n.type !== "arte") return false;
     const status = (n.data as SaidaArteData).generatingStatus;
     return status === "queued" || status === "processing";
   });
@@ -507,6 +600,40 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
     setNodes([...keptNodes, ...newNodes]);
     setEdges([...keptEdges, ...newEdges]);
     toast.info("Fluxo desta demanda redefinido para o padrão");
+    scheduleAutoSave();
+  }
+
+  // ─── Context menu (botão direito num node) ──────────────────────────────
+
+  function onNodeContextMenu(event: React.MouseEvent, node: Node) {
+    event.preventDefault();
+    const rect = wrapperRef.current?.getBoundingClientRect();
+    setNodeMenu({
+      x: event.clientX - (rect?.left ?? 0),
+      y: event.clientY - (rect?.top ?? 0),
+      nodeId: node.id,
+    });
+  }
+
+  function deleteNode(nodeId: string) {
+    setNodes((ns) => ns.filter((n) => n.id !== nodeId));
+    setEdges((es) => es.filter((e) => e.source !== nodeId && e.target !== nodeId));
+    setNodeMenu(null);
+    scheduleAutoSave();
+  }
+
+  function duplicateNode(nodeId: string) {
+    const node = getNodes().find((n) => n.id === nodeId);
+    setNodeMenu(null);
+    if (!node) return;
+    const copy: Node = {
+      ...node,
+      id: `${node.type}-${Date.now()}`,
+      position: { x: node.position.x + 40, y: node.position.y + 40 },
+      selected: false,
+      data: { ...node.data },
+    };
+    setNodes((ns) => [...ns, copy]);
     scheduleAutoSave();
   }
 
@@ -572,6 +699,9 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
             onConnect={onConnect}
             onDragOver={onDragOver}
             onDrop={onDrop}
+            onNodeContextMenu={onNodeContextMenu}
+            onPaneClick={() => setNodeMenu(null)}
+            onMoveStart={() => setNodeMenu(null)}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             fitView
@@ -597,6 +727,32 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
             />
           </ReactFlow>
         </FlowCanvasContext.Provider>
+
+        {/* Context menu (botão direito num node) */}
+        {nodeMenu && (
+          <div
+            className="absolute z-20 min-w-40 overflow-hidden rounded-xl border border-border bg-popover p-1 shadow-[var(--surface-shadow-elevated)]"
+            style={{ left: nodeMenu.x, top: nodeMenu.y }}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            <button
+              type="button"
+              onClick={() => duplicateNode(nodeMenu.nodeId)}
+              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-accent"
+            >
+              <Copy className="size-3.5 text-muted-foreground" />
+              Duplicar nó
+            </button>
+            <button
+              type="button"
+              onClick={() => deleteNode(nodeMenu.nodeId)}
+              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-tone-red transition-colors hover:bg-tone-red/10"
+            >
+              <Trash2 className="size-3.5" />
+              Excluir nó
+            </button>
+          </div>
+        )}
 
         {/* Node palette — floating bottom center */}
         <div className="pointer-events-none absolute inset-x-0 bottom-6 z-10 flex justify-center px-4">

@@ -1,11 +1,10 @@
-import { NextResponse, after } from "next/server";
+import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   resolveDemandClient,
   backfillClientExternalId,
 } from "@/lib/demands/match-client";
 import { parseMakeDemandPayload } from "@/lib/demands/parse-make-payload";
-import { triggerMagnificGeneration } from "@/lib/magnific/trigger-generation";
 import {
   collectDemandDriveUrls,
   isMateriaisEditadosMissing,
@@ -17,8 +16,7 @@ import type { Database } from "@/types/database";
 type CreativeDemandInsert =
   Database["public"]["Tables"]["creative_demands"]["Insert"];
 
-// Cobre a geração de Magnific Space disparada via after() abaixo (upload de fotos +
-// create + edit + polling pode passar de 1 minuto).
+// Ingestão de referências pode subir várias imagens — folga no tempo de execução.
 export const maxDuration = 300;
 
 /**
@@ -191,32 +189,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Persiste as imagens de referência antes de disparar a geração, para que o
-  // Magnific Space já as inclua ao subir as creations.
+  // Persiste as imagens de referência da demanda assim que ela chega.
   await ingestReferenceImages(supabase, data.id, parsed.referenceImageUrls);
 
-  // Dispara a geração automática do Space sempre que o cliente está vinculado e a
-  // demanda ainda não está em geração/pronta — evita reprocessar a cada re-sync do
-  // Make sobre a mesma demanda (upsert por external_id). A geração é best-effort:
-  // segue em frente mesmo sem material, usando o que estiver disponível.
-  if (data.client_id && !data.client_not_found) {
-    const { data: claimed } = await supabase
-      .from("creative_demands")
-      .update({
-        magnific_space_status: "generating",
-        magnific_space_requested_at: new Date().toISOString(),
-        magnific_space_error: null,
-      })
-      .eq("id", data.id)
-      .neq("magnific_space_status", "generating")
-      .neq("magnific_space_status", "ready")
-      .select("id")
-      .maybeSingle();
-
-    if (claimed) {
-      after(() => triggerMagnificGeneration(data.id));
-    }
-  }
+  // Nota: o Space agora é criado sob demanda ao abrir a página (sem custo) e a
+  // geração de imagens é manual (botão Executar no canvas) — o webhook não
+  // dispara mais geração automática.
 
   return NextResponse.json({
     ok: true,

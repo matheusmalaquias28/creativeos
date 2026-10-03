@@ -1,44 +1,38 @@
 "use client";
 
-import { Handle, Position } from "@xyflow/react";
-import { ImageIcon } from "lucide-react";
-import {
-  FLOW_NODE_TONE,
-  NodeImagePlaceholder,
-  NodeShell,
-  flowHandleClass,
-} from "@/components/flow/nodes/node-shell";
+import { Handle, Position, useReactFlow } from "@xyflow/react";
+import { useFlowCanvas } from "@/components/flow/flow-canvas-context";
+import { NodeImage } from "@/components/flow/nodes/node-image";
+import { flowHandleClass } from "@/components/flow/nodes/node-shell";
 import type { ReferenciaImagemData } from "@/lib/flow/types";
 
 export function ReferenciaImagemNode({
+  id,
   data,
   selected,
 }: {
+  id: string;
   data: ReferenciaImagemData;
   selected?: boolean;
 }) {
-  return (
-    <NodeShell
-      tone={FLOW_NODE_TONE.referenciaImagem}
-      icon={ImageIcon}
-      title={data.label || "Imagem"}
-      selected={selected}
-      className="w-40"
-      bodyClassName="p-2.5"
-    >
-      {data.imageUrl ? (
-        <div className="overflow-hidden rounded-xl border border-border bg-surface">
-          <img
-            src={data.imageUrl}
-            alt={data.label || "Referência"}
-            className="aspect-square w-full object-cover"
-          />
-        </div>
-      ) : (
-        <NodeImagePlaceholder icon={ImageIcon} className="aspect-square" />
-      )}
+  const { setNodes } = useReactFlow();
+  const { scheduleAutoSave } = useFlowCanvas();
 
+  function rename(label: string) {
+    setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, data: { ...n.data, label } } : n)));
+    scheduleAutoSave();
+  }
+
+  return (
+    <div className="relative">
+      <NodeImage
+        url={data.imageUrl}
+        name={data.label || "Imagem"}
+        alt={data.label || "Referência"}
+        selected={selected}
+        onRename={rename}
+      />
       <Handle type="source" position={Position.Right} className={flowHandleClass} />
-    </NodeShell>
+    </div>
   );
 }

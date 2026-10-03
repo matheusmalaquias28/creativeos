@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Handle, Position, useNodes, useEdges } from "@xyflow/react";
+import { Handle, Position, useNodes, useEdges, useReactFlow } from "@xyflow/react";
 import { Sparkles, Play, Loader2, Check } from "lucide-react";
 import { toast } from "sonner";
-import { IMAGE_GEN_DEFAULTS } from "@/lib/ai/imagegen/defaults";
+import { useFlowCanvas } from "@/components/flow/flow-canvas-context";
 import {
   FLOW_NODE_TONE,
   NodeShell,
@@ -16,11 +16,60 @@ import type { GerarImagemData, SaidaArteData } from "@/lib/flow/types";
 
 type Props = { id: string; data: GerarImagemData; selected?: boolean };
 
+const ASPECT_OPTIONS = ["4:5", "9:16", "1:1", "3:4", "16:9"];
+const QUALITY_OPTIONS: { value: "low" | "medium" | "high"; label: string }[] = [
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" },
+];
+const SIZE_OPTIONS = ["1K", "2K", "4K"];
+const COUNT_OPTIONS = [1, 2, 3, 4, 6];
+
+function NodeSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="flex flex-col gap-0.5">
+      <span className="text-[0.5625rem] font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="nodrag w-full rounded-md border border-border bg-input px-1.5 py-1 font-mono text-[0.625rem] text-foreground transition-premium hover:border-border-strong focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-ring/20"
+      >
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 export function GerarImagemNode({ id, data, selected }: Props) {
   const nodes = useNodes();
   const edges = useEdges();
+  const { setNodes } = useReactFlow();
+  const { scheduleAutoSave } = useFlowCanvas();
   const [executing, setExecuting] = useState(false);
   const [done, setDone] = useState(false);
+
+  function update(patch: Partial<GerarImagemData>) {
+    setNodes((ns) =>
+      ns.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...patch } } : n))
+    );
+    scheduleAutoSave();
+  }
 
   async function handleExecute() {
     if (!data.demandId) {
@@ -67,7 +116,7 @@ export function GerarImagemNode({ id, data, selected }: Props) {
       icon={Sparkles}
       title="Gerar imagem"
       selected={selected}
-      className="w-52"
+      className="w-56"
       meta={
         <button
           onClick={handleExecute}
@@ -98,20 +147,34 @@ export function GerarImagemNode({ id, data, selected }: Props) {
       <Handle type="target" position={Position.Left} id="prompt" style={{ top: "72%" }}
         className={cn(flowHandleClass, "!bg-tone-amber")} title="Prompt" />
 
-      <div className="flex flex-wrap items-center gap-1.5">
-        {["Gemini", IMAGE_GEN_DEFAULTS.aspectRatio, IMAGE_GEN_DEFAULTS.imageSize].map(
-          (chip, i) => (
-            <span
-              key={i}
-              className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[0.625rem] text-muted-foreground"
-            >
-              {chip}
-            </span>
-          )
-        )}
+      <div className="grid grid-cols-2 gap-1.5">
+        <NodeSelect
+          label="Formato"
+          value={data.aspectRatio ?? "4:5"}
+          options={ASPECT_OPTIONS.map((v) => ({ value: v, label: v }))}
+          onChange={(v) => update({ aspectRatio: v })}
+        />
+        <NodeSelect
+          label="Esforço"
+          value={data.quality ?? "medium"}
+          options={QUALITY_OPTIONS}
+          onChange={(v) => update({ quality: v as "low" | "medium" | "high" })}
+        />
+        <NodeSelect
+          label="Resolução"
+          value={data.imageSize ?? "2K"}
+          options={SIZE_OPTIONS.map((v) => ({ value: v, label: v }))}
+          onChange={(v) => update({ imageSize: v })}
+        />
+        <NodeSelect
+          label="Quantidade"
+          value={String(data.count ?? 1)}
+          options={COUNT_OPTIONS.map((v) => ({ value: String(v), label: String(v) }))}
+          onChange={(v) => update({ count: Number(v) })}
+        />
       </div>
 
-      <div className="mt-2.5 flex items-center gap-2.5 text-[0.625rem] text-muted-foreground">
+      <div className="mt-2 flex items-center gap-2.5 text-[0.625rem] text-muted-foreground">
         <span className="inline-flex items-center gap-1">
           <span className={cn("size-1.5 rounded-full", tones.blue.dot)} /> Logo
         </span>

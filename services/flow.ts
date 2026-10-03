@@ -30,8 +30,8 @@ export async function upsertClientFlowGraph(clientId: string, graph: FlowGraph):
 
 function hasDemandNodes(graph: FlowGraph, demandId: string): boolean {
   return graph.nodes.some(
-    (n): n is FlowNode & { type: "gerarImagem" } =>
-      n.type === "gerarImagem" && n.data.demandId === demandId
+    (n): n is FlowNode & { type: "arte" } =>
+      n.type === "arte" && n.data.demandId === demandId
   );
 }
 
