@@ -165,3 +165,73 @@ export function compilePrompt(
 
   return parts.join("\n\n");
 }
+
+/**
+ * Compilador do "Space" (canvas node-based) — ao contrário do `compilePrompt`
+ * do pipeline estruturado, aqui o texto do operador é DIREÇÃO CRIATIVA e vai
+ * praticamente literal. Sem o colete de força "a imagem deve conter SOMENTE
+ * esses textos, nada mais" e sem forçar a paleta como fundo — o operador pede
+ * o que quiser (imagem de fundo, cena, etc.) e isso é respeitado.
+ *
+ * A instrução livre do operador chega em `informacoesExtras` (quando o prompt
+ * não usa rótulos Headline/CTA, o texto inteiro cai aqui). Headline/subheadline/
+ * CTA, quando presentes, são a COPY a exibir — a única restrição de texto.
+ */
+export function compileSpacePrompt(
+  profile: CreativeProfile,
+  briefing: BriefingCopy,
+  artSpec: ArtSpec,
+  demandRefs: DemandReference[] = [],
+  logoDirective: string | null = null
+): string {
+  const parts: string[] = [];
+
+  // 1. Direção criativa do operador — primeiro e sem reescrita.
+  if (artSpec.informacoesExtras?.trim()) {
+    parts.push(artSpec.informacoesExtras.trim());
+  }
+
+  // Logo enviada como referência: instrução de posição/tamanho vinda do node.
+  if (logoDirective?.trim()) {
+    parts.push(logoDirective.trim());
+  }
+
+  // 2. Identidade da marca como apoio (não manda no layout).
+  if (profile.base_prompt.trim()) {
+    parts.push(`Identidade visual da marca (referência de estilo, não copiar ao pé da letra): ${profile.base_prompt.trim()}`);
+  }
+
+  if (briefing.titulo) parts.push(`Campanha: "${briefing.titulo}".`);
+
+  // 3. Referências anexadas (acervo/estilo).
+  const refBlock = buildReferenceBlock(buildOrderedRefs(profile, demandRefs));
+  if (refBlock) parts.push(refBlock);
+
+  // 4. Copy a exibir — a ÚNICA restrição de texto (não "nada além disso").
+  const copy: string[] = [];
+  if (artSpec.headline) copy.push(`Headline: "${artSpec.headline}"`);
+  if (artSpec.subheadline) copy.push(`Subheadline: "${artSpec.subheadline}"`);
+  if (artSpec.cta) copy.push(`CTA: "${artSpec.cta}"`);
+  if (copy.length > 0) {
+    parts.push(
+      "Textos a exibir na arte (use exatamente estes como copy, sem inventar outros):\n" +
+        copy.map((l) => `- ${l}`).join("\n")
+    );
+    if (artSpec.cta) {
+      parts.push("Renderize o CTA como um botão gráfico, centralizado na parte inferior.");
+    }
+  }
+
+  // 5. Paleta como referência de cor (NÃO forçada como fundo).
+  if (profile.palette.length > 0) {
+    parts.push(`Paleta da marca para referência de cor: ${profile.palette.join(", ")}.`);
+  }
+
+  // 6. Técnico.
+  const tech: string[] = [];
+  if (artSpec.aspect_ratio) tech.push(`proporção ${artSpec.aspect_ratio}`);
+  if (artSpec.image_size) tech.push(`resolução ${artSpec.image_size}`);
+  if (tech.length > 0) parts.push(`Produção profissional, ${tech.join(", ")}.`);
+
+  return parts.join("\n\n");
+}

@@ -29,7 +29,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { generateArtImage } from "./provider";
 import { urlToInlineDataPart } from "./storage-refs";
 import { compositeBrandLogo, prepareLogo } from "./brand-logo";
-import { compilePrompt } from "./prompt-compiler";
+import { compilePrompt, compileSpacePrompt } from "./prompt-compiler";
+import { buildLogoDirective } from "@/lib/flow/logo-directive";
 import { adaptArtToStory } from "./story";
 import {
   appendTechnicalBlock,
@@ -84,6 +85,8 @@ type JobRow = {
     count?: number;
     fanout_reference_urls?: string[] | null;
     skip_logo?: boolean;
+    logo_position?: string | null;
+    logo_size?: string | null;
     briefing_titulo?: string | null;
     briefing_tipo?: string | null;
     extra_reference_urls?: string[] | null;
@@ -396,11 +399,20 @@ async function runJob(
     imageSize: artSpec.image_size,
   };
 
-  // Referências enviadas ao modelo. A logo nunca entra: ela é composta depois.
+  // No Space (ephemeral) a logo vai como REFERÊNCIA pro modelo — ele passa a
+  // saber que a logo existe e reserva espaço pra ela, em vez de gerar
+  // texto/elementos onde a logo sobreposta cairia. Nos demais fluxos a logo
+  // continua sendo composta depois (nítida, pixel-perfect).
+  const logoAsReference = job.ephemeral === true && !skipLogo && !!effectiveLogoUrl;
+  const logoDirective = logoAsReference
+    ? buildLogoDirective(job.params.logo_position ?? undefined, job.params.logo_size ?? undefined)
+    : null;
+
   const styleRefs = directedRefs.filter((r) => r.role !== "logo");
   const references = approvedPrompt
     ? styleRefs.map((r) => ({ url: r.storage_url, intent: r.intent ?? r.role }))
     : [
+        ...(logoAsReference ? [{ url: effectiveLogoUrl!, intent: logoDirective! }] : []),
         ...creativeProfile.style_reference_urls.map((url) => ({
           url,
           intent: "referência de estilo do cliente",
@@ -420,11 +432,15 @@ async function runJob(
         job.direction?.negative
       );
     }
-    // Sem diretor (canvas de fluxo): prompt compilado + os mesmos padrões.
-    const parts = [
-      compilePrompt(creativeProfile, briefing, artSpec, allDemandRefs),
-      buildStandardsBlock(textSpec),
-    ];
+    // Space (canvas): a direção criativa do operador vai literal, sem o colete
+    // de força do pipeline estruturado. Demais fluxos sem diretor mantêm o
+    // compilador clássico + padrões.
+    const parts = job.ephemeral
+      ? [compileSpacePrompt(creativeProfile, briefing, artSpec, allDemandRefs, logoDirective)]
+      : [
+          compilePrompt(creativeProfile, briefing, artSpec, allDemandRefs),
+          buildStandardsBlock(textSpec),
+        ];
     if (fixNotes?.length) {
       parts.push(
         ["A PREVIOUS ATTEMPT FAILED REVIEW. Fix all of these:", ...fixNotes.map((n) => `- ${n}`)].join("\n")
@@ -433,11 +449,14 @@ async function runJob(
     return parts.join("\n\n");
   };
 
-  const cleanLogo = effectiveLogoUrl
-    ? await prepareLogo(
-        Buffer.from((await urlToInlineDataPart(effectiveLogoUrl)).inlineData.data, "base64")
-      )
-    : null;
+  // Quando a logo vai como referência (Space), não compõe depois — senão ela
+  // apareceria duas vezes. Composite segue nos demais fluxos.
+  const cleanLogo =
+    effectiveLogoUrl && !logoAsReference
+      ? await prepareLogo(
+          Buffer.from((await urlToInlineDataPart(effectiveLogoUrl)).inlineData.data, "base64")
+        )
+      : null;
 
   type Candidate = { raw: Buffer; final: Buffer; prompt: string; review: ArtReview | null; attempts: number };
 

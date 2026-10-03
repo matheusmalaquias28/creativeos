@@ -76,6 +76,10 @@ export type SaidaArteData = {
 export type ReferenciaImagemData = {
   imageUrl: string | null;
   label?: string;
+  /** Categoria de uso vinda do acervo (subject/brand/style/environment). */
+  category?: string;
+  /** Instrução de como usar a imagem — vira o `role` da referência na geração. */
+  intent?: string;
 };
 
 /**
@@ -93,6 +97,9 @@ export type ArteData = PromptFields & {
   model?: string;
   quality?: 'low' | 'medium' | 'high';
   count?: number;
+  /** Posição/tamanho da logo (quando enviada como referência). Ver logo-directive.ts */
+  logoPosition?: string;
+  logoSize?: 'small' | 'medium' | 'large';
   // Contexto
   demandId?: string;
   clientId?: string;

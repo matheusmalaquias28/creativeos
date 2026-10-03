@@ -35,6 +35,9 @@ export type FlowJobParams = {
   fanout_reference_urls?: string[] | null;
   /** Stories: reenquadra a arte já pronta — não recompor logo (ela já está lá). */
   skip_logo?: boolean;
+  /** Posição/tamanho da logo (quando enviada como referência no Space). */
+  logo_position?: string | null;
+  logo_size?: string | null;
   briefing_titulo?: string | null;
   briefing_tipo?: string | null;
   flow_logo_url: string | null;
@@ -76,14 +79,13 @@ function addReferenciaImagemNode(
   if (node.type !== "referenciaImagem") return;
   const data = node.data as ReferenciaImagemData;
   const label = data.label?.trim();
-  addReference(
-    refs,
-    seen,
-    data.imageUrl,
-    label
+  // `intent` vem do acervo (instrução da categoria) e vence o texto genérico.
+  const role = data.intent?.trim()
+    ? data.intent.trim()
+    : label
       ? `use a referência "${label}" como guia visual principal`
-      : "use esta imagem como referência visual"
-  );
+      : "use esta imagem como referência visual";
+  addReference(refs, seen, data.imageUrl, role);
 }
 
 function resolveNamedRefTokens(
@@ -366,6 +368,8 @@ function extractArteJob(
     count: Math.max(1, data.count ?? 1),
     fanout_reference_urls: fanoutUrls,
     skip_logo: data.format === "story",
+    logo_position: data.logoPosition ?? null,
+    logo_size: data.logoSize ?? null,
     briefing_titulo: briefing.titulo ?? null,
     briefing_tipo: briefing.tipo ?? null,
     flow_logo_url: logoUrl,
@@ -390,6 +394,8 @@ export function flowJobParamsToRow(p: FlowJobParams): Json {
     count: p.count,
     fanout_reference_urls: p.fanout_reference_urls ?? null,
     skip_logo: p.skip_logo ?? false,
+    logo_position: p.logo_position ?? null,
+    logo_size: p.logo_size ?? null,
     briefing_titulo: p.briefing_titulo,
     briefing_tipo: p.briefing_tipo,
     flow_logo_url: p.flow_logo_url,

@@ -35,12 +35,18 @@ export function LibraryPickerDialog({
   arteIndex,
   onClose,
   onAdded,
+  onPick,
 }: {
   demandId: string;
   /** Arte alvo; null fecha o dialog. */
   arteIndex: number | null;
   onClose: () => void;
-  onAdded: (reference: ArteReference) => void;
+  onAdded?: (reference: ArteReference) => void;
+  /**
+   * Modo canvas: em vez de gravar em demand_reference_image, devolve a imagem +
+   * categoria escolhidas para quem chamou (o node cria a referência no Space).
+   */
+  onPick?: (image: LibraryImage, category: ReferenceCategory) => void;
 }) {
   const open = arteIndex !== null;
   const [images, setImages] = useState<LibraryImage[] | null>(libraryCache);
@@ -85,6 +91,15 @@ export function LibraryPickerDialog({
 
   function add() {
     if (arteIndex === null || !selected || !category) return;
+
+    // Modo canvas: devolve a escolha, sem tocar em demand_reference_image.
+    if (onPick) {
+      onPick(selected, category);
+      toast.success(`Adicionada como ${CATEGORY_META[category].short}`);
+      onClose();
+      return;
+    }
+
     startTransition(async () => {
       const result = await addLibraryImageToArteAction({
         demandId,
@@ -97,7 +112,7 @@ export function LibraryPickerDialog({
         return;
       }
       toast.success(`Adicionada à arte ${arteIndex + 1} como ${CATEGORY_META[category].short}`);
-      onAdded(result.reference);
+      onAdded?.(result.reference);
       onClose();
     });
   }
