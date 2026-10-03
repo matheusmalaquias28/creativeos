@@ -2,8 +2,12 @@
 export const IMAGE_GEN_DEFAULTS = {
   aspectRatio: "3:4",
   imageSize: "2K",
-  /** Slug Magnific (images_generate.mode) ou "gemini" para o pipeline Gemini. */
-  model: "gpt-2",
+  /**
+   * Campo legado — o provider real é escolhido por IMAGE_PROVIDER (ver
+   * provider.ts); o worker IGNORA este `model`. Mantido só porque o shape dos
+   * nodes/params ainda o carrega. O Space usa OpenAI `gpt-image-2`.
+   */
+  model: "gpt-image-2",
   quality: "low" as const,
 } as const;
 

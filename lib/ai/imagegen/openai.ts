@@ -20,7 +20,7 @@
 import sharp from "sharp";
 
 const OPENAI_API = "https://api.openai.com/v1";
-const DEFAULT_MODEL = "gpt-image-2.5-sunburst";
+const DEFAULT_MODEL = "gpt-image-2";
 /** Teto defensivo de referências por chamada (evita payload gigante). */
 const MAX_REFERENCES = 8;
 
