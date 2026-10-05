@@ -100,6 +100,12 @@ export type ArteData = PromptFields & {
   /** Posição/tamanho da logo (quando enviada como referência). Ver logo-directive.ts */
   logoPosition?: string;
   logoSize?: 'small' | 'medium' | 'large';
+  /**
+   * A identidade de marca do cliente (base_prompt/paleta) já foi semeada como
+   * linha visível no prompt deste node — ver enrich-graph.ts. Uma vez `true`,
+   * nunca mais reaparece sozinha: apagar a linha é definitivo.
+   */
+  brandIdentitySeeded?: boolean;
   // Contexto
   demandId?: string;
   clientId?: string;

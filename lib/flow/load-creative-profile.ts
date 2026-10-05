@@ -3,6 +3,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export type FlowCreativeProfile = {
   logo_url: string | null;
   style_reference_urls: string[] | null;
+  base_prompt: string | null;
+  palette: string[] | null;
 };
 
 /**
@@ -20,7 +22,7 @@ export async function loadFlowCreativeProfile(
   const [{ data: profile }, { data: refRows }, { data: onboarding }] = await Promise.all([
     supabase
       .from("client_creative_profile")
-      .select("logo_url, style_reference_urls, identity_sample_urls")
+      .select("logo_url, style_reference_urls, identity_sample_urls, base_prompt, palette")
       .eq("client_id", clientId)
       .maybeSingle(),
     supabase
@@ -55,5 +57,7 @@ export async function loadFlowCreativeProfile(
   return {
     logo_url: profile?.logo_url ?? onboardingLogo,
     style_reference_urls: referenceUrls,
+    base_prompt: profile?.base_prompt?.trim() || null,
+    palette: (profile?.palette as string[] | null) ?? null,
   };
 }

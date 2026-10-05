@@ -374,29 +374,53 @@ async function runJob(
   };
 
   const creativeProfile: CreativeProfile = {
-    base_prompt: profile?.base_prompt ?? "",
-    palette: (profile?.palette as string[]) ?? [],
-    logo_mode: (profile?.logo_mode as "reference" | "composite") ?? "composite",
-    style_reference_urls: usesFlowGraph
-      ? []
-      : ((profile?.style_reference_urls as string[]) ?? []),
+    // Job efêmero (Space): base_prompt/paleta já foram semeados como linha
+    // visível no prompt pelo enrich-graph.ts antes da extração — incluir de
+    // novo aqui mandaria a MESMA coisa pro modelo por um canal invisível.
+    base_prompt: job.ephemeral === true ? "" : profile?.base_prompt ?? "",
+    palette: job.ephemeral === true ? [] : (profile?.palette as string[]) ?? [],
+    // Job efêmero: a logo é 100% decidida pelo node clienteLogo conectado
+    // (ou não) nessa arte — nunca pelo `logo_mode` global do cliente.
+    // "composite" aqui só evita que buildOrderedRefs invente uma entrada de
+    // logo na lista de referências sem imagem correspondente de verdade.
+    logo_mode:
+      job.ephemeral === true
+        ? "composite"
+        : (profile?.logo_mode as "reference" | "composite") ?? "composite",
+    // Job efêmero: referências de estilo fixas do cliente só entram se
+    // estiverem conectadas no canvas (clienteReferencias) — `usesFlowGraph`
+    // dava falso-negativo numa arte sem NADA conectado (sem refs, sem logo),
+    // que ainda assim cairia nesse fallback e herdaria as referências fixas
+    // do cliente sem nenhum indício disso em Spaces.
+    style_reference_urls:
+      job.ephemeral === true ? [] : (profile?.style_reference_urls as string[]) ?? [],
   };
 
   // Stories reenquadra uma arte que JÁ tem a logo — recompor duplicaria.
   const skipLogo = job.params.skip_logo === true;
 
-  let effectiveLogoUrl = flowLogoUrl?.trim() || profile?.logo_url?.trim() || null;
-  if (!skipLogo && !effectiveLogoUrl && job.client_id) {
-    const { data: onboarding, error: logoError } = await supabase
-      .from("onboarding_answers").select("answers").eq("client_id", job.client_id).maybeSingle();
-    if (logoError) throw new Error("Não foi possível carregar a logo do cliente");
-    const answers = onboarding?.answers as { logoUrl?: unknown } | null;
-    effectiveLogoUrl = typeof answers?.logoUrl === "string" ? answers.logoUrl.trim() || null : null;
+  let effectiveLogoUrl: string | null;
+  if (job.ephemeral === true) {
+    // Space: só usa o que está CONECTADO no canvas dessa arte específica.
+    // Sem node clienteLogo conectado = sem logo nessa geração — nunca cai
+    // escondido pro perfil/onboarding do cliente por fora do que o operador
+    // vê e decide no grafo (desconectar a logo é uma escolha visível e vale).
+    effectiveLogoUrl = skipLogo ? null : (flowLogoUrl?.trim() || null);
+  } else {
+    // Pipeline legado (sem canvas pra mostrar) — aqui sim cai no perfil do
+    // cliente, e depois no onboarding, com logo obrigatória.
+    effectiveLogoUrl = flowLogoUrl?.trim() || profile?.logo_url?.trim() || null;
+    if (!skipLogo && !effectiveLogoUrl && job.client_id) {
+      const { data: onboarding, error: logoError } = await supabase
+        .from("onboarding_answers").select("answers").eq("client_id", job.client_id).maybeSingle();
+      if (logoError) throw new Error("Não foi possível carregar a logo do cliente");
+      const answers = onboarding?.answers as { logoUrl?: unknown } | null;
+      effectiveLogoUrl = typeof answers?.logoUrl === "string" ? answers.logoUrl.trim() || null : null;
+    }
+    if (!skipLogo && !effectiveLogoUrl) {
+      throw new Error("Logo do cliente não encontrada. Cadastre a logo antes de gerar; a arte não será entregue sem ela.");
+    }
   }
-  if (!skipLogo && !effectiveLogoUrl) {
-    throw new Error("Logo do cliente não encontrada. Cadastre a logo antes de gerar; a arte não será entregue sem ela.");
-  }
-  if (skipLogo) effectiveLogoUrl = null;
 
   const textSpec: TechnicalBlockSpec = {
     headline: artSpec.headline,

@@ -5,6 +5,9 @@
  * divergir do que está escrito aqui, visível e editável pelo operador.
  */
 
+/** Label da linha de identidade de marca semeada pelo enrich-graph.ts. */
+export const BRAND_IDENTITY_LABEL = "Identidade da marca";
+
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -49,4 +52,43 @@ export function upsertMentionLine(
   }
   const base = text.trimEnd();
   return base ? `${base}\n${line}` : line;
+}
+
+/**
+ * Cola uma linha `label: conteúdo` no texto do prompt SE ela ainda não
+ * existir — pra direcionamento sem uma imagem/node conectável por trás (ex.:
+ * identidade de marca do cliente). Diferente de `upsertMentionLine` (que
+ * sempre espelha o valor atual de um seletor), aqui não há seletor: semeia
+ * uma vez, visível, e dali em diante o texto no canvas manda — editar ou
+ * apagar a linha é definitivo, nunca reaparece sozinha sobrescrevendo o que
+ * o operador decidiu.
+ */
+export function seedLabeledLineIfMissing(text: string, label: string, content: string): string {
+  const prefix = `${label}:`;
+  const already = text.split("\n").some((l) => l.trim().toLowerCase().startsWith(prefix.toLowerCase()));
+  if (already) return text;
+  const line = `${prefix} ${content}`;
+  const base = text.trimEnd();
+  return base ? `${base}\n${line}` : line;
+}
+
+/**
+ * Lê o conteúdo de uma linha `label: conteúdo` do texto do prompt (ver
+ * `seedLabeledLineIfMissing`). `parsePromptArteText` só reconhece as 4 labels
+ * de copy (Headline/Subheadline/CTA/Extras) — qualquer outra linha, como essa,
+ * cai fora do `informacoesExtras` estruturado quando essas labels existem.
+ * Por isso a extração do job lê essa linha direto do texto bruto e garante
+ * que ela entra no prompt final de qualquer jeito — nunca fica só visível
+ * sem efeito.
+ */
+export function extractLabeledLine(text: string | null | undefined, label: string): string | null {
+  if (!text) return null;
+  const prefix = `${label}:`;
+  for (const line of text.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed.toLowerCase().startsWith(prefix.toLowerCase())) {
+      return trimmed.slice(prefix.length).trim() || null;
+    }
+  }
+  return null;
 }

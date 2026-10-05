@@ -1,9 +1,13 @@
 import { IMAGE_GEN_DEFAULTS } from "@/lib/ai/imagegen/defaults";
-import type { FlowGraph, FlowNode } from "@/lib/flow/types";
+import { BRAND_IDENTITY_LABEL, seedLabeledLineIfMissing } from "@/lib/flow/mention-text";
+import { getPromptArteEditorText } from "@/lib/flow/prompt-arte-text";
+import type { FlowGraph } from "@/lib/flow/types";
 
 type CreativeProfileRow = {
   logo_url: string | null;
   style_reference_urls: string[] | null;
+  base_prompt?: string | null;
+  palette?: string[] | null;
 };
 
 export function enrichFlowGraphWithProfile(
@@ -11,6 +15,13 @@ export function enrichFlowGraphWithProfile(
   profile: CreativeProfileRow | null
 ): FlowGraph {
   if (!profile) return graph;
+
+  const brandContent = [
+    profile.base_prompt?.trim() || null,
+    profile.palette?.length ? `paleta ${profile.palette.join(", ")}` : null,
+  ]
+    .filter(Boolean)
+    .join(" — ");
 
   return {
     ...graph,
@@ -38,9 +49,7 @@ export function enrichFlowGraphWithProfile(
           },
         };
       }
-      if (node.type === "gerarImagem" || node.type === "arte") {
-        // Só preenche o que o operador NÃO definiu no node — nunca sobrescreve
-        // os controles escolhidos (formato/esforço/resolução/quantidade).
+      if (node.type === "gerarImagem") {
         const d = node.data;
         return {
           ...node,
@@ -51,7 +60,29 @@ export function enrichFlowGraphWithProfile(
             model: d.model ?? IMAGE_GEN_DEFAULTS.model,
             quality: d.quality ?? IMAGE_GEN_DEFAULTS.quality,
           },
-        } as FlowNode;
+        };
+      }
+      if (node.type === "arte") {
+        // Só preenche o que o operador NÃO definiu no node — nunca sobrescreve
+        // os controles escolhidos (formato/esforço/resolução/quantidade).
+        const d = node.data;
+        const withDefaults = {
+          ...d,
+          aspectRatio: d.aspectRatio ?? IMAGE_GEN_DEFAULTS.aspectRatio,
+          imageSize: d.imageSize ?? IMAGE_GEN_DEFAULTS.imageSize,
+          model: d.model ?? IMAGE_GEN_DEFAULTS.model,
+          quality: d.quality ?? IMAGE_GEN_DEFAULTS.quality,
+        };
+        // Base_prompt/paleta do cliente nunca entram escondidos no prompt
+        // final — semeia uma linha editável/removível no texto do node, UMA
+        // vez só (flag persistida): depois disso o texto no canvas manda,
+        // nunca sobrescreve o que o operador editou ou apagou.
+        if (brandContent && !withDefaults.brandIdentitySeeded) {
+          const text = getPromptArteEditorText(withDefaults);
+          withDefaults.promptText = seedLabeledLineIfMissing(text, BRAND_IDENTITY_LABEL, brandContent);
+          withDefaults.brandIdentitySeeded = true;
+        }
+        return { ...node, data: withDefaults };
       }
       return node;
     }),

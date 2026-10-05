@@ -1,6 +1,6 @@
 import { IMAGE_GEN_DEFAULTS } from "@/lib/ai/imagegen/defaults";
 import { buildLogoDirective } from "@/lib/flow/logo-directive";
-import { extractMentionInstruction } from "@/lib/flow/mention-text";
+import { BRAND_IDENTITY_LABEL, extractLabeledLine, extractMentionInstruction } from "@/lib/flow/mention-text";
 import { getPromptArteEditorText, resolvePromptArteFields } from "@/lib/flow/prompt-arte-text";
 import type { Json } from "@/types/database";
 import type {
@@ -381,12 +381,24 @@ function extractArteJob(
   const headline = resolveNamedRefTokens(rawPrompt.headline, namedRefMap, refs, seen);
   const subheadline = resolveNamedRefTokens(rawPrompt.subheadline, namedRefMap, refs, seen);
   const cta = resolveNamedRefTokens(rawPrompt.cta, namedRefMap, refs, seen);
-  const informacoesExtras = resolveNamedRefTokens(
+  let informacoesExtras = resolveNamedRefTokens(
     rawPrompt.informacoesExtras,
     namedRefMap,
     refs,
     seen
   );
+
+  // `parsePromptArteText` só reconhece Headline/Subheadline/CTA/Extras — a
+  // linha "Identidade da marca: ..." (ver enrich-graph.ts) cai fora do
+  // informacoesExtras estruturado quando essas labels existem. Lê direto do
+  // texto bruto e garante que ela entra no prompt final de qualquer jeito —
+  // visível no node tem que ser igual a usado na geração, sempre.
+  const brandLine = extractLabeledLine(fullText, BRAND_IDENTITY_LABEL);
+  if (brandLine && !(informacoesExtras ?? "").includes(brandLine)) {
+    informacoesExtras = [informacoesExtras, `${BRAND_IDENTITY_LABEL}: ${brandLine}`]
+      .filter(Boolean)
+      .join("\n\n");
+  }
 
   // A frase da logo vem da linha `@(logo) — ...` que o próprio seletor da UI
   // colou no prompt (ver arte-node.tsx). Só cai no fallback computado se essa

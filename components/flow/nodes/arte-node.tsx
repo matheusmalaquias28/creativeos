@@ -67,24 +67,22 @@ function AspectGlyph({ aspect }: { aspect: string }) {
 }
 
 /**
- * Texto do prompt com as menções `@(nome)` renderizadas como chips. Menção que
- * casa com uma referência realmente conectada ao node fica VERDE; menção sem
- * vínculo (texto solto) fica apagada.
+ * Texto do prompt com as menções `@(nome)` renderizadas como chip — SÓ quando
+ * a menção casa com uma referência realmente conectada ao node (badge verde
+ * com o nome). `@(algo)` sem vínculo é texto solto igual ao resto — não vira
+ * badge nenhum, pra não parecer uma referência que não existe de verdade.
  */
 function PromptPreview({ text, linked }: { text: string; linked: Set<string> }) {
   return (
     <>
       {text.split(/(@\([^)]+\))/g).map((part, i) => {
         const m = /^@\(([^)]+)\)$/.exec(part);
-        if (!m) return <span key={i}>{part}</span>;
-        const isLinked = linked.has(part.toLowerCase());
+        const isLinked = m && linked.has(part.toLowerCase());
+        if (!isLinked) return <span key={i}>{part}</span>;
         return (
           <span
             key={i}
-            className={cn(
-              "mx-0.5 rounded-md px-1.5 py-px text-[0.75rem] font-semibold",
-              isLinked ? "bg-emerald-500/85 text-white" : "bg-white/15 text-white/60"
-            )}
+            className="mx-0.5 rounded-md bg-emerald-500/85 px-1.5 py-px text-[0.75rem] font-semibold text-white"
           >
             @{m[1]}
           </span>
