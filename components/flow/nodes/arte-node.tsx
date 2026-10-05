@@ -15,6 +15,7 @@ import {
   RefreshCw,
   Gauge,
   Library,
+  FolderUp,
 } from "lucide-react";
 import type { Node } from "@xyflow/react";
 import { toast } from "sonner";
@@ -23,6 +24,7 @@ import { flowHandleClass } from "@/components/flow/nodes/node-shell";
 import { ImageLightbox } from "@/components/flow/nodes/node-image";
 import { NodeSelect } from "@/components/flow/nodes/node-select";
 import { LibraryPickerDialog } from "@/components/image-library/library-picker-dialog";
+import { SendToDriveDialog } from "@/components/flow/send-to-drive-dialog";
 import { CATEGORY_META, type ReferenceCategory } from "@/lib/image-library/categories";
 import {
   LOGO_POSITIONS,
@@ -33,6 +35,7 @@ import {
   type LogoSize,
 } from "@/lib/flow/logo-directive";
 import { upsertMentionLine } from "@/lib/flow/mention-text";
+import { slugify } from "@/lib/utils/slug";
 import {
   getPromptArteEditorText,
   parsePromptArteText,
@@ -312,7 +315,7 @@ export function ArteNode({ id, data, selected }: Props) {
   const safeIdx = Math.min(Math.max(0, idx), Math.max(0, stack.length - 1));
   const current = stack[safeIdx];
   const [lightbox, setLightbox] = useState(false);
-  const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
+  const [driveOpen, setDriveOpen] = useState(false);
   const count = data.count ?? 1;
   const aspect = data.aspectRatio ?? "4:5";
 
@@ -346,13 +349,35 @@ export function ArteNode({ id, data, selected }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasLogo, isStory]);
 
+  // Nome do arquivo: SEMPRE o nome da demanda + um número (o índice da arte)
+  // pra diferenciar — nunca o label do node (que pode ter sido renomeado).
+  const downloadFilename = (() => {
+    const demandName = data.briefingTitulo?.trim() || data.label?.trim() || "arte";
+    return `${slugify(demandName) || "arte"}-${data.artIndex + 1}.png`;
+  })();
+
+  // Baixa de verdade (não abre aba nova): a URL do Storage é de outra origem,
+  // então `<a download>` sozinho é ignorado pelo navegador — baixa como blob
+  // same-origin e aciona o download a partir dele.
+  async function downloadUrl(url: string, filename: string) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("download falhou");
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      toast.error("Não foi possível baixar a imagem");
+    }
+  }
+
   function download() {
     if (!current) return;
-    const a = document.createElement("a");
-    a.href = current.url;
-    a.download = `${(data.label ?? `arte-${data.artIndex + 1}`).replace(/\s+/g, "-").toLowerCase()}-${safeIdx + 1}.png`;
-    a.target = "_blank";
-    a.click();
+    void downloadUrl(current.url, downloadFilename);
   }
 
   const statusPill =
@@ -388,10 +413,11 @@ export function ArteNode({ id, data, selected }: Props) {
             </button>
           </div>
         )}
-        {current && dims && (
-          <span className="flex h-7 items-center rounded-full border border-border bg-card px-2.5 text-xs font-bold tabular-nums text-muted-foreground">
-            {dims.w} × {dims.h}
-          </span>
+        {current && (
+          <button type="button" onClick={() => setDriveOpen(true)} title="Enviar para o Drive de outra demanda"
+            className="flex h-7 items-center gap-1 rounded-full border border-border bg-card px-2.5 text-xs font-semibold text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground">
+            <FolderUp className="size-3.5" /> Drive
+          </button>
         )}
         {statusPill && (
           <span className="flex h-7 items-center gap-1.5 rounded-full border border-border bg-card px-2.5 text-xs font-semibold text-foreground">
@@ -436,7 +462,6 @@ export function ArteNode({ id, data, selected }: Props) {
               src={current.url}
               alt={data.label ?? ""}
               draggable={false}
-              onLoad={(e) => setDims({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
               onDoubleClick={() => !promptOpen && setLightbox(true)}
               className={cn(
                 "size-full cursor-zoom-in object-cover transition-[filter,transform] duration-300 ease-out",
@@ -477,6 +502,42 @@ export function ArteNode({ id, data, selected }: Props) {
 
         {/* Overlay de UI */}
         <div className="pointer-events-none absolute inset-0 flex flex-col p-3.5 [&_button]:pointer-events-auto [&_textarea]:pointer-events-auto">
+          {/* Pilha: uma miniatura por versão já gerada, cada uma com download próprio. */}
+          {stack.length > 1 && (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {stack.map((item, i) => (
+                <div
+                  key={item.versionId}
+                  className={cn(
+                    "group nodrag relative size-9 shrink-0 overflow-hidden rounded-lg border-2 transition-colors",
+                    i === safeIdx ? "border-primary" : "border-white/15 hover:border-white/40"
+                  )}
+                >
+                  <button
+                    type="button"
+                    title={`Versão ${i + 1}`}
+                    onClick={() => setIdx(i)}
+                    className="absolute inset-0"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={item.url} alt={`Versão ${i + 1}`} draggable={false} className="size-full object-cover" />
+                  </button>
+                  <button
+                    type="button"
+                    title="Baixar esta versão"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void downloadUrl(item.url, downloadFilename);
+                    }}
+                    className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 transition-opacity group-hover:opacity-100"
+                  >
+                    <Download className="size-3.5 text-white" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Logo: posição + tamanho (só quando há logo conectada) */}
           {!isStory && hasLogo && (
             <div className="mt-2 flex items-center gap-1.5">
@@ -664,6 +725,10 @@ export function ArteNode({ id, data, selected }: Props) {
           onClose={() => setPickerOpen(false)}
           onPick={addLibraryReference}
         />
+      )}
+
+      {driveOpen && current && (
+        <SendToDriveDialog sourceUrl={current.url} onClose={() => setDriveOpen(false)} />
       )}
     </div>
   );

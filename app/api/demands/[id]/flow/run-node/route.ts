@@ -4,7 +4,7 @@ import { runWorker } from "@/lib/ai/imagegen/worker";
 import { extractFlowJobParams, flowJobParamsToRow } from "@/lib/flow/extract-flow-jobs";
 import { enrichFlowGraphWithProfile } from "@/lib/flow/enrich-graph";
 import { loadFlowCreativeProfile } from "@/lib/flow/load-creative-profile";
-import { getClientFlowGraph } from "@/services/flow";
+import { getClientFlowGraph, syncAndPersistDemandReferences } from "@/services/flow";
 import type { FlowGraph } from "@/lib/flow/types";
 
 // Cobre o worker de geração (rodado via after() abaixo) — cada job tem seu próprio
@@ -44,16 +44,20 @@ export async function POST(req: Request, { params }: Params) {
     return NextResponse.json({ error: "Demanda não encontrada" }, { status: 404 });
   }
 
-  const graph = demand.client_id
+  const savedGraph = demand.client_id
     ? await getClientFlowGraph(demand.client_id)
     : ((demand.flow_graph as FlowGraph | null) ?? null);
 
-  if (!graph || !graph.nodes?.length) {
+  if (!savedGraph || !savedGraph.nodes?.length) {
     return NextResponse.json(
       { error: "Nenhum fluxo salvo — salve o fluxo antes de executar" },
       { status: 400 }
     );
   }
+
+  // Sincroniza referências cadastradas na página da demanda antes de gerar —
+  // ver run/route.ts para o motivo.
+  const graph = await syncAndPersistDemandReferences(demand, savedGraph);
 
   const profile = await loadFlowCreativeProfile(demand.client_id ?? null);
 
@@ -71,21 +75,38 @@ export async function POST(req: Request, { params }: Params) {
     );
   }
 
-  await supabase
+  // Reaproveita o MESMO job (mesma linha, mesmo id) ao regerar — nunca cria um
+  // job novo pra essa art_index. art_version referencia job_id: um job novo
+  // a cada clique em "Gerar" deixava a pilha de versões anteriores órfã (a UI
+  // só lê versions do job atual), como se as artes já geradas tivessem sido
+  // perdidas. Reusar o id mantém a pilha completa (v1, v2, …) sempre visível.
+  const { data: existingJob } = await supabase
     .from("art_generation_job")
-    .delete()
+    .select("id")
     .eq("demand_id", demandId)
     .eq("art_index", body.artIndex)
-    .in("status", ["queued", "failed"]);
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-  const { error } = await supabase.from("art_generation_job").insert({
-    demand_id: demandId,
-    client_id: demand.client_id,
-    art_index: job.art_index,
-    status: "queued",
-    ephemeral: true,
-    params: flowJobParamsToRow(job),
-  });
+  const { error } = existingJob
+    ? await supabase
+        .from("art_generation_job")
+        .update({
+          status: "queued",
+          error: null,
+          ephemeral: true,
+          params: flowJobParamsToRow(job),
+        })
+        .eq("id", existingJob.id)
+    : await supabase.from("art_generation_job").insert({
+        demand_id: demandId,
+        client_id: demand.client_id,
+        art_index: job.art_index,
+        status: "queued",
+        ephemeral: true,
+        params: flowJobParamsToRow(job),
+      });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

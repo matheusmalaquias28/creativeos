@@ -344,9 +344,16 @@ async function runJob(
     role: ref.role,
   }));
 
-  const allDemandRefs = usesFlowGraph
-    ? [...flowDemandRefs, ...demandRefs]
-    : [...demandRefs, ...extraRefs];
+  // Job efêmero (Space): `demand_reference_image` já foi materializada como
+  // node `referenciaImagem` no grafo antes de extrair o job (ver
+  // syncAndPersistDemandReferences em services/flow.ts) — por isso já está
+  // em flowDemandRefs. Somar `demandRefs` aqui mandaria a MESMA imagem duas
+  // vezes pro modelo.
+  const allDemandRefs = job.ephemeral === true
+    ? flowDemandRefs
+    : usesFlowGraph
+      ? [...flowDemandRefs, ...demandRefs]
+      : [...demandRefs, ...extraRefs];
 
   const artSpec: ArtSpec = {
     headline: job.params.headline,

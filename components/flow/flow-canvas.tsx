@@ -53,7 +53,7 @@ import { FLOW_NODE_TONE } from "@/components/flow/nodes/node-shell";
 import { Button } from "@/components/ui/button";
 import { tones } from "@/lib/design/tokens";
 import { cn } from "@/lib/utils";
-import { gerarFluxoDaDemanda, gerarSubfluxoDaDemanda, ROW_H } from "@/lib/flow/generator";
+import { ARTE_ROW_Y, gerarFluxoDaDemanda, gerarSubfluxoDaDemanda, ROW_H } from "@/lib/flow/generator";
 import { IMAGE_GEN_DEFAULTS } from "@/lib/ai/imagegen/defaults";
 import type { FlowGraph, SaidaArteData } from "@/lib/flow/types";
 import type { CreativeDemand } from "@/types/demand";
@@ -588,11 +588,14 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
     const logoId = currentNodes.find((n) => n.type === "clienteLogo")?.id ?? "logo";
     const refsId = currentNodes.find((n) => n.type === "clienteReferencias")?.id ?? "refs";
 
+    // Piso em ARTE_ROW_Y - ROW_H: com só logo/refs sobrando, +ROW_H cai em
+    // ARTE_ROW_Y — a linha de artes sempre abaixo do bloco logo/refs, nunca
+    // por cima dele (ver mesma lógica em generator.ts:maxContentY).
     const maxY = keptNodes.reduce((max, n) => {
       if (n.type === "clienteLogo" || n.type === "clienteReferencias") return max;
       return Math.max(max, n.position.y);
-    }, -ROW_H);
-    const yOffset = keptNodes.length > 2 ? maxY + ROW_H : 0;
+    }, ARTE_ROW_Y - ROW_H);
+    const yOffset = maxY + ROW_H;
 
     const subGraph = gerarSubfluxoDaDemanda(demanda, numArtes, { logoId, refsId, yOffset });
     const { nodes: newNodes, edges: newEdges } = graphToRF(subGraph);

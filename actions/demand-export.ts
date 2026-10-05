@@ -20,6 +20,7 @@ import {
 } from "@/lib/google/drive";
 import { parseArtes } from "@/services/demands";
 import type { DemandExportFile, DemandExportReport } from "@/types/demand-export";
+import type { DemandArte } from "@/types/demand";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -454,4 +455,152 @@ export async function deliverDemandExportAction(
       failed,
     },
   };
+}
+
+export type DriveTargetDemand = {
+  id: string;
+  title: string;
+  tipo: string | null;
+  clientName: string;
+  artes: DemandArte[];
+};
+
+export type ListDriveTargetDemandsState = {
+  error?: string;
+  demands?: DriveTargetDemand[];
+};
+
+/**
+ * Lista demandas recentes pra escolher o destino de uma arte gerada no Space
+ * (botão "Drive" no node). Busca as mais recentes e deixa o filtro por texto
+ * pro cliente (poucas centenas de linhas no máximo — não precisa de busca no
+ * servidor).
+ */
+export async function listRecentDemandsForDriveAction(): Promise<ListDriveTargetDemandsState> {
+  const auth = await requireUser();
+  if ("error" in auth && !("user" in auth)) return { error: auth.error };
+
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("creative_demands")
+    .select("id, tipo, briefing, artes, client_name_external, clients(name)")
+    .order("created_at", { ascending: false })
+    .limit(150);
+
+  if (error) return { error: error.message };
+
+  const demands: DriveTargetDemand[] = (data ?? []).map((row) => {
+    const briefing = (row.briefing ?? {}) as { titulo?: string };
+    const clients = row.clients as { name?: string } | { name?: string }[] | null;
+    const client = Array.isArray(clients) ? clients[0] : clients;
+    return {
+      id: row.id as string,
+      title: demandExportTitle({ briefingTitle: briefing.titulo, tipo: row.tipo as string | null }),
+      tipo: row.tipo as string | null,
+      clientName: client?.name || (row.client_name_external as string) || "Cliente",
+      artes: parseArtes(row.artes),
+    };
+  });
+
+  return { demands };
+}
+
+/**
+ * Manda uma arte já gerada no Space (URL do Storage de art-generations) pro
+ * slot de entrega (feed/story de um art_index) de QUALQUER demanda escolhida
+ * pelo operador — não necessariamente a demanda do fluxo onde ela foi gerada.
+ * Baixa os bytes da origem e sobe direto no slot, igual a um upload manual no
+ * modal "Entregar demanda"; dali em diante segue o fluxo normal de revisão e
+ * envio ao Drive.
+ */
+export async function sendArtToDemandSlotAction(params: {
+  targetDemandId: string;
+  artIndex: number;
+  format: string;
+  sourceUrl: string;
+}): Promise<DemandExportActionState> {
+  const auth = await requireUser();
+  if ("error" in auth && !("user" in auth)) return { error: auth.error };
+
+  if (!isExportFormat(params.format)) return { error: "Slot inválido" };
+  if (!Number.isInteger(params.artIndex) || params.artIndex < 1) {
+    return { error: "Slot inválido" };
+  }
+
+  let bytes: Buffer;
+  let mimeType: string;
+  try {
+    const res = await fetch(params.sourceUrl);
+    if (!res.ok) throw new Error("Não foi possível ler a arte gerada");
+    mimeType = res.headers.get("content-type")?.split(";")[0]?.trim() || "image/png";
+    bytes = Buffer.from(await res.arrayBuffer());
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Falha ao baixar a arte" };
+  }
+  if (bytes.byteLength > MAX_FILE_SIZE) {
+    return { error: "Arte passa de 10MB" };
+  }
+  if (!ALLOWED_TYPES.includes(mimeType)) mimeType = "image/png";
+
+  const resolved = await resolveExportFilename({
+    demandId: params.targetDemandId,
+    artIndex: params.artIndex,
+    format: params.format,
+    mimeType,
+  });
+  if ("error" in resolved) return { error: resolved.error };
+
+  const admin = createAdminClient();
+
+  const { data: existing } = await admin
+    .from("demand_export_files")
+    .select("id, storage_path")
+    .eq("demand_id", params.targetDemandId)
+    .eq("art_index", params.artIndex)
+    .eq("format", params.format)
+    .maybeSingle();
+
+  if (existing?.storage_path && existing.storage_path !== resolved.storagePath) {
+    await admin.storage.from(BUCKET).remove([existing.storage_path]);
+  }
+
+  const { error: uploadError } = await admin.storage
+    .from(BUCKET)
+    .upload(resolved.storagePath, bytes, { contentType: mimeType, upsert: true });
+  if (uploadError) return { error: uploadError.message };
+
+  const { data: publicUrl } = admin.storage.from(BUCKET).getPublicUrl(resolved.storagePath);
+
+  const row = {
+    demand_id: params.targetDemandId,
+    art_index: params.artIndex,
+    format: params.format,
+    filename: resolved.filename,
+    storage_path: resolved.storagePath,
+    public_url: publicUrl.publicUrl,
+    mime_type: mimeType,
+    file_size: bytes.byteLength,
+    drive_file_id: null,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data: saved, error: saveError } = await admin
+    .from("demand_export_files")
+    .upsert(row, { onConflict: "demand_id,art_index,format" })
+    .select("*")
+    .single();
+
+  if (saveError) return { error: saveError.message };
+
+  await admin
+    .from("creative_demands")
+    .update({
+      export_status: "pending",
+      export_error: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", params.targetDemandId);
+
+  revalidatePath(`/demands/${params.targetDemandId}`);
+  return { success: true, file: saved as DemandExportFile };
 }

@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { gerarFluxoDaDemanda, mergeDemandIntoClientGraph } from "@/lib/flow/generator";
+import { syncDemandReferencesIntoGraph, type DemandReferenceRow } from "@/lib/flow/sync-demand-references";
 import type { FlowGraph, FlowNode } from "@/lib/flow/types";
 import type { CreativeDemand } from "@/types/demand";
 
@@ -36,10 +37,55 @@ function hasDemandNodes(graph: FlowGraph, demandId: string): boolean {
 }
 
 /**
+ * Referências cadastradas na PÁGINA da demanda (fora do Space). Carregadas a
+ * cada visita ao canvas pra sincronizar com o grafo — ver syncDemandReferencesIntoGraph.
+ */
+async function loadDemandReferenceRows(demandId: string): Promise<DemandReferenceRow[]> {
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from("demand_reference_image")
+    .select("id, storage_url, role, category, arte_index, position")
+    .eq("demand_id", demandId)
+    .order("position", { ascending: true });
+  return (data ?? []) as DemandReferenceRow[];
+}
+
+/**
+ * Sincroniza referências da página da demanda num grafo JÁ CARREGADO
+ * (persistindo se mudou algo) — usado pelas rotas run/run-node, que leem o
+ * grafo salvo sem o fallback de criar/fundir (`getOrCreateClientFlowGraph` é
+ * só pra carga de página). Sem isso, gerar via API logo após cadastrar uma
+ * referência na página da demanda rodaria contra o grafo desatualizado.
+ */
+export async function syncAndPersistDemandReferences(
+  demand: Pick<DemandForFlow, "id" | "client_id">,
+  graph: FlowGraph
+): Promise<FlowGraph> {
+  const refRows = await loadDemandReferenceRows(demand.id);
+  const synced = syncDemandReferencesIntoGraph(graph, demand.id, refRows);
+  if (synced === graph) return graph;
+
+  if (demand.client_id) {
+    await upsertClientFlowGraph(demand.client_id, synced);
+  } else {
+    const supabase = createAdminClient();
+    await supabase
+      .from("creative_demands")
+      .update({ flow_graph: synced, updated_at: new Date().toISOString() })
+      .eq("id", demand.id);
+  }
+  return synced;
+}
+
+/**
  * Fonte principal do grafo do fluxo pra uma demanda. Sem client_id vinculado, cai
  * no fallback legado (flow_graph por demanda). Com client_id, busca/cria/funde o
  * grafo compartilhado do cliente — a única escrita-durante-leitura desse fluxo
  * (criar/fundir na primeira visita de cada demanda ao canvas).
+ *
+ * Em toda visita, também sincroniza as referências cadastradas na página da
+ * demanda (fora do Space) como nodes visíveis — nunca pode existir um
+ * direcionamento de geração que só existe escondido no banco.
  */
 export async function getOrCreateClientFlowGraph(
   demand: DemandForFlow,
@@ -54,18 +100,24 @@ export async function getOrCreateClientFlowGraph(
       .maybeSingle();
 
     const existing = (data?.flow_graph as FlowGraph | null) ?? null;
-    return { graph: existing ?? gerarFluxoDaDemanda(demand, numArtes), clientId: null };
+    const base = existing ?? gerarFluxoDaDemanda(demand, numArtes);
+    const synced = await syncAndPersistDemandReferences(demand, base);
+    return { graph: synced, clientId: null };
   }
 
   const existingGraph = await getClientFlowGraph(demand.client_id);
 
-  if (existingGraph && hasDemandNodes(existingGraph, demand.id)) {
-    return { graph: existingGraph, clientId: demand.client_id };
+  const base =
+    existingGraph && hasDemandNodes(existingGraph, demand.id)
+      ? existingGraph
+      : mergeDemandIntoClientGraph(existingGraph, demand, numArtes);
+
+  if (base !== existingGraph) {
+    await upsertClientFlowGraph(demand.client_id, base);
   }
 
-  const merged = mergeDemandIntoClientGraph(existingGraph, demand, numArtes);
-  await upsertClientFlowGraph(demand.client_id, merged);
-  return { graph: merged, clientId: demand.client_id };
+  const synced = await syncAndPersistDemandReferences(demand, base);
+  return { graph: synced, clientId: demand.client_id };
 }
 
 /**

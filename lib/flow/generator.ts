@@ -2,8 +2,16 @@ import type { FlowGraph, FlowNode, FlowEdge } from './types';
 import type { CreativeDemand } from '@/types/demand';
 import { IMAGE_GEN_DEFAULTS } from '@/lib/ai/imagegen/defaults';
 
-const COL_W = 280;
-export const ROW_H = 200;
+/**
+ * Layout do Space: logo + referências do cliente ficam num bloco fixo acima
+ * (x=0, y pequeno); as artes de uma demanda formam UMA LINHA horizontal
+ * abaixo desse bloco (mesmo y, x crescente) — nunca empilhadas na mesma
+ * coluna, senão o card (≈320×460) de uma sobrepõe o de baixo.
+ */
+const ARTE_COL_W = 400; // passo horizontal entre artes/stories da mesma linha
+export const ARTE_ROW_Y = 360; // y da linha de artes — abaixo do bloco logo/refs
+/** Espaço vertical entre a linha de artes de demandas diferentes no grafo compartilhado. */
+export const ROW_H = 560;
 
 // Padrão do "Space" por demanda: feed 4:5 medium 2K. (Não mexe no
 // IMAGE_GEN_DEFAULTS global — outros caminhos ainda usam 3:4.)
@@ -53,15 +61,19 @@ function appendStoriesBlock(
   ids: { lista: string; arte: string },
   demanda: Pick<CreativeDemand, "id" | "client_id" | "briefing">,
   storyArtIndex: number,
-  yTop: number
+  rowY: number
 ): void {
   if (feedArteIds.length === 0) return;
+
+  // Continua a MESMA linha horizontal das artes de feed, duas colunas à frente.
+  const listaX = feedArteIds.length * ARTE_COL_W;
+  const storyX = (feedArteIds.length + 1) * ARTE_COL_W;
 
   nodes.push({
     id: ids.lista,
     type: "listaImagens",
     data: { label: "Feed", mode: "list" },
-    position: { x: COL_W * 3, y: yTop },
+    position: { x: listaX, y: rowY },
   });
   nodes.push({
     id: ids.arte,
@@ -79,7 +91,7 @@ function appendStoriesBlock(
       demandId: demanda.id,
       clientId: demanda.client_id ?? "",
     },
-    position: { x: COL_W * 4, y: yTop },
+    position: { x: storyX, y: rowY },
   });
 
   // Cada node de feed alimenta a Lista; a Lista (modo list) alimenta o node de stories.
@@ -94,15 +106,12 @@ function appendStoriesBlock(
  * Gera um FlowGraph padrão para uma demanda com `numArtes` artes.
  *
  * Layout:
- *   clienteLogo  ──────────────────────────┐
- *                                           ├→ gerarImagem_0 → saidaArte_0
- *   clienteReferencias → promptArte_0 ─────┘
- *                           ↑ (seq edge de gerar_0)
- *                        promptArte_1 ─────→ gerarImagem_1 → saidaArte_1
- *                           ...
+ *   clienteLogo         (x=0,   y=0)
+ *   clienteReferencias  (x=0,   y=120)
+ *   arte_0 ─ arte_1 ─ ... ─ arte_{n-1} ─ lista_stories ─ arte_stories
+ *   (uma linha horizontal só, todas no mesmo y=ARTE_ROW_Y, abaixo do bloco logo/refs)
  *
- * Edge de sequência: gerar_{i-1} → prompt_{i}
- * Garante que @img{i} em prompt_{i} já esteja disponível quando o nó executa.
+ * Logo e referências entram direto em cada node `arte` (targetHandle logo/refs).
  */
 export function gerarFluxoDaDemanda(
   demanda: Pick<CreativeDemand, 'id' | 'client_id' | 'artes' | 'briefing'>,
@@ -130,14 +139,13 @@ export function gerarFluxoDaDemanda(
   });
 
   for (let i = 0; i < numArtes; i++) {
-    const y = i * ROW_H;
     const arteId = `arte_${i}`;
 
     nodes.push({
       id: arteId,
       type: 'arte',
       data: feedArteData(demanda, i),
-      position: { x: COL_W, y },
+      position: { x: i * ARTE_COL_W, y: ARTE_ROW_Y },
     });
 
     // Logo e refs entram direto no node unificado.
@@ -153,7 +161,7 @@ export function gerarFluxoDaDemanda(
     { lista: "lista_stories", arte: "arte_stories" },
     demanda,
     numArtes,
-    0
+    ARTE_ROW_Y
   );
 
   return { nodes, edges };
@@ -174,14 +182,13 @@ export function gerarSubfluxoDaDemanda(
   const edges: FlowEdge[] = [];
 
   for (let i = 0; i < numArtes; i++) {
-    const y = yOffset + i * ROW_H;
     const arteId = `arte_${demanda.id}_${i}`;
 
     nodes.push({
       id: arteId,
       type: 'arte',
       data: { ...feedArteData(demanda, i), demandId: demanda.id },
-      position: { x: COL_W, y },
+      position: { x: i * ARTE_COL_W, y: yOffset },
     });
 
     edges.push({ id: `e-logo-${arteId}`, source: logoId, target: arteId, targetHandle: 'logo' });
@@ -202,11 +209,17 @@ export function gerarSubfluxoDaDemanda(
   return { nodes, edges };
 }
 
+/**
+ * Maior y ocupado por conteúdo "de demanda" (não logo/refs). Piso em
+ * `ARTE_ROW_Y - ROW_H` pra que, com grafo vazio, `+ROW_H` resulte em
+ * ARTE_ROW_Y — a primeira linha de artes cai abaixo do bloco logo/refs, não
+ * por cima dele.
+ */
 function maxContentY(graph: FlowGraph): number {
   return graph.nodes.reduce((max, n) => {
     if (n.type === 'clienteLogo' || n.type === 'clienteReferencias') return max;
     return Math.max(max, n.position.y);
-  }, -ROW_H);
+  }, ARTE_ROW_Y - ROW_H);
 }
 
 /**
@@ -250,7 +263,7 @@ export function mergeDemandIntoClientGraph(
     });
   }
 
-  const yOffset = clientGraph ? maxContentY(base) + ROW_H : 0;
+  const yOffset = maxContentY(base) + ROW_H;
   const subGraph = gerarSubfluxoDaDemanda(demanda, numArtes, { logoId, refsId, yOffset });
 
   return {
