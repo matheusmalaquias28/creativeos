@@ -87,6 +87,7 @@ type JobRow = {
     skip_logo?: boolean;
     logo_position?: string | null;
     logo_size?: string | null;
+    logo_directive?: string | null;
     briefing_titulo?: string | null;
     briefing_tipo?: string | null;
     extra_reference_urls?: string[] | null;
@@ -404,8 +405,14 @@ async function runJob(
   // texto/elementos onde a logo sobreposta cairia. Nos demais fluxos a logo
   // continua sendo composta depois (nítida, pixel-perfect).
   const logoAsReference = job.ephemeral === true && !skipLogo && !!effectiveLogoUrl;
+  // `logo_directive` já foi resolvido na extração a partir da linha
+  // `@(logo) — ...` do prompt (ver extract-flow-jobs.ts) — é a mesma frase
+  // que o operador vê no node. Só recai no cálculo a partir de
+  // logo_position/logo_size para jobs antigos, enfileirados antes dessa
+  // mudança, que nunca tiveram esse campo.
   const logoDirective = logoAsReference
-    ? buildLogoDirective(job.params.logo_position ?? undefined, job.params.logo_size ?? undefined)
+    ? job.params.logo_directive ??
+      buildLogoDirective(job.params.logo_position ?? undefined, job.params.logo_size ?? undefined)
     : null;
 
   const styleRefs = directedRefs.filter((r) => r.role !== "logo");
@@ -436,7 +443,7 @@ async function runJob(
     // de força do pipeline estruturado. Demais fluxos sem diretor mantêm o
     // compilador clássico + padrões.
     const parts = job.ephemeral
-      ? [compileSpacePrompt(creativeProfile, briefing, artSpec, allDemandRefs, logoDirective)]
+      ? [compileSpacePrompt(creativeProfile, briefing, artSpec, allDemandRefs)]
       : [
           compilePrompt(creativeProfile, briefing, artSpec, allDemandRefs),
           buildStandardsBlock(textSpec),

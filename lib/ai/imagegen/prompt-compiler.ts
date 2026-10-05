@@ -181,19 +181,16 @@ export function compileSpacePrompt(
   profile: CreativeProfile,
   briefing: BriefingCopy,
   artSpec: ArtSpec,
-  demandRefs: DemandReference[] = [],
-  logoDirective: string | null = null
+  demandRefs: DemandReference[] = []
 ): string {
   const parts: string[] = [];
 
-  // 1. Direção criativa do operador — primeiro e sem reescrita.
+  // 1. Direção criativa do operador — primeiro e sem reescrita. A instrução
+  // da logo (posição/tamanho) já vem embutida aqui como a linha
+  // `@(logo) — ...`, colada pelo seletor da UI no próprio texto do prompt —
+  // não existe injeção separada/escondida de instrução de logo.
   if (artSpec.informacoesExtras?.trim()) {
     parts.push(artSpec.informacoesExtras.trim());
-  }
-
-  // Logo enviada como referência: instrução de posição/tamanho vinda do node.
-  if (logoDirective?.trim()) {
-    parts.push(logoDirective.trim());
   }
 
   // 2. Identidade da marca como apoio (não manda no layout).

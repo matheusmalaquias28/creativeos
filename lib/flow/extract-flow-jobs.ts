@@ -1,5 +1,7 @@
 import { IMAGE_GEN_DEFAULTS } from "@/lib/ai/imagegen/defaults";
-import { resolvePromptArteFields } from "@/lib/flow/prompt-arte-text";
+import { buildLogoDirective } from "@/lib/flow/logo-directive";
+import { extractMentionInstruction } from "@/lib/flow/mention-text";
+import { getPromptArteEditorText, resolvePromptArteFields } from "@/lib/flow/prompt-arte-text";
 import type { Json } from "@/types/database";
 import type {
   ArteData,
@@ -38,6 +40,13 @@ export type FlowJobParams = {
   /** Posição/tamanho da logo (quando enviada como referência no Space). */
   logo_position?: string | null;
   logo_size?: string | null;
+  /**
+   * Frase de instrução da logo já resolvida — vem da linha `@(logo) — ...`
+   * no texto do prompt (ver mention-text.ts). Nunca recomputada "escondida"
+   * a partir de logo_position/logo_size no worker; esses dois campos só
+   * continuam existindo para o seletor da UI refletir o valor atual.
+   */
+  logo_directive?: string | null;
   briefing_titulo?: string | null;
   briefing_tipo?: string | null;
   flow_logo_url: string | null;
@@ -71,20 +80,39 @@ function addReference(
   refs.push({ url, role });
 }
 
+/**
+ * Resolve a instrução de uso de uma referência. A única fonte de verdade é a
+ * linha `@(label) — instrução` no texto do prompt (editável pelo operador) —
+ * se ele editar ou apagar essa linha, isso tem que mudar o que vai pro
+ * modelo. `storedIntent` (vindo do acervo, no momento em que a imagem foi
+ * adicionada) só serve de fallback para quando a linha nunca existiu ou foi
+ * removida do texto.
+ */
+function resolveReferenceRole(
+  promptText: string,
+  label: string | undefined,
+  storedIntent: string | undefined
+): string {
+  if (label) {
+    const inline = extractMentionInstruction(promptText, normalizeRefName(label));
+    if (inline) return inline;
+  }
+  if (storedIntent?.trim()) return storedIntent.trim();
+  return label
+    ? `use a referência "${label}" como guia visual principal`
+    : "use esta imagem como referência visual";
+}
+
 function addReferenciaImagemNode(
   node: FlowNode,
   refs: FlowReferenceEntry[],
-  seen: Set<string>
+  seen: Set<string>,
+  promptText: string
 ) {
   if (node.type !== "referenciaImagem") return;
   const data = node.data as ReferenciaImagemData;
   const label = data.label?.trim();
-  // `intent` vem do acervo (instrução da categoria) e vence o texto genérico.
-  const role = data.intent?.trim()
-    ? data.intent.trim()
-    : label
-      ? `use a referência "${label}" como guia visual principal`
-      : "use esta imagem como referência visual";
+  const role = resolveReferenceRole(promptText, label, data.intent);
   addReference(refs, seen, data.imageUrl, role);
 }
 
@@ -164,6 +192,10 @@ function extractPipelineJob(
   const gerarPreds = predecessors.get(gerarId) ?? [];
   const promptId = gerarPreds.find((id) => nodeById.get(id)?.type === "promptArte");
   const promptNode = promptId ? nodeById.get(promptId) : undefined;
+  const fullText =
+    promptNode?.type === "promptArte"
+      ? getPromptArteEditorText(promptNode.data as PromptArteData)
+      : "";
 
   const refs: FlowReferenceEntry[] = [];
   const seen = new Set<string>();
@@ -181,7 +213,7 @@ function extractPipelineJob(
         if (!data.imageUrl) continue;
         const key = normalizeRefName(data.label ?? refId);
         namedRefMap.set(key, { url: data.imageUrl });
-        addReferenciaImagemNode(refNode, refs, seen);
+        addReferenciaImagemNode(refNode, refs, seen, fullText);
         continue;
       }
 
@@ -225,7 +257,7 @@ function extractPipelineJob(
     }
 
     if (node.type === "referenciaImagem") {
-      addReferenciaImagemNode(node, refs, seen);
+      addReferenciaImagemNode(node, refs, seen, fullText);
       continue;
     }
 
@@ -302,6 +334,7 @@ function extractArteJob(
   const arteNode = nodeById.get(arteId);
   if (arteNode?.type !== "arte") return null;
   const data = arteNode.data as ArteData;
+  const fullText = getPromptArteEditorText(data);
 
   const refs: FlowReferenceEntry[] = [];
   const seen = new Set<string>();
@@ -328,7 +361,7 @@ function extractArteJob(
     if (node.type === "referenciaImagem") {
       const d = node.data as ReferenciaImagemData;
       if (d.imageUrl) namedRefMap.set(normalizeRefName(d.label ?? predId), { url: d.imageUrl });
-      addReferenciaImagemNode(node, refs, seen);
+      addReferenciaImagemNode(node, refs, seen, fullText);
       continue;
     }
     if (node.type === "listaImagens") {
@@ -355,6 +388,14 @@ function extractArteJob(
     seen
   );
 
+  // A frase da logo vem da linha `@(logo) — ...` que o próprio seletor da UI
+  // colou no prompt (ver arte-node.tsx). Só cai no fallback computado se essa
+  // linha nunca existiu (grafo salvo antes dessa mudança, por exemplo) — o
+  // worker nunca recalcula isso escondido a partir de logo_position/logo_size.
+  const logoDirective =
+    extractMentionInstruction(fullText, "logo") ??
+    buildLogoDirective(data.logoPosition ?? undefined, data.logoSize ?? undefined);
+
   return {
     art_index: data.artIndex,
     headline,
@@ -370,6 +411,7 @@ function extractArteJob(
     skip_logo: data.format === "story",
     logo_position: data.logoPosition ?? null,
     logo_size: data.logoSize ?? null,
+    logo_directive: logoDirective,
     briefing_titulo: briefing.titulo ?? null,
     briefing_tipo: briefing.tipo ?? null,
     flow_logo_url: logoUrl,
@@ -396,6 +438,7 @@ export function flowJobParamsToRow(p: FlowJobParams): Json {
     skip_logo: p.skip_logo ?? false,
     logo_position: p.logo_position ?? null,
     logo_size: p.logo_size ?? null,
+    logo_directive: p.logo_directive ?? null,
     briefing_titulo: p.briefing_titulo,
     briefing_tipo: p.briefing_tipo,
     flow_logo_url: p.flow_logo_url,

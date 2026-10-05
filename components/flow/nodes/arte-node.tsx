@@ -29,8 +29,10 @@ import {
   LOGO_SIZES,
   DEFAULT_LOGO_POSITION,
   DEFAULT_LOGO_SIZE,
+  buildLogoDirective,
   type LogoSize,
 } from "@/lib/flow/logo-directive";
+import { upsertMentionLine } from "@/lib/flow/mention-text";
 import {
   getPromptArteEditorText,
   parsePromptArteText,
@@ -319,10 +321,30 @@ export function ArteNode({ id, data, selected }: Props) {
   const logoPosition = data.logoPosition ?? DEFAULT_LOGO_POSITION;
   const logoSize: LogoSize = data.logoSize ?? DEFAULT_LOGO_SIZE;
   const logoSizeLevel = LOGO_SIZES.findIndex((s) => s.value === logoSize); // 0..2
+
+  // O seletor não guarda nenhuma instrução escondida: ele só cola a frase
+  // `@(logo) — ...` no texto do prompt. O que vai pro modelo é exatamente
+  // o que aparece aqui, editável pelo operador como qualquer outro texto.
+  function applyLogoDirective(position: string, size: LogoSize) {
+    const next = upsertMentionLine(draftRef.current, "logo", buildLogoDirective(position, size));
+    setDraft(next);
+    commit(next);
+  }
+
   function cycleLogoSize() {
     const next = LOGO_SIZES[(logoSizeLevel + 1) % LOGO_SIZES.length].value;
     update({ logoSize: next });
+    applyLogoDirective(logoPosition, next);
   }
+
+  // Ao conectar a logo pela primeira vez, já cola a frase padrão no prompt —
+  // nunca fica uma posição/tamanho "assumidos" sem aparecer no texto.
+  useEffect(() => {
+    if (!hasLogo || isStory) return;
+    if (draftRef.current.toLowerCase().includes("@(logo)")) return;
+    applyLogoDirective(logoPosition, logoSize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasLogo, isStory]);
 
   function download() {
     if (!current) return;
@@ -463,7 +485,10 @@ export function ArteNode({ id, data, selected }: Props) {
               </span>
               <NodeSelect variant="glass" title="Posição da logo" value={logoPosition}
                 options={LOGO_POSITIONS.map((p) => ({ value: p.value, label: p.label }))}
-                onChange={(v) => update({ logoPosition: v })} />
+                onChange={(v) => {
+                  update({ logoPosition: v });
+                  applyLogoDirective(v, logoSize);
+                }} />
               <button
                 type="button"
                 onClick={cycleLogoSize}
