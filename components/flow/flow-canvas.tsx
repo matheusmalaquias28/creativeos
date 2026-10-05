@@ -346,6 +346,80 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
     [getNodes, getEdges, setNodes, setEdges, scheduleAutoSave, stackUrlsOf]
   );
 
+  // ─── Hidrata resultados já existentes ao montar ───────────────────────
+  // O Realtime abaixo só reage a eventos NOVOS depois que o canal abre — ele
+  // nunca busca o estado atual do banco. Sem isto, toda vez que a página do
+  // Space é recarregada (F5, navegar e voltar) as artes já geradas "somem":
+  // o node volta a ficar vazio até a PRÓXIMA geração, mesmo com a arte
+  // salva e intacta no art_version. Nenhuma arte gerada pode ficar invisível
+  // assim — carrega o job/versão atual de cada node assim que o canvas monta.
+  useEffect(() => {
+    let cancelled = false;
+    const supabase = createClient();
+
+    (async () => {
+      const { data: jobs } = await supabase
+        .from("art_generation_job")
+        .select("id, art_index, status, created_at")
+        .eq("demand_id", demanda.id)
+        .order("created_at", { ascending: false });
+      if (cancelled || !jobs?.length) return;
+
+      // Job mais recente por art_index — pode haver duplicatas de antes da
+      // dedupe em run/run-node (ver app/api/demands/[id]/flow/run*/route.ts).
+      const jobByIndex = new Map<number, { id: string; status: string }>();
+      for (const j of jobs) {
+        if (!jobByIndex.has(j.art_index)) {
+          jobByIndex.set(j.art_index, { id: j.id, status: j.status });
+        }
+      }
+
+      const jobIds = Array.from(jobByIndex.values(), (j) => j.id);
+      const { data: versions } = await supabase
+        .from("art_version")
+        .select("id, job_id, result_url, is_current, version_number, format")
+        .in("job_id", jobIds)
+        .order("version_number", { ascending: true });
+      if (cancelled) return;
+
+      const versionsByJob = new Map<string, NonNullable<typeof versions>>();
+      for (const v of versions ?? []) {
+        const list = versionsByJob.get(v.job_id) ?? [];
+        list.push(v);
+        versionsByJob.set(v.job_id, list);
+      }
+
+      setNodes((ns) =>
+        ns.map((n) => {
+          if (n.type !== "arte" && n.type !== "saidaArte") return n;
+          const d = n.data as SaidaArteData;
+          const job = jobByIndex.get(d.artIndex);
+          if (!job) return n;
+
+          const format = d.format === "story" ? "story" : "feed";
+          const jobVersions = (versionsByJob.get(job.id) ?? []).filter(
+            (v) => v.format === format && v.result_url
+          );
+          const status = job.status as SaidaArteData["generatingStatus"];
+          if (jobVersions.length === 0) {
+            return { ...n, data: { ...n.data, jobId: job.id, generatingStatus: status } };
+          }
+          const stack = jobVersions.map((v) => ({ versionId: v.id, url: v.result_url as string }));
+          const current = jobVersions.find((v) => v.is_current);
+          const resultUrl = current?.result_url ?? stack[stack.length - 1].url;
+          return {
+            ...n,
+            data: { ...n.data, resultUrl, resultUrls: stack, jobId: job.id, generatingStatus: status },
+          };
+        })
+      );
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [demanda.id, setNodes]);
+
   // ─── Real-time: art_generation_job ────────────────────────────────────
 
   useEffect(() => {
