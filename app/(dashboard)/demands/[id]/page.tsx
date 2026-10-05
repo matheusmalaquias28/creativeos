@@ -32,6 +32,9 @@ import {
   resolveDemandDriveFolder,
 } from "@/lib/export/drive-folder";
 import { getGoogleDriveAuth } from "@/lib/google/drive";
+import { isCarouselDemand } from "@/lib/carousel-studio/demand";
+import { ensureStudioForDemand } from "@/services/carousel-studio";
+import { DemandStudioSection } from "@/components/carousel-studio/demand-studio-section";
 
 export const maxDuration = 300;
 
@@ -103,13 +106,16 @@ export default async function DemandDetailPage({ params }: PageProps) {
   ]);
   if (!demand) notFound();
 
-  const [clientAssets, demandRefs, exportFiles, driveAuth] = await Promise.all([
+  // Demandas de carrossel vão para o Carrossel Studio (criado sob demanda, sem custo).
+  const carouselDemand = isCarouselDemand({ tipo: demand.tipo, briefing: demand.briefing });
+  const [clientAssets, demandRefs, exportFiles, driveAuth, studio] = await Promise.all([
     demand.client_id && user
       ? getClientVisualAssets(demand.client_id, user.id)
       : Promise.resolve(null),
     getDemandReferenceImages(id),
     getDemandExportFiles(id),
     getGoogleDriveAuth(),
+    carouselDemand ? ensureStudioForDemand(id) : Promise.resolve(null),
   ]);
 
   const title =
@@ -241,7 +247,11 @@ export default async function DemandDetailPage({ params }: PageProps) {
           </div>
         </Surface>
 
-        {!demand.client_not_found && <DemandSpaceSection demand={demand} />}
+        {studio ? (
+          <DemandStudioSection initial={studio} hasClient={Boolean(demand.client_id)} />
+        ) : (
+          !demand.client_not_found && <DemandSpaceSection demand={demand} />
+        )}
 
         <section className="space-y-4">
           <SectionHeader

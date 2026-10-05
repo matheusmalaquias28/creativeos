@@ -6,6 +6,7 @@ import { mergeLegacyDemandFlowIntoClient } from "@/services/flow";
 import { linkUnmatchedDemandsByExternalName } from "@/lib/demands/link-unmatched-siblings";
 import { notifyWarStatusChange } from "@/lib/demands/war-status-callback";
 import { externalClientIdFromPayload } from "@/lib/demands/parse-make-payload";
+import { autoRouteCarouselDemand } from "@/lib/carousel-studio/auto-trigger";
 import type { Database, Json } from "@/types/database";
 import { DEMAND_WORKING_STATUS, isDoneStatus, type DemandArte } from "@/types/demand";
 
@@ -276,7 +277,13 @@ export async function linkDemandToClientAction(
     console.error("[linkDemandToClientAction] merge de fluxo falhou:", err);
   });
 
-  const linkedCount = new Set([demandId, ...siblingIds]).size;
+  const linkedIds = Array.from(new Set([demandId, ...siblingIds]));
+
+  // Demandas de carrossel que esperavam cliente entram agora no Carrossel Studio
+  // (gera sozinho só se ainda não foi gerado).
+  await Promise.all(linkedIds.map((id) => autoRouteCarouselDemand(id)));
+
+  const linkedCount = linkedIds.length;
 
   return {
     success: true,

@@ -11,6 +11,8 @@ import {
   resolveDemandDriveFolder,
 } from "@/lib/export/drive-folder";
 import { DEMAND_INITIAL_STATUS } from "@/types/demand";
+import { isCarouselDemand } from "@/lib/carousel-studio/demand";
+import { autoRouteCarouselDemand } from "@/lib/carousel-studio/auto-trigger";
 import type { Database } from "@/types/database";
 
 type CreativeDemandInsert =
@@ -195,6 +197,12 @@ export async function POST(request: Request) {
   // Nota: o Space agora é criado sob demanda ao abrir a página (sem custo) e a
   // geração de imagens é manual (botão Executar no canvas) — o webhook não
   // dispara mais geração automática.
+  //
+  // Exceção: demandas de CARROSSEL vão direto para o Carrossel Studio, que
+  // gera sozinho na primeira chegada (se a demanda já tem cliente vinculado).
+  if (isCarouselDemand({ tipo: parsed.tipo, briefing: parsed.briefing, raw_payload: body })) {
+    await autoRouteCarouselDemand(data.id);
+  }
 
   return NextResponse.json({
     ok: true,

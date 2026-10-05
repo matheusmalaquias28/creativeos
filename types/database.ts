@@ -947,6 +947,60 @@ export type Database = {
         }>;
         Relationships: [];
       };
+      studio_carousels: {
+        Row: {
+          id: string;
+          demand_id: string | null;
+          client_id: string | null;
+          user_id: string | null;
+          name: string;
+          format: string;
+          status: string;
+          document: Json;
+          brand: Json;
+          reference_urls: Json;
+          brief: string | null;
+          caption: string | null;
+          generation: Json;
+          thumbnail_url: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          demand_id?: string | null;
+          client_id?: string | null;
+          user_id?: string | null;
+          name?: string;
+          format?: string;
+          status?: string;
+          document?: Json;
+          brand?: Json;
+          reference_urls?: Json;
+          brief?: string | null;
+          caption?: string | null;
+          generation?: Json;
+          thumbnail_url?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<{
+          demand_id: string | null;
+          client_id: string | null;
+          name: string;
+          format: string;
+          status: string;
+          document: Json;
+          brand: Json;
+          reference_urls: Json;
+          brief: string | null;
+          caption: string | null;
+          generation: Json;
+          thumbnail_url: string | null;
+          updated_at: string;
+        }>;
+        Relationships: [];
+      };
       tweet_carousels: {
         Row: {
           id: string;

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Layers, Palette } from "lucide-react";
+import { GalleryHorizontalEnd, Layers, Palette } from "lucide-react";
 import { DashboardPage } from "@/components/layout/dashboard-page";
 import { SectionHeader } from "@/components/layout/section-header";
 import { CarouselCard } from "@/components/carousel/carousel-card";
@@ -13,14 +13,17 @@ import { getCarouselProfilesForUser } from "@/services/carousel-profiles";
 import { getClientOptionsForCurrentUser } from "@/services/clients";
 import { getTweetCarouselsForUser, getTweetProfilesForUser } from "@/services/tweet-carousels";
 import { TweetCarouselCard } from "@/components/carousel/tweet/tweet-carousel-card";
+import { StudioListCard } from "@/components/carousel-studio/studio-list-card";
+import { listStudioCarousels } from "@/services/carousel-studio";
 
 export default async function CarouselPage() {
-  const [carousels, profiles, clients, tweetCarousels, tweetProfiles] = await Promise.all([
+  const [carousels, profiles, clients, tweetCarousels, tweetProfiles, studioCarousels] = await Promise.all([
     getCarouselsForUser(),
     getCarouselProfilesForUser(),
     getClientOptionsForCurrentUser(),
     getTweetCarouselsForUser(),
     getTweetProfilesForUser(),
+    listStudioCarousels(),
   ]);
 
   // Avançados e tweet na mesma grade, pela última edição.
@@ -57,6 +60,21 @@ export default async function CarouselPage() {
       }
     >
       <div className={layout.sectionGap}>
+        {studioCarousels.length > 0 ? (
+          <section className="space-y-4">
+            <SectionHeader
+              icon={GalleryHorizontalEnd}
+              tone="pink"
+              title="Carrossel Studio"
+              description="Gerados automaticamente das demandas de carrossel · editáveis camada por camada"
+            />
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              {studioCarousels.map((item) => (
+                <StudioListCard key={item.id} item={item} />
+              ))}
+            </div>
+          </section>
+        ) : null}
         {items.length === 0 ? (
           <EmptyState
             icon={Layers}
