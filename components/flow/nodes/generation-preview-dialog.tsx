@@ -6,7 +6,12 @@ import { Loader2, ScanEye, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-type PreviewReference = { url: string; intent: string; kind: "logo" | "ref" | "item" };
+type PreviewReference = {
+  url: string;
+  intent: string;
+  kind: "logo" | "ref" | "item";
+  label: string;
+};
 
 type Preview = {
   prompt: string;
@@ -16,12 +21,6 @@ type Preview = {
   aspectRatio: string;
   imageSize: string;
   quality: string;
-};
-
-const KIND_LABEL: Record<PreviewReference["kind"], string> = {
-  logo: "Logo",
-  ref: "Referência",
-  item: "Item da lista",
 };
 
 /**
@@ -126,7 +125,7 @@ export function GenerationPreviewDialog({
                         />
                         <div className="min-w-0 text-xs">
                           <p className="font-semibold text-foreground">
-                            Imagem {i + 1} · {KIND_LABEL[ref.kind]}
+                            Imagem {i + 1} · {ref.label}
                             {fanout && ref.kind === "item" ? " (muda a cada geração)" : ""}
                           </p>
                           <p className="text-muted-foreground">{ref.intent}</p>
@@ -147,10 +146,6 @@ export function GenerationPreviewDialog({
                 <h3 className="text-xs font-semibold text-muted-foreground">Prompt enviado</h3>
                 <pre className="whitespace-pre-wrap rounded-xl border border-border bg-surface p-3 font-sans text-xs leading-relaxed text-foreground">
                   {preview.prompt}
-                  {preview.references.length > 0 &&
-                    `\n\nReferências anexadas:\n${preview.references
-                      .map((r, i) => `Imagem ${i + 1}: ${r.intent}`)
-                      .join("\n")}`}
                 </pre>
                 <p className="text-[0.6875rem] text-muted-foreground">
                   Se a revisão automática reprovar a arte, uma 2ª tentativa recebe também as

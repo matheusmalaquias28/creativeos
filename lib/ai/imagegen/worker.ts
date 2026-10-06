@@ -44,7 +44,7 @@ import { reviewArt, type ArtReview } from "@/lib/ai/art-director/review-art";
 import { ART_ASPECT_RATIO } from "@/lib/ai/art-director/constants";
 import type { DirectionMeta, ReferenceRole } from "@/lib/ai/art-director/types";
 import { IMAGE_GEN_DEFAULTS } from "./defaults";
-import { buildSpaceRequest, SPACE_MAX_COUNT } from "./space-request";
+import { buildSpaceRequest, spacePromptFor, SPACE_MAX_COUNT } from "./space-request";
 import type { LogoPlacement } from "./logo-composite";
 import type { CreativeProfile, ArtSpec, BriefingCopy, DemandReference } from "./prompt-compiler";
 import { CATEGORY_META, isReferenceCategory } from "@/lib/image-library/categories";
@@ -501,7 +501,10 @@ async function runJob(
         ...allDemandRefs.map((r) => ({ url: r.url, intent: r.role })),
       ];
 
-  const buildPrompt = (fixNotes?: string[]): string => {
+  const buildPrompt = (
+    fixNotes?: string[],
+    extraRef?: { url: string; intent: string } | null
+  ): string => {
     if (approvedPrompt) {
       // Camada de direção de arte: o briefing aprovado carrega o design,
       // o bloco técnico impõe os padrões de produto.
@@ -516,8 +519,10 @@ async function runJob(
     // Space (canvas): a direção criativa do operador vai literal, sem o colete
     // de força do pipeline estruturado. Demais fluxos sem diretor mantêm o
     // compilador clássico + padrões.
+    // No Space, as imagens anexadas abrem o prompt, numeradas na ordem desta
+    // geração (no fan-out o item da lista é a Imagem 1).
     const parts = space
-      ? [space.prompt]
+      ? [spacePromptFor(space, space.batch.find((b) => b && b.url === extraRef?.url) ?? null)]
       : [
           compilePrompt(creativeProfile, briefing, artSpec, allDemandRefs),
           buildStandardsBlock(textSpec),
@@ -556,7 +561,7 @@ async function runJob(
 
     while (attempts < MAX_ATTEMPTS) {
       attempts += 1;
-      const prompt = buildPrompt(fixNotes);
+      const prompt = buildPrompt(fixNotes, extraRef);
 
       const raw = await withRateLimitRetry(() =>
         generateArtImage({
@@ -566,6 +571,8 @@ async function runJob(
           aspectRatio: artSpec.aspect_ratio ?? IMAGE_GEN_DEFAULTS.aspectRatio,
           // Esforço do GPT Image vindo do node (ignorado por Magnific/Gemini).
           quality: job.params.quality ?? "medium",
+          // Space: o papel de cada imagem já abre o prompt — o provedor não anexa de novo.
+          referencesInPrompt: space !== null,
         })
       );
       const logoResult = cleanLogo

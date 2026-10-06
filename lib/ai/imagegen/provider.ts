@@ -31,6 +31,8 @@ export type GenerateArtImageParams = {
   imageSize?: string;
   /** Esforço do GPT Image (low/medium/high…). Ignorado por Magnific/Gemini. */
   quality?: OpenAIImageQuality;
+  /** O prompt já descreve o papel de cada referência — não anexar a lista de novo. */
+  referencesInPrompt?: boolean;
 };
 
 export function getImageProvider(): ImageProvider {
@@ -54,6 +56,7 @@ export async function generateArtImage(
       aspectRatio: params.aspectRatio ?? "3:4",
       resolution: params.imageSize ?? "2K",
       quality: params.quality ?? "medium",
+      referencesInPrompt: params.referencesInPrompt,
     });
     return buffer;
   }

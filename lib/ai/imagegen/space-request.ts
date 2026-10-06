@@ -5,6 +5,11 @@
  * isto e o preview do node (`/flow/preview-node`) mostra exatamente isto. Só
  * entra o que está no grafo — prompt do node (onde a identidade da marca e a
  * frase da logo já estão como linhas visíveis), logo/refs/listas conectadas.
+ *
+ * As referências abrem o prompt, numeradas na ordem em que as imagens vão
+ * (Imagem 1, 2…), como a diretiva principal da arte. A ordem importa: o modelo
+ * preserva melhor as primeiras imagens, então o sujeito (pessoa/produto) vai na
+ * frente, depois a logo, e por último as referências de estilo/ambiente.
  */
 
 import { buildLogoDirective } from "@/lib/flow/logo-directive";
@@ -27,25 +32,27 @@ export type SpaceJobParams = {
   briefing_titulo?: string | null;
   briefing_tipo?: string | null;
   flow_logo_url?: string | null;
-  flow_references?: { url: string; role: string | null }[] | null;
+  flow_references?: { url: string; role: string | null; category?: string | null }[] | null;
 };
 
 export type SpaceReference = {
   url: string;
   intent: string;
   kind: "logo" | "ref" | "item";
+  /** Rótulo curto do papel da imagem (Sujeito, Logo, Estilo…). */
+  label: string;
 };
 
 export type SpaceRequest = {
-  /** Referências fixas, na ordem enviada (logo primeiro, depois as refs). */
+  /** Referências fixas, na ordem enviada. */
   references: SpaceReference[];
   /**
    * Uma entrada por geração do lote: `null` = variação do mesmo prompt (count);
    * referência = item da Lista em fan-out (vai como Imagem 1 daquela geração).
    */
   batch: (SpaceReference | null)[];
-  /** Prompt enviado (sem as notas de correção da revisão automática). */
-  prompt: string;
+  /** Corpo do prompt (direção, copy, técnico) — sem o bloco de referências. */
+  body: string;
   logoUrl: string | null;
   aspectRatio: string;
   imageSize: string;
@@ -55,7 +62,25 @@ export type SpaceRequest = {
 /** Teto do lote de variações (`count`). O fan-out da Lista não tem teto. */
 export const SPACE_MAX_COUNT = 6;
 
-const FANOUT_INTENT = "item da lista — base principal desta arte";
+const FANOUT_INTENT =
+  "é a imagem-base desta arte: reproduza o conteúdo, a composição e o visual dela com fidelidade";
+
+const CATEGORY_LABEL: Record<string, string> = {
+  subject: "Sujeito/produto",
+  brand: "Marca",
+  style: "Estilo",
+  environment: "Ambiente",
+};
+
+/** Ordem de envio: sujeito → logo → marca → sem categoria → ambiente → estilo. */
+const CATEGORY_RANK: Record<string, number> = {
+  subject: 0,
+  brand: 2,
+  environment: 4,
+  style: 5,
+};
+const LOGO_RANK = 1;
+const UNCATEGORIZED_RANK = 3;
 
 /** No Space, perfil do cliente nunca entra por fora do que está no node. */
 const NO_PROFILE: CreativeProfile = {
@@ -75,26 +100,39 @@ export function buildSpaceRequest(
       buildLogoDirective(params.logo_position ?? undefined, params.logo_size ?? undefined)
     : null;
 
-  const references: SpaceReference[] = [];
+  const ranked: { ref: SpaceReference; rank: number; order: number }[] = [];
   const seen = new Set<string>();
   if (logoUrl && logoDirective) {
     seen.add(logoUrl);
-    references.push({ url: logoUrl, intent: logoDirective, kind: "logo" });
-  }
-  for (const ref of params.flow_references ?? []) {
-    if (!ref.url?.trim() || seen.has(ref.url)) continue;
-    seen.add(ref.url);
-    references.push({
-      url: ref.url,
-      intent: ref.role?.trim() || "use esta imagem como referência visual",
-      kind: "ref",
+    ranked.push({
+      ref: { url: logoUrl, intent: logoDirective, kind: "logo", label: "Logo" },
+      rank: LOGO_RANK,
+      order: 0,
     });
   }
+  (params.flow_references ?? []).forEach((ref, i) => {
+    if (!ref.url?.trim() || seen.has(ref.url)) return;
+    seen.add(ref.url);
+    const category = ref.category ?? "";
+    ranked.push({
+      ref: {
+        url: ref.url,
+        intent: ref.role?.trim() || "use esta imagem como referência visual",
+        kind: "ref",
+        label: CATEGORY_LABEL[category] ?? "Referência",
+      },
+      rank: CATEGORY_RANK[category] ?? UNCATEGORIZED_RANK,
+      order: i + 1,
+    });
+  });
+  const references = ranked
+    .sort((a, b) => a.rank - b.rank || a.order - b.order)
+    .map((r) => r.ref);
 
   const fanout = (params.fanout_reference_urls ?? []).filter((u) => u?.trim());
   const batch: (SpaceReference | null)[] =
     fanout.length > 0
-      ? fanout.map((url) => ({ url, intent: FANOUT_INTENT, kind: "item" as const }))
+      ? fanout.map((url) => ({ url, intent: FANOUT_INTENT, kind: "item" as const, label: "Item da lista" }))
       : Array.from(
           { length: Math.min(SPACE_MAX_COUNT, Math.max(1, params.count ?? 1)) },
           () => null
@@ -103,11 +141,7 @@ export function buildSpaceRequest(
   const aspectRatio = params.aspect_ratio ?? defaults.aspectRatio;
   const imageSize = params.image_size ?? defaults.imageSize;
 
-  // Sem bloco de referências no corpo do prompt: o provedor anexa a lista
-  // numerada ("Imagem N: papel") a partir das próprias referências enviadas —
-  // assim a numeração sempre bate com as imagens (logo e item do fan-out
-  // incluídos).
-  const prompt = compileSpacePrompt(
+  const body = compileSpacePrompt(
     NO_PROFILE,
     { titulo: params.briefing_titulo ?? undefined, tipo: params.briefing_tipo ?? undefined },
     {
@@ -124,7 +158,7 @@ export function buildSpaceRequest(
   return {
     references,
     batch,
-    prompt,
+    body,
     logoUrl,
     aspectRatio,
     imageSize,
@@ -140,4 +174,19 @@ export function spaceReferencesFor(
   return item
     ? [item, ...request.references.filter((r) => r.url !== item.url)]
     : request.references;
+}
+
+/**
+ * Prompt de UMA geração: abre com as imagens anexadas (numeradas na ordem em
+ * que vão, cada uma com o seu papel) e segue com o corpo. As imagens são a
+ * diretiva principal — o texto diz o que muda em cima delas.
+ */
+export function spacePromptFor(request: SpaceRequest, item: SpaceReference | null): string {
+  const refs = spaceReferencesFor(request, item);
+  if (refs.length === 0) return request.body;
+  const block = [
+    "IMAGENS ANEXADAS — elas são a base desta arte. Siga cada uma exatamente no papel indicado:",
+    ...refs.map((r, i) => `- Imagem ${i + 1} (${r.label}): ${r.intent}`),
+  ].join("\n");
+  return `${block}\n\n${request.body}`;
 }

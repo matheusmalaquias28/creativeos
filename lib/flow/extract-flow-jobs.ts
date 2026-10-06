@@ -16,6 +16,12 @@ import type {
 export type FlowReferenceEntry = {
   url: string;
   role: string | null;
+  /**
+   * Categoria de uso (subject/brand/style/environment — ver
+   * lib/image-library/categories.ts). Define a ORDEM das imagens na geração:
+   * o modelo preserva melhor as primeiras, então o sujeito vai na frente.
+   */
+  category?: string | null;
 };
 
 export type FlowJobParams = {
@@ -73,11 +79,12 @@ function addReference(
   refs: FlowReferenceEntry[],
   seen: Set<string>,
   url: string | null | undefined,
-  role: string | null
+  role: string | null,
+  category: string | null = null
 ) {
   if (!url?.trim() || seen.has(url)) return;
   seen.add(url);
-  refs.push({ url, role });
+  refs.push({ url, role, category });
 }
 
 /**
@@ -113,7 +120,9 @@ function addReferenciaImagemNode(
   const data = node.data as ReferenciaImagemData;
   const label = data.label?.trim();
   const role = resolveReferenceRole(promptText, label, data.intent);
-  addReference(refs, seen, data.imageUrl, role);
+  // Imagem solta (arrastada, sem categoria do acervo) é "guia visual principal"
+  // — trata como sujeito.
+  addReference(refs, seen, data.imageUrl, role, data.category ?? "subject");
 }
 
 function resolveNamedRefTokens(
@@ -250,7 +259,8 @@ function extractPipelineJob(
           refs,
           seen,
           url,
-          "siga o estilo visual desta referência do cliente"
+          "siga o estilo visual desta referência do cliente",
+          "style"
         );
       }
       continue;
@@ -354,7 +364,7 @@ function extractArteJob(
     if (node.type === "clienteReferencias") {
       (node.data.referenceUrls ?? []).forEach((url, i) => {
         namedRefMap.set(`ref-cliente-${i + 1}`, { url, skipAutoAdd: true });
-        addReference(refs, seen, url, "siga o estilo visual desta referência do cliente");
+        addReference(refs, seen, url, "siga o estilo visual desta referência do cliente", "style");
       });
       continue;
     }

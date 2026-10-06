@@ -1,7 +1,8 @@
 import { IMAGE_GEN_DEFAULTS } from "@/lib/ai/imagegen/defaults";
 import { BRAND_IDENTITY_LABEL, seedLabeledLineIfMissing } from "@/lib/flow/mention-text";
 import { getPromptArteEditorText } from "@/lib/flow/prompt-arte-text";
-import type { FlowGraph } from "@/lib/flow/types";
+import { upgradeLegacyInstructions } from "@/lib/image-library/categories";
+import type { ArteData, FlowGraph, FlowNode, ReferenciaImagemData } from "@/lib/flow/types";
 
 type CreativeProfileRow = {
   logo_url: string | null;
@@ -10,10 +11,41 @@ type CreativeProfileRow = {
   palette?: string[] | null;
 };
 
+/**
+ * Troca as instruções antigas das categorias do acervo (ver
+ * `upgradeLegacyInstructions`) no texto dos prompts e no `intent` das
+ * referências. Fica visível no node — o texto é a fonte da geração.
+ */
+function upgradeReferenceInstructions(node: FlowNode): FlowNode {
+  if (node.type === "arte") {
+    const d = node.data as ArteData;
+    const fields = ["promptText", "headline", "subheadline", "cta", "informacoesExtras"] as const;
+    let changed = false;
+    const next: ArteData = { ...d };
+    for (const f of fields) {
+      const v = d[f];
+      if (typeof v !== "string") continue;
+      const up = upgradeLegacyInstructions(v);
+      if (up !== v) {
+        next[f] = up;
+        changed = true;
+      }
+    }
+    return changed ? { ...node, data: next } : node;
+  }
+  if (node.type === "referenciaImagem") {
+    const d = node.data as ReferenciaImagemData;
+    const intent = d.intent ? upgradeLegacyInstructions(d.intent) : d.intent;
+    return intent !== d.intent ? { ...node, data: { ...d, intent } } : node;
+  }
+  return node;
+}
+
 export function enrichFlowGraphWithProfile(
-  graph: FlowGraph,
+  rawGraph: FlowGraph,
   profile: CreativeProfileRow | null
 ): FlowGraph {
+  const graph: FlowGraph = { ...rawGraph, nodes: rawGraph.nodes.map(upgradeReferenceInstructions) };
   if (!profile) return graph;
 
   const brandContent = [

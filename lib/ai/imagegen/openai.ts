@@ -47,7 +47,24 @@ export type OpenAIImageParams = {
   /** "1K" | "2K" | "4K" — faixa de total de pixels. */
   resolution?: string;
   quality?: OpenAIImageQuality;
+  /** O prompt já descreve o papel de cada referência — não anexar a lista. */
+  referencesInPrompt?: boolean;
 };
+
+/**
+ * Fidelidade às imagens de entrada no /images/edits. "high" preserva rosto,
+ * produto, logo e o visual das referências; o padrão da API ("low") só se
+ * inspira nelas — era por isso que as artes "ignoravam" as referências.
+ * `OPENAI_INPUT_FIDELITY=low` (ou `off`, para não enviar) muda isso.
+ */
+function inputFidelity(): string | null {
+  const v = process.env.OPENAI_INPUT_FIDELITY?.trim().toLowerCase();
+  if (v === "off" || v === "none") return null;
+  return v || "high";
+}
+
+/** O modelo recusou `input_fidelity` uma vez — não manda mais neste processo. */
+let fidelityUnsupported = false;
 
 function apiKey(): string {
   const key = process.env.OPENAI_API_KEY?.trim();
@@ -142,7 +159,9 @@ async function downloadReference(url: string): Promise<{ blob: Blob; filename: s
   if (!res.ok) {
     throw new OpenAIImageError(`Falha ao baixar referência (${res.status}): ${url}`);
   }
-  const mime = mimeFromUrl(url);
+  // Tipo real do arquivo (data: URL e Storage sem extensão confiável).
+  const header = res.headers.get("content-type")?.split(";")[0].trim().toLowerCase();
+  const mime = header?.startsWith("image/") ? header : mimeFromUrl(url);
   const bytes = Buffer.from(await res.arrayBuffer());
   return { blob: new Blob([bytes], { type: mime }), filename: `ref.${extFromMime(mime)}` };
 }
@@ -176,29 +195,44 @@ export async function generateOpenAIImage(
   const { size } = resolveDimensions(params.aspectRatio, params.resolution);
   const quality = params.quality ?? "medium";
   const refs = (params.references ?? []).slice(0, MAX_REFERENCES);
-  const prompt = composePrompt({ ...params, references: refs });
+  const prompt = params.referencesInPrompt
+    ? params.prompt.trim()
+    : composePrompt({ ...params, references: refs });
 
   let payload: unknown;
 
   if (refs.length > 0) {
-    // Edição multipart com uma ou mais referências (`image[]`).
-    const form = new FormData();
-    form.append("model", model());
-    form.append("prompt", prompt);
-    form.append("size", size);
-    form.append("quality", quality);
-    form.append("n", "1");
-    for (const ref of refs) {
-      const { blob, filename } = await downloadReference(ref.url);
-      form.append("image[]", blob, filename);
-    }
+    // Edição multipart com uma ou mais referências (`image[]`), na ordem — o
+    // modelo preserva melhor as primeiras.
+    const images = await Promise.all(refs.map((ref) => downloadReference(ref.url)));
+    const send = async (fidelity: string | null) => {
+      const form = new FormData();
+      form.append("model", model());
+      form.append("prompt", prompt);
+      form.append("size", size);
+      form.append("quality", quality);
+      form.append("n", "1");
+      if (fidelity) form.append("input_fidelity", fidelity);
+      for (const { blob, filename } of images) form.append("image[]", blob, filename);
+      const res = await fetch(`${OPENAI_API}/images/edits`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey()}` },
+        body: form,
+      });
+      return { res, body: (await res.json().catch(() => ({}))) as unknown };
+    };
 
-    const res = await fetch(`${OPENAI_API}/images/edits`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey()}` },
-      body: form,
-    });
-    payload = await res.json().catch(() => ({}));
+    const fidelity = fidelityUnsupported ? null : inputFidelity();
+    let { res, body } = await send(fidelity);
+    const errorMessage = (b: unknown) =>
+      (b as { error?: { message?: string } })?.error?.message ?? "";
+    if (!res.ok && fidelity && res.status === 400 && /input_fidelity/i.test(errorMessage(body))) {
+      // Modelo sem suporte ao parâmetro: segue sem ele (e não tenta de novo).
+      fidelityUnsupported = true;
+      console.warn("[openai] input_fidelity não suportado por", model(), "— enviando sem");
+      ({ res, body } = await send(null));
+    }
+    payload = body;
     if (!res.ok) {
       throw new OpenAIImageError(
         `OpenAI ${res.status}: ${(payload as { error?: { message?: string } })?.error?.message ?? "erro na edição"}`

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildSpaceRequest, spaceReferencesFor, SPACE_MAX_COUNT } from "../space-request";
+import {
+  buildSpaceRequest,
+  spacePromptFor,
+  spaceReferencesFor,
+  SPACE_MAX_COUNT,
+} from "../space-request";
+import { CATEGORY_META, upgradeLegacyInstructions } from "@/lib/image-library/categories";
 
 const defaults = { aspectRatio: "4:5", imageSize: "2K" };
 
@@ -23,22 +29,26 @@ describe("buildSpaceRequest", () => {
     expect(req.logoUrl).toBeNull();
   });
 
-  it("logo vai primeiro com a frase do prompt; refs na sequência, sem duplicar", () => {
+  it("ordem: sujeito → logo → sem categoria → estilo; sem duplicar", () => {
     const req = buildSpaceRequest(
       {
         flow_logo_url: "https://x/logo.png",
         logo_directive: "logo no topo",
         flow_references: [
-          { url: "https://x/a.png", role: "estilo" },
-          { url: "https://x/a.png", role: "duplicada" },
+          { url: "https://x/estilo.png", role: "estilo", category: "style" },
+          { url: "https://x/solta.png", role: "solta" },
+          { url: "https://x/pessoa.png", role: "pessoa", category: "subject" },
+          { url: "https://x/estilo.png", role: "duplicada", category: "style" },
           { url: "https://x/logo.png", role: "logo de novo" },
         ],
       },
       defaults
     );
-    expect(req.references.map((r) => [r.kind, r.intent])).toEqual([
-      ["logo", "logo no topo"],
-      ["ref", "estilo"],
+    expect(req.references.map((r) => [r.label, r.intent])).toEqual([
+      ["Sujeito/produto", "pessoa"],
+      ["Logo", "logo no topo"],
+      ["Referência", "solta"],
+      ["Estilo", "estilo"],
     ]);
   });
 
@@ -49,14 +59,39 @@ describe("buildSpaceRequest", () => {
     );
     const refs = spaceReferencesFor(req, req.batch[0]);
     expect(refs.map((r) => r.kind)).toEqual(["item", "logo"]);
+    expect(spacePromptFor(req, req.batch[0])).toContain("- Imagem 1 (Item da lista)");
   });
 
-  it("o prompt não carrega bloco de referências próprio (o provedor numera)", () => {
+  it("o prompt ABRE com as imagens numeradas na ordem enviada", () => {
     const req = buildSpaceRequest(
-      { informacoesExtras: "cena", flow_references: [{ url: "https://x/a.png", role: "estilo" }] },
+      {
+        informacoesExtras: "cena",
+        flow_references: [{ url: "https://x/a.png", role: "replique o layout", category: "style" }],
+      },
       defaults
     );
-    expect(req.prompt).not.toContain("Crie a arte usando as imagens");
-    expect(req.prompt.startsWith("cena")).toBe(true);
+    const prompt = spacePromptFor(req, null);
+    expect(prompt.startsWith("IMAGENS ANEXADAS")).toBe(true);
+    expect(prompt).toContain("- Imagem 1 (Estilo): replique o layout");
+    expect(prompt.indexOf("Imagem 1")).toBeLessThan(prompt.indexOf("cena"));
+  });
+
+  it("sem referências o prompt é só o corpo", () => {
+    const req = buildSpaceRequest({ informacoesExtras: "cena" }, defaults);
+    expect(spacePromptFor(req, null).startsWith("cena")).toBe(true);
+  });
+});
+
+describe("upgradeLegacyInstructions", () => {
+  it("troca a instrução antiga de estilo (que mandava NÃO seguir a imagem)", () => {
+    const old =
+      "@(estilo) — é só inspiração de estilo (luz, tratamento, composição geral): não copie textos, logos nem elementos literais. Destaque do dr";
+    const up = upgradeLegacyInstructions(old);
+    expect(up).toBe(`@(estilo) — ${CATEGORY_META.style.instruction}. Destaque do dr`);
+    expect(up).not.toContain("só inspiração");
+  });
+
+  it("não mexe em texto escrito pelo operador", () => {
+    expect(upgradeLegacyInstructions("fundo azul, luz suave")).toBe("fundo azul, luz suave");
   });
 });

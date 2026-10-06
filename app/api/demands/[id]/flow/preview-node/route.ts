@@ -3,6 +3,7 @@ import { IMAGE_GEN_DEFAULTS } from "@/lib/ai/imagegen/defaults";
 import { MAX_REFERENCES } from "@/lib/ai/imagegen/openai";
 import {
   buildSpaceRequest,
+  spacePromptFor,
   spaceReferencesFor,
   type SpaceJobParams,
 } from "@/lib/ai/imagegen/space-request";
@@ -34,10 +35,11 @@ export async function GET(req: Request, { params }: Params) {
   });
 
   // Referências de UMA geração (no fan-out, o item da lista entra como Imagem 1).
-  const firstGeneration = spaceReferencesFor(request, request.batch[0] ?? null);
+  const firstItem = request.batch[0] ?? null;
+  const firstGeneration = spaceReferencesFor(request, firstItem);
 
   return NextResponse.json({
-    prompt: request.prompt,
+    prompt: spacePromptFor(request, firstItem),
     references: firstGeneration.slice(0, MAX_REFERENCES),
     droppedReferences: Math.max(0, firstGeneration.length - MAX_REFERENCES),
     batch: request.batch.map((item) => item?.url ?? null),
