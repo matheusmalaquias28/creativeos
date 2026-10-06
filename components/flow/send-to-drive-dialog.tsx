@@ -16,12 +16,14 @@ import { cn } from "@/lib/utils";
 
 type Props = {
   sourceUrl: string;
+  /** Demanda do Space onde a arte foi gerada — o diálogo já abre nela. */
+  currentDemandId?: string;
   onClose: () => void;
 };
 
 const FORMAT_LABEL: Record<ExportFormat, string> = { feed: "Feed", story: "Stories" };
 
-export function SendToDriveDialog({ sourceUrl, onClose }: Props) {
+export function SendToDriveDialog({ sourceUrl, currentDemandId, onClose }: Props) {
   const [demands, setDemands] = useState<DriveTargetDemand[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -30,11 +32,18 @@ export function SendToDriveDialog({ sourceUrl, onClose }: Props) {
   const [sentSlot, setSentSlot] = useState<string | null>(null);
 
   useEffect(() => {
-    listRecentDemandsForDriveAction().then((res) => {
-      if (res.error) setLoadError(res.error);
-      else setDemands(res.demands ?? []);
+    listRecentDemandsForDriveAction(currentDemandId).then((res) => {
+      if (res.error) {
+        setLoadError(res.error);
+        return;
+      }
+      const list = res.demands ?? [];
+      setDemands(list);
+      // Abre direto na demanda atual; o "voltar" leva à lista para escolher outra.
+      const current = currentDemandId ? list.find((d) => d.id === currentDemandId) : undefined;
+      if (current) setPicked(current);
     });
-  }, []);
+  }, [currentDemandId]);
 
   const filtered = useMemo(() => {
     if (!demands) return [];
@@ -79,7 +88,7 @@ export function SendToDriveDialog({ sourceUrl, onClose }: Props) {
             <FolderUp className="size-4 text-muted-foreground" />
           )}
           <h2 className="flex-1 truncate text-sm font-semibold text-foreground">
-            {picked ? picked.title : "Enviar para o Drive de outra demanda"}
+            {picked ? picked.title : "Enviar para o Drive de uma demanda"}
           </h2>
           <Button type="button" variant="ghost" size="icon-sm" onClick={onClose} title="Fechar">
             <X />

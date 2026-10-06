@@ -12,7 +12,9 @@
  *   5. salva a arte final (v1.png) e a versão sem logo (v1_raw.png), usada
  *      pelos ajustes para recompor a logo sem duplicá-la.
  *
- * Timeout: IMAGE_JOB_TIMEOUT_MS (padrão 4min — cobre duas gerações + revisões).
+ * Timeout: IMAGE_JOB_TIMEOUT_MS (padrão 4min — cobre duas gerações + revisões)
+ * por geração. No Space o lote do node roda em paralelo (SPACE_FANOUT_CONCURRENCY)
+ * e o timeout do job escala com o número de rodadas.
  * Cancelamento: ao marcar o job como 'failed' externamente, o worker respeita.
  *
  * Versionamento: a numeração corre por FORMATO ('feed' 3:4 e 'story' 9:16).
@@ -29,7 +31,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { generateArtImage } from "./provider";
 import { urlToInlineDataPart } from "./storage-refs";
 import { compositeBrandLogo, prepareLogo } from "./brand-logo";
-import { compilePrompt, compileSpacePrompt } from "./prompt-compiler";
+import { compilePrompt } from "./prompt-compiler";
 import { buildLogoDirective } from "@/lib/flow/logo-directive";
 import { adaptArtToStory } from "./story";
 import {
@@ -42,6 +44,7 @@ import { reviewArt, type ArtReview } from "@/lib/ai/art-director/review-art";
 import { ART_ASPECT_RATIO } from "@/lib/ai/art-director/constants";
 import type { DirectionMeta, ReferenceRole } from "@/lib/ai/art-director/types";
 import { IMAGE_GEN_DEFAULTS } from "./defaults";
+import { buildSpaceRequest, SPACE_MAX_COUNT } from "./space-request";
 import type { LogoPlacement } from "./logo-composite";
 import type { CreativeProfile, ArtSpec, BriefingCopy, DemandReference } from "./prompt-compiler";
 import { CATEGORY_META, isReferenceCategory } from "@/lib/image-library/categories";
@@ -194,6 +197,34 @@ function ttlExpiresAt(ephemeral: boolean | undefined): string | null {
   return new Date(Date.now() + SPACE_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
 }
 
+/** Quantas gerações do lote de um node do Space rodam em paralelo. */
+const SPACE_CONCURRENCY = Math.max(1, Number(process.env.SPACE_FANOUT_CONCURRENCY ?? "6"));
+
+/** Tamanho do lote: 1 geração por item da Lista (fan-out) ou `count` variações. */
+function batchSize(params: JobRow["params"]): number {
+  const fanout = params.fanout_reference_urls?.length ?? 0;
+  return fanout > 0 ? fanout : Math.min(SPACE_MAX_COUNT, Math.max(1, params.count ?? 1));
+}
+
+/** Timeout do job inteiro: cada rodada de gerações paralelas tem o seu. */
+function jobTimeoutMs(job: JobRow): number {
+  const rounds = Math.ceil(batchSize(job.params) / (job.ephemeral ? SPACE_CONCURRENCY : 1));
+  return JOB_TIMEOUT_MS * Math.max(1, rounds);
+}
+
+/** Rate limit do provedor (várias gerações em paralelo): espera e tenta de novo. */
+async function withRateLimitRetry<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (!/\b429\b|rate.?limit/i.test(message) || attempt >= retries) throw err;
+      await new Promise((r) => setTimeout(r, 15_000 * (attempt + 1)));
+    }
+  }
+}
+
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -258,7 +289,7 @@ async function processJob(job: JobRow): Promise<void> {
     .eq("id", job.id);
 
   try {
-    await withTimeout(runJob(job, supabase), JOB_TIMEOUT_MS, `job ${job.id}`);
+    await withTimeout(runJob(job, supabase), jobTimeoutMs(job), `job ${job.id}`);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
 
@@ -446,9 +477,21 @@ async function runJob(
       buildLogoDirective(job.params.logo_position ?? undefined, job.params.logo_size ?? undefined)
     : null;
 
+  // Space: prompt, referências e lote vêm da MESMA montagem que o preview do
+  // node exibe (`/flow/preview-node`) — o que aparece no node é o que vai.
+  const space =
+    job.ephemeral === true && !approvedPrompt
+      ? buildSpaceRequest(job.params, {
+          aspectRatio: artSpec.aspect_ratio ?? IMAGE_GEN_DEFAULTS.aspectRatio,
+          imageSize: artSpec.image_size ?? IMAGE_GEN_DEFAULTS.imageSize,
+        })
+      : null;
+
   const styleRefs = directedRefs.filter((r) => r.role !== "logo");
   const references = approvedPrompt
     ? styleRefs.map((r) => ({ url: r.storage_url, intent: r.intent ?? r.role }))
+    : space
+    ? space.references.map((r) => ({ url: r.url, intent: r.intent }))
     : [
         ...(logoAsReference ? [{ url: effectiveLogoUrl!, intent: logoDirective! }] : []),
         ...creativeProfile.style_reference_urls.map((url) => ({
@@ -473,8 +516,8 @@ async function runJob(
     // Space (canvas): a direção criativa do operador vai literal, sem o colete
     // de força do pipeline estruturado. Demais fluxos sem diretor mantêm o
     // compilador clássico + padrões.
-    const parts = job.ephemeral
-      ? [compileSpacePrompt(creativeProfile, briefing, artSpec, allDemandRefs)]
+    const parts = space
+      ? [space.prompt]
       : [
           compilePrompt(creativeProfile, briefing, artSpec, allDemandRefs),
           buildStandardsBlock(textSpec),
@@ -504,7 +547,9 @@ async function runJob(
   const generateBestCandidate = async (
     extraRef: { url: string; intent: string } | null
   ): Promise<Candidate> => {
-    const candidateRefs = extraRef ? [extraRef, ...references] : references;
+    const candidateRefs = extraRef
+      ? [extraRef, ...references.filter((r) => r.url !== extraRef.url)]
+      : references;
     let best: Candidate | null = null;
     let fixNotes: string[] | undefined;
     let attempts = 0;
@@ -513,14 +558,16 @@ async function runJob(
       attempts += 1;
       const prompt = buildPrompt(fixNotes);
 
-      const raw = await generateArtImage({
-        prompt,
-        references: candidateRefs,
-        imageSize: artSpec.image_size ?? "2K",
-        aspectRatio: artSpec.aspect_ratio ?? IMAGE_GEN_DEFAULTS.aspectRatio,
-        // Esforço do GPT Image vindo do node (ignorado por Magnific/Gemini).
-        quality: job.params.quality ?? "medium",
-      });
+      const raw = await withRateLimitRetry(() =>
+        generateArtImage({
+          prompt,
+          references: candidateRefs,
+          imageSize: artSpec.image_size ?? "2K",
+          aspectRatio: artSpec.aspect_ratio ?? IMAGE_GEN_DEFAULTS.aspectRatio,
+          // Esforço do GPT Image vindo do node (ignorado por Magnific/Gemini).
+          quality: job.params.quality ?? "medium",
+        })
+      );
       const logoResult = cleanLogo
         ? await compositeBrandLogo({ art: raw, logo: cleanLogo, palette: creativeProfile.palette })
         : null;
@@ -562,79 +609,124 @@ async function runJob(
     return best;
   };
 
-  // Lote de gerações para este node: fan-out (1 por item da Lista) OU `count`
-  // variações do mesmo prompt. Cada uma vira uma versão na pilha do saidaArte.
+  // Lote de gerações para este node: fan-out (1 por item da Lista, sem teto) OU
+  // `count` variações do mesmo prompt. Cada uma vira uma versão na pilha do node.
   const fanout = job.params.fanout_reference_urls ?? null;
-  const batch: ({ url: string; intent: string } | null)[] =
-    fanout && fanout.length > 0
+  const batch: ({ url: string; intent: string } | null)[] = space
+    ? space.batch.map((item) => (item ? { url: item.url, intent: item.intent } : null))
+    : fanout && fanout.length > 0
       ? fanout.map((url) => ({ url, intent: "item da lista — base principal desta arte" }))
-      : Array.from({ length: Math.min(6, Math.max(1, job.params.count ?? 1)) }, () => null);
+      : Array.from({ length: Math.min(SPACE_MAX_COUNT, Math.max(1, job.params.count ?? 1)) }, () => null);
 
+  const isCancelled = async () => {
+    const { data } = await supabase
+      .from("art_generation_job")
+      .select("status")
+      .eq("id", job.id)
+      .single();
+    return data?.status !== "processing";
+  };
+
+  // Publica uma geração: upload + galeria + nova versão. Serializado — a
+  // numeração lê o máximo e soma 1, então duas publicações juntas colidiriam.
+  const publishLock = pLimit(1);
+  const publish = (best: Candidate, isListItem: boolean) =>
+    publishLock(async () => {
+      // Upload ao Storage — final (com logo) e raw (sem logo, insumo dos ajustes).
+      const versionNumber = await nextVersionNumber(supabase, job.id, "feed");
+      const { publicUrl, storagePath } = await uploadArtToStorage({
+        buffer: best.final,
+        jobId: job.id,
+        versionNumber,
+      });
+      await uploadArtToStorage({ buffer: best.raw, jobId: job.id, versionNumber, raw: true }).catch(
+        (err) => console.warn("[worker] upload da versão sem logo falhou:", (err as Error)?.message ?? err)
+      );
+
+      // Registra na Galeria (não-fatal)
+      await supabase.from("generated_images").insert({
+        source: "artes",
+        prompt: artSpec.headline ?? briefing.titulo ?? "",
+        aspect_ratio: artSpec.aspect_ratio ?? "1:1",
+        resolution: artSpec.image_size ?? "2K",
+        storage_path: storagePath,
+        url: publicUrl,
+      }).then(({ error }) => {
+        if (error) console.error("[worker] galeria insert falhou:", error.message);
+      });
+
+      // Nova versão do formato feed — empilha (v1, v2, …); a última fica is_current.
+      await publishVersion(supabase, {
+        jobId: job.id,
+        format: "feed",
+        versionNumber,
+        resultUrl: publicUrl,
+        storagePath,
+        instruction: isListItem ? "item da lista" : versionNumber > 1 ? "variação" : null,
+        expiresAt: ttlExpiresAt(job.ephemeral),
+      });
+    });
+
+  // As gerações do lote rodam em PARALELO no Space (em série nos demais
+  // fluxos), cada uma com o próprio timeout. Antes era tudo em série dentro de
+  // um único timeout — listas com mais de ~4 itens estouravam o tempo. Cada
+  // geração publica assim que fica pronta; uma falha isolada não derruba as outras.
+  const limit = pLimit(space ? SPACE_CONCURRENCY : 1);
+  const errors: string[] = [];
   let lastBest: Candidate | null = null;
-  for (const item of batch) {
-    const best = await generateBestCandidate(item);
-    lastBest = best;
 
-    // Upload ao Storage — final (com logo) e raw (sem logo, insumo dos ajustes).
-    const versionNumber = await nextVersionNumber(supabase, job.id, "feed");
-    const { publicUrl, storagePath } = await uploadArtToStorage({
-      buffer: best.final,
-      jobId: job.id,
-      versionNumber,
-    });
-    await uploadArtToStorage({ buffer: best.raw, jobId: job.id, versionNumber, raw: true }).catch(
-      (err) => console.warn("[worker] upload da versão sem logo falhou:", (err as Error)?.message ?? err)
-    );
+  await Promise.all(
+    batch.map((item) =>
+      limit(async () => {
+        if (await isCancelled()) return;
+        try {
+          const best = await withTimeout(generateBestCandidate(item), JOB_TIMEOUT_MS, `geração do job ${job.id}`);
+          if (await isCancelled()) return;
+          await publish(best, item !== null);
+          lastBest = best;
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error("[worker] geração do lote falhou:", message);
+          errors.push(message);
+        }
+      })
+    )
+  );
 
-    // Registra na Galeria (não-fatal)
-    await supabase.from("generated_images").insert({
-      source: "artes",
-      prompt: artSpec.headline ?? briefing.titulo ?? "",
-      aspect_ratio: artSpec.aspect_ratio ?? "1:1",
-      resolution: artSpec.image_size ?? "2K",
-      storage_path: storagePath,
-      url: publicUrl,
-    }).then(({ error }) => {
-      if (error) console.error("[worker] galeria insert falhou:", error.message);
-    });
-
-    // Nova versão do formato feed — empilha (v1, v2, …); a última fica is_current.
-    await publishVersion(supabase, {
-      jobId: job.id,
-      format: "feed",
-      versionNumber,
-      resultUrl: publicUrl,
-      storagePath,
-      instruction: versionNumber > 1 ? "variação" : null,
-      expiresAt: ttlExpiresAt(job.ephemeral),
-    });
+  if (!lastBest) {
+    if (await isCancelled()) return;
+    throw new Error(errors[0] ?? "Nenhuma arte gerada");
   }
+  const finalBest: Candidate = lastBest;
+  const promptFinal = finalBest.prompt;
 
-  if (!lastBest) throw new Error("Nenhuma arte gerada");
-  const promptFinal = lastBest.prompt;
-
-  if (job.direction && lastBest.review) {
+  if (job.direction && finalBest.review) {
     const direction: DirectionMeta = {
       ...job.direction,
       review: {
-        pass: lastBest.review.pass,
-        score: lastBest.review.score,
-        attempts: lastBest.attempts,
-        fixes: lastBest.review.fixes,
+        pass: finalBest.review.pass,
+        score: finalBest.review.score,
+        attempts: finalBest.attempts,
+        fixes: finalBest.review.fixes,
       },
     };
     await supabase.from("art_generation_job").update({ direction }).eq("id", job.id);
   }
 
-  // Marca job como succeeded
+  // Marca job como succeeded (se não foi pausado no meio do lote). Falhas
+  // isoladas do lote ficam registradas em `error`.
   await supabase
     .from("art_generation_job")
     .update({
       status: "succeeded",
       prompt_final: promptFinal,
+      error: errors.length > 0
+        ? `${errors.length} de ${batch.length} gerações falharam: ${errors[0]}`
+        : null,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", job.id);
+    .eq("id", job.id)
+    .eq("status", "processing");
 }
 
 // ---------------------------------------------------------------------------

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, ArrowUpRight } from "lucide-react";
+import { X, ArrowUpRight, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /** Lightbox simples (portal) — duplo-clique numa imagem do canvas abre aqui. */
@@ -41,15 +41,18 @@ export function ImageLightbox({ url, onClose }: { url: string; onClose: () => vo
 
 /**
  * Thumbnail dentro de uma lista (clienteReferencias / listaImagens): maior,
- * lightbox no duplo-clique e, no hover, uma seta que "joga a imagem para fora".
+ * lightbox no duplo-clique e, no hover, uma seta que "joga a imagem para fora"
+ * e uma lixeira que remove a imagem da lista.
  */
 export function NodeThumb({
   url,
   onPopOut,
+  onRemove,
   alt,
 }: {
   url: string;
   onPopOut?: () => void;
+  onRemove?: () => void;
   alt?: string;
 }) {
   const [lightbox, setLightbox] = useState(false);
@@ -72,6 +75,16 @@ export function NodeThumb({
           className="nodrag absolute right-1 top-1 flex size-5 items-center justify-center rounded-md border border-border bg-card/85 text-foreground opacity-0 backdrop-blur transition-premium hover:bg-primary hover:text-primary-foreground group-hover/thumb:opacity-100"
         >
           <ArrowUpRight className="size-3" />
+        </button>
+      )}
+      {onRemove && (
+        <button
+          type="button"
+          onClick={onRemove}
+          title="Remover da lista"
+          className="nodrag absolute left-1 top-1 flex size-5 items-center justify-center rounded-md border border-border bg-card/85 text-foreground opacity-0 backdrop-blur transition-premium hover:bg-tone-red hover:text-white group-hover/thumb:opacity-100"
+        >
+          <Trash2 className="size-3" />
         </button>
       )}
       {lightbox && <ImageLightbox url={url} onClose={() => setLightbox(false)} />}

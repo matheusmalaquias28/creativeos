@@ -39,13 +39,16 @@ export function enrichFlowGraphWithProfile(
         };
       }
       if (node.type === "clienteReferencias") {
+        // Refs que o operador tirou do node não voltam pelo perfil.
+        const removed = new Set(node.data.removedUrls ?? []);
         const existing = node.data.referenceUrls ?? [];
         const fromProfile = profile.style_reference_urls ?? [];
         return {
           ...node,
           data: {
             ...node.data,
-            referenceUrls: fromProfile.length > 0 ? fromProfile : existing,
+            referenceUrls:
+              fromProfile.length > 0 ? fromProfile.filter((url) => !removed.has(url)) : existing,
           },
         };
       }

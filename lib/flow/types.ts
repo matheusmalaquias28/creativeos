@@ -22,6 +22,11 @@ export type ClienteLogoData = {
 export type ClienteReferenciasData = {
   clientId: string;
   referenceUrls?: string[];
+  /**
+   * Refs do perfil que o operador tirou deste node — o enrich com o perfil não
+   * as devolve (senão a ref apagada voltava a influenciar a geração).
+   */
+  removedUrls?: string[];
 };
 
 /** Campos de copy/prompt compartilhados entre promptArte e o node unificado arte. */
@@ -133,6 +138,8 @@ export type ListaImagensData = {
    * consegue fazer o fan-out mesmo sem ver os resultados de runtime dos nodes.
    */
   items?: string[];
+  /** De qual node veio cada item materializado (url → nodeId). */
+  itemSources?: Record<string, string>;
 };
 
 // ─── Discriminated union node ─────────────────────────────────────────────

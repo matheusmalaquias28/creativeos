@@ -16,6 +16,7 @@ import {
   Gauge,
   Library,
   FolderUp,
+  ScanEye,
 } from "lucide-react";
 import type { Node } from "@xyflow/react";
 import { toast } from "sonner";
@@ -25,6 +26,7 @@ import { ImageLightbox } from "@/components/flow/nodes/node-image";
 import { NodeSelect } from "@/components/flow/nodes/node-select";
 import { LibraryPickerDialog } from "@/components/image-library/library-picker-dialog";
 import { SendToDriveDialog } from "@/components/flow/send-to-drive-dialog";
+import { GenerationPreviewDialog } from "@/components/flow/nodes/generation-preview-dialog";
 import { CATEGORY_META, type ReferenceCategory } from "@/lib/image-library/categories";
 import {
   LOGO_POSITIONS,
@@ -274,6 +276,9 @@ export function ArteNode({ id, data, selected }: Props) {
     if (!data.demandId) { toast.error("Salve o fluxo antes de gerar"); return; }
     setTriggering(true);
     try {
+      // A geração lê o fluxo SALVO: salva já, senão o que acabou de ser
+      // apagado/editado no canvas (ainda no debounce) iria na geração.
+      if (!(await saveNow())) throw new Error("Não foi possível salvar o fluxo");
       const res = await fetch(`/api/demands/${data.demandId}/flow/run-node`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -314,6 +319,7 @@ export function ArteNode({ id, data, selected }: Props) {
   const current = stack[safeIdx];
   const [lightbox, setLightbox] = useState(false);
   const [driveOpen, setDriveOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const count = data.count ?? 1;
   const aspect = data.aspectRatio ?? "4:5";
 
@@ -411,8 +417,14 @@ export function ArteNode({ id, data, selected }: Props) {
             </button>
           </div>
         )}
+        {data.demandId && (
+          <button type="button" onClick={() => setPreviewOpen(true)} title="Ver tudo o que vai na geração (prompt, imagens, lote)"
+            className="flex size-7 items-center justify-center rounded-full border border-border bg-card text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground">
+            <ScanEye className="size-3.5" />
+          </button>
+        )}
         {current && (
-          <button type="button" onClick={() => setDriveOpen(true)} title="Enviar para o Drive de outra demanda"
+          <button type="button" onClick={() => setDriveOpen(true)} title="Enviar para o Drive desta demanda"
             className="flex h-7 items-center gap-1 rounded-full border border-border bg-card px-2.5 text-xs font-semibold text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground">
             <FolderUp className="size-3.5" /> Drive
           </button>
@@ -726,7 +738,20 @@ export function ArteNode({ id, data, selected }: Props) {
       )}
 
       {driveOpen && current && (
-        <SendToDriveDialog sourceUrl={current.url} onClose={() => setDriveOpen(false)} />
+        <SendToDriveDialog
+          sourceUrl={current.url}
+          currentDemandId={data.demandId}
+          onClose={() => setDriveOpen(false)}
+        />
+      )}
+
+      {previewOpen && data.demandId && (
+        <GenerationPreviewDialog
+          demandId={data.demandId}
+          artIndex={data.artIndex}
+          prepare={saveNow}
+          onClose={() => setPreviewOpen(false)}
+        />
       )}
     </div>
   );

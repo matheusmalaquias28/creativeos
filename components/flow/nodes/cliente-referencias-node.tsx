@@ -26,6 +26,24 @@ export function ClienteReferenciasNode({
   const { scheduleAutoSave } = useFlowCanvas();
   const refs = data.referenceUrls ?? [];
 
+  // Tira a URL do node e lembra a remoção — o perfil não a devolve no enrich.
+  function withoutUrl(n: Node, url: string, index: number): Node {
+    const d = n.data as ClienteReferenciasData;
+    return {
+      ...n,
+      data: {
+        ...d,
+        referenceUrls: (d.referenceUrls ?? []).filter((_, i) => i !== index),
+        removedUrls: Array.from(new Set([...(d.removedUrls ?? []), url])),
+      },
+    };
+  }
+
+  function remove(url: string, index: number) {
+    setNodes((ns) => ns.map((n) => (n.id === id ? withoutUrl(n, url, index) : n)));
+    scheduleAutoSave();
+  }
+
   // "Joga para fora": remove a URL da lista e cria um node de imagem solto ao lado.
   function popOut(url: string, index: number) {
     const self = getNode(id);
@@ -38,22 +56,7 @@ export function ClienteReferenciasNode({
       position: pos,
       data: { imageUrl: url, label: "Imagem" } as ReferenciaImagemData,
     };
-    setNodes((ns) => [
-      ...ns.map((n) =>
-        n.id === id
-          ? {
-              ...n,
-              data: {
-                ...n.data,
-                referenceUrls: (n.data.referenceUrls as string[] ?? []).filter(
-                  (_, i) => i !== index
-                ),
-              },
-            }
-          : n
-      ),
-      newNode,
-    ]);
+    setNodes((ns) => [...ns.map((n) => (n.id === id ? withoutUrl(n, url, index) : n)), newNode]);
     scheduleAutoSave();
   }
 
@@ -75,7 +78,13 @@ export function ClienteReferenciasNode({
       {refs.length > 0 ? (
         <div className="grid grid-cols-2 gap-1.5">
           {refs.map((url, i) => (
-            <NodeThumb key={`${url}-${i}`} url={url} alt={`Ref ${i + 1}`} onPopOut={() => popOut(url, i)} />
+            <NodeThumb
+              key={`${url}-${i}`}
+              url={url}
+              alt={`Ref ${i + 1}`}
+              onPopOut={() => popOut(url, i)}
+              onRemove={() => remove(url, i)}
+            />
           ))}
         </div>
       ) : (

@@ -21,8 +21,8 @@ import sharp from "sharp";
 
 const OPENAI_API = "https://api.openai.com/v1";
 const DEFAULT_MODEL = "gpt-image-2";
-/** Teto defensivo de referências por chamada (evita payload gigante). */
-const MAX_REFERENCES = 8;
+/** Teto de referências por chamada — o máximo de imagens que o /images/edits aceita. */
+export const MAX_REFERENCES = 16;
 
 export class OpenAIImageError extends Error {
   constructor(message: string) {
@@ -175,8 +175,8 @@ export async function generateOpenAIImage(
 
   const { size } = resolveDimensions(params.aspectRatio, params.resolution);
   const quality = params.quality ?? "medium";
-  const prompt = composePrompt(params);
   const refs = (params.references ?? []).slice(0, MAX_REFERENCES);
+  const prompt = composePrompt({ ...params, references: refs });
 
   let payload: unknown;
 

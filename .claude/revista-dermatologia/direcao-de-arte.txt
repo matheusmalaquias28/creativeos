@@ -1,0 +1,94 @@
+Geração: ferramenta integrada de imagens.
+
+PÁGINA 1
+Use case: ads-marketing. Create ONE finished flat portrait magazine page, 3:4 aspect ratio, high resolution, entirely in Brazilian Portuguese. Luxury dermatology clinic editorial for Dra. Bianca de Franco. Match attached reference visual language: warm ivory #EAE5DA background, espresso brown #514137 typography, subtle taupe hairlines, very restrained muted gold details, large delicate high contrast Didot-style serif titles with occasional italic, airy tracked small sans-serif labels and very legible body text. Sophisticated warm sunlit editorial photography with realistic natural skin pores, elegant close crops. Generous margins, precise grid, impeccable accents and spelling. Actual full-bleed flat page artwork, NOT magazine mockup, no perspective or outside background. No invented credentials, no placeholder text or interface. References are visual guidance only; replace all editorial content with the supplied text. PAGE 01 COVER. Full-page warm beauty portrait of adult brunette woman, natural skin, shoulders, beige backdrop, close crop similar to reference cover. Large white serif DERMATOLOGIA across top with enough margin to fit word. Subtitle below: 'Ciência, tecnologia e naturalidade.' Bottom left elegant B monogram inspired by reference, thin circular words 'BIANCA DE FRANCO • DERMATOLOGIA'. Under it 'DRA. BIANCA DE FRANCO' and 'DERMATOLOGIA'. Restrained and luxurious, no other copy.
+
+PÁGINA 2
+Use case: ads-marketing. Create ONE finished flat portrait magazine page, 3:4 aspect ratio, high resolution, entirely in Brazilian Portuguese. Luxury dermatology clinic editorial for Dra. Bianca de Franco. Match attached reference visual language: warm ivory #EAE5DA background, espresso brown #514137 typography, subtle taupe hairlines, very restrained muted gold details, large delicate high contrast Didot-style serif titles with occasional italic, airy tracked small sans-serif labels and very legible body text. Sophisticated warm sunlit editorial photography with realistic natural skin pores, elegant close crops. Generous margins, precise grid, impeccable accents and spelling. Actual full-bleed flat page artwork, NOT magazine mockup, no perspective or outside background. No invented credentials, no placeholder text or interface. References are visual guidance only; replace all editorial content with the supplied text. PAGE 02 — philosophy. Adapt reference page 2 layout: upper 65% left text ivory panel and right warm close-up female skin photograph; lower 35% two elegant doctor bio columns. Preserve the two actual doctors' faces from the reference in small portrait crops, do not substitute fictional doctors. Reduce headline size enough for ALL text to fit legibly.
+Label "SOBRE NÓS"
+Headline "Cuidar da pele é entender o (seu) tempo."
+Body "Na nossa clínica, acreditamos que a beleza real nasce do equilíbrio entre ciência, saúde e naturalidade."
+"Cada pele tem uma história e necessidades únicas. Por isso, nosso acompanhamento é personalizado, unindo prevenção, promoção à saúde e tratamentos que respeitam a sua individualidade e o seu tempo — hoje e no futuro."
+"Nosso objetivo é cuidar da sua pele em todas as fases da vida."
+Photo small words "PREVENÇÃO • SAÚDE • CIÊNCIA • RESULTADOS REAIS"
+Bio 1 title "Dra. Bianca de Franco", subtitle "DERMATOLOGISTA", text "Médica dermatologista pela UERJ, especialista em tricologia, dermatologia clínica e cosmiatria. Abordagem individualizada, com foco em saúde da pele, naturalidade e gerenciamento do envelhecimento."
+Bio 2 title "Dr. Carlos Arthur Athayde", subtitle "DERMATOLOGISTA", text "Médico dermatologista pela UNIRIO, especialista em oncologia cutânea pelo INCA. Atua em dermatologia clínica, avaliação de pintas e mapeamento corporal com FotoFinder, ao lado da Dra. Bianca, no cuidado integral de cada paciente."
+Tiny footer "BIANCA DE FRANCO • DERMATOLOGIA" and page "02".
+
+PÁGINA 3
+Use case: ads-marketing. Create ONE finished flat portrait magazine page, 3:4 aspect ratio, high resolution, entirely in Brazilian Portuguese. Luxury dermatology clinic editorial for Dra. Bianca de Franco. Match attached reference visual language: warm ivory #EAE5DA background, espresso brown #514137 typography, subtle taupe hairlines, very restrained muted gold details, large delicate high contrast Didot-style serif titles with occasional italic, airy tracked small sans-serif labels and very legible body text. Sophisticated warm sunlit editorial photography with realistic natural skin pores, elegant close crops. Generous margins, precise grid, impeccable accents and spelling. Actual full-bleed flat page artwork, NOT magazine mockup, no perspective or outside background. No invented credentials, no placeholder text or interface. References are visual guidance only; replace all editorial content with the supplied text. PAGE 03. Follow reference 3 composition closely: upper left editorial text, upper right large sunlit female face and neck photograph, bottom left shoulder and hand photographic detail, bottom right italic quote.
+Label "NOSSA ABORDAGEM".
+Headline "Cada pele tem uma história." and italic subheadline "Cada tratamento, uma estratégia."
+Body "Acreditamos que a dermatologia abrange o cuidado integral do maior órgão do corpo humano, prevenindo doenças e melhorando sua autoestima. É sobre entender a sua pele, o seu tempo e os seus objetivos para criar um plano de cuidado único, seguro e eficaz."
+Second paragraph "Combinamos ciência, tecnologia e um olhar individualizado para promover resultados reais, que respeitam a sua beleza natural e acompanham cada fase da sua vida."
+Photo words "CIÊNCIA / TECNOLOGIA / NATURALIDADE".
+Bottom quote "Cuidar da pele é entender o tempo."
+Tiny footer "BIANCA DE FRANCO • DERMATOLOGIA" and "03".
+
+PÁGINA 4
+Use case: ads-marketing. Create ONE finished flat portrait magazine page, 3:4 aspect ratio, high resolution, entirely in Brazilian Portuguese. Luxury dermatology clinic editorial for Dra. Bianca de Franco. Match attached reference visual language: warm ivory #EAE5DA background, espresso brown #514137 typography, subtle taupe hairlines, very restrained muted gold details, large delicate high contrast Didot-style serif titles with occasional italic, airy tracked small sans-serif labels and very legible body text. Sophisticated warm sunlit editorial photography with realistic natural skin pores, elegant close crops. Generous margins, precise grid, impeccable accents and spelling. Actual full-bleed flat page artwork, NOT magazine mockup, no perspective or outside background. No invented credentials, no placeholder text or interface. References are visual guidance only; replace all editorial content with the supplied text. PAGE 04. Match reference 4 split editorial composition, ivory text left, 3-4 warm photographic skin close-up panels right, fine ivory gutters. No equipment photos needed.
+Label "TECNOLOGIAS"
+Headline "Tecnologias que você encontra aqui."
+Intro "Ciência e tecnologia a serviço da firmeza, da qualidade da pele e da naturalidade."
+Three generously spaced text sections:
+"LINEAR Z"
+"Ultrassom micro e macrofocado que estimula a produção de colágeno para o tratamento da flacidez. Pode promover efeito lifting, firmeza e definição dos contornos, em tratamentos faciais e corporais."
+"XERF"
+"Radiofrequência que aquece camadas profundas da pele, estimulando o colágeno e contribuindo para a firmeza e a qualidade da pele."
+"LASER INTENSE"
+"Tecnologia voltada ao estímulo de colágeno e à melhora da qualidade da pele, com indicação e recuperação avaliadas individualmente."
+Small image words "FIRMEZA / QUALIDADE DA PELE / NATURALIDADE".
+Tiny footer "BIANCA DE FRANCO • DERMATOLOGIA" and "04".
+
+PÁGINA 5
+Use case: ads-marketing. Create ONE finished flat portrait magazine page, 3:4 aspect ratio, high resolution, entirely in Brazilian Portuguese. Luxury dermatology clinic editorial for Dra. Bianca de Franco. Match attached reference visual language: warm ivory #EAE5DA background, espresso brown #514137 typography, subtle taupe hairlines, very restrained muted gold details, large delicate high contrast Didot-style serif titles with occasional italic, airy tracked small sans-serif labels and very legible body text. Sophisticated warm sunlit editorial photography with realistic natural skin pores, elegant close crops. Generous margins, precise grid, impeccable accents and spelling. Actual full-bleed flat page artwork, NOT magazine mockup, no perspective or outside background. No invented credentials, no placeholder text or interface. References are visual guidance only; replace all editorial content with the supplied text. PAGE 05. Label "LASERS". Headline "Luz, renovação e cuidado." Layout photographs on LEFT 42% in three rectangular crops of female cheek, shoulder and hands, text RIGHT 58% on ivory; same warm light as reference. Title and intro at top right, elegant numbered 01–05 list with thin dividers below, readable.
+Intro "Tecnologias que contribuem para a renovação da pele e para a melhora de textura, poros, manchas, cicatrizes e rugas."
+"01 — Laser de picossegundos"
+"Pigmentação • textura e poros • luminosidade • rejuvenescimento"
+"02 — Laser fracionado ablativo"
+"Rejuvenescimento e rugas • cicatrizes • textura"
+"03 — Laser não ablativo"
+"Rejuvenescimento • cicatrizes • qualidade da pele"
+"04 — Luz intensa pulsada"
+"Dano solar • manchas • vasos • qualidade da pele"
+"05 — Indicações personalizadas"
+"Rosácea, acne e cicatrizes, olheiras, envelhecimento do colo, estrias e manchas no dorso das mãos."
+Small closing line "A escolha da tecnologia depende da avaliação da sua pele."
+Footer "BIANCA DE FRANCO • DERMATOLOGIA" and "05".
+
+PÁGINA 6
+Use case: ads-marketing. Create ONE finished flat portrait magazine page, 3:4 aspect ratio, high resolution, entirely in Brazilian Portuguese. Luxury dermatology clinic editorial for Dra. Bianca de Franco. Match attached reference visual language: warm ivory #EAE5DA background, espresso brown #514137 typography, subtle taupe hairlines, very restrained muted gold details, large delicate high contrast Didot-style serif titles with occasional italic, airy tracked small sans-serif labels and very legible body text. Sophisticated warm sunlit editorial photography with realistic natural skin pores, elegant close crops. Generous margins, precise grid, impeccable accents and spelling. Actual full-bleed flat page artwork, NOT magazine mockup, no perspective or outside background. No invented credentials, no placeholder text or interface. References are visual guidance only; replace all editorial content with the supplied text. PAGE 06. One large warm elegant photograph occupying upper 42% showing adult woman with eyes closed and hand gently near cheek, natural skin, serene, not disease demonstration. Bottom ivory block 58% with label, headline, intro and two-column conditions list. Match reference type and colors.
+Label "SAÚDE DA PELE"
+Headline "Dermatologia além da estética."
+Body "A dermatologia também está presente no diagnóstico e tratamento de condições que impactam a saúde, o conforto e a qualidade de vida."
+Balanced two-column list with fine separators:
+"Rosácea"
+"Acne"
+"Melasma"
+"Micose de unha"
+"Dermatites e alergias"
+"Avaliação e acompanhamento de pintas"
+"Câncer de pele"
+"Psoríase"
+Footer "BIANCA DE FRANCO • DERMATOLOGIA" and "06".
+
+PÁGINA 7
+Use case: ads-marketing. Create ONE finished flat portrait magazine page, 3:4 aspect ratio, high resolution, entirely in Brazilian Portuguese. Luxury dermatology clinic editorial for Dra. Bianca de Franco. Match attached reference visual language: warm ivory #EAE5DA background, espresso brown #514137 typography, subtle taupe hairlines, very restrained muted gold details, large delicate high contrast Didot-style serif titles with occasional italic, airy tracked small sans-serif labels and very legible body text. Sophisticated warm sunlit editorial photography with realistic natural skin pores, elegant close crops. Generous margins, precise grid, impeccable accents and spelling. Actual full-bleed flat page artwork, NOT magazine mockup, no perspective or outside background. No invented credentials, no placeholder text or interface. References are visual guidance only; replace all editorial content with the supplied text. PAGE 07. Minimal spacious editorial, left 52% ivory with typography; right 48% beautiful photographic crop of adult brunette woman's long healthy hair, side/back of head, hand gently in hair, natural sunlit brown strands; restrained bottom photographic strip of hair texture. No medical devices.
+Label "COURO CABELUDO"
+Large headline "Tricologia e alopecias."
+Body "A queda de cabelo pode ter diferentes causas. Por isso, o tratamento começa pela investigação, pelo diagnóstico e pela avaliação individual do couro cabeludo."
+Thin rule then label "CUIDADOS E PROCEDIMENTOS"
+Three elegant stacked names widely spaced with hairline separators:
+"Tricoscopia"
+"MMP capilar"
+"Laser capilar"
+Footer "BIANCA DE FRANCO • DERMATOLOGIA" and "07".
+
+PÁGINA 8
+undefined
+
+PÁGINA 9
+undefined
+
+PÁGINA 10
+undefined

@@ -476,20 +476,34 @@ export type ListDriveTargetDemandsState = {
  * pro cliente (poucas centenas de linhas no máximo — não precisa de busca no
  * servidor).
  */
-export async function listRecentDemandsForDriveAction(): Promise<ListDriveTargetDemandsState> {
+export async function listRecentDemandsForDriveAction(
+  /** Garante esta demanda na lista (a atual do Space), mesmo fora das recentes. */
+  includeDemandId?: string
+): Promise<ListDriveTargetDemandsState> {
   const auth = await requireUser();
   if ("error" in auth && !("user" in auth)) return { error: auth.error };
 
   const admin = createAdminClient();
+  const columns = "id, tipo, briefing, artes, client_name_external, clients(name)";
   const { data, error } = await admin
     .from("creative_demands")
-    .select("id, tipo, briefing, artes, client_name_external, clients(name)")
+    .select(columns)
     .order("created_at", { ascending: false })
     .limit(150);
 
   if (error) return { error: error.message };
 
-  const demands: DriveTargetDemand[] = (data ?? []).map((row) => {
+  const rows = data ?? [];
+  if (includeDemandId && !rows.some((row) => row.id === includeDemandId)) {
+    const { data: extra } = await admin
+      .from("creative_demands")
+      .select(columns)
+      .eq("id", includeDemandId)
+      .maybeSingle();
+    if (extra) rows.unshift(extra);
+  }
+
+  const demands: DriveTargetDemand[] = rows.map((row) => {
     const briefing = (row.briefing ?? {}) as { titulo?: string };
     const clients = row.clients as { name?: string } | { name?: string }[] | null;
     const client = Array.isArray(clients) ? clients[0] : clients;

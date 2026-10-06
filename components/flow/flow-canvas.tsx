@@ -55,7 +55,7 @@ import { tones } from "@/lib/design/tokens";
 import { cn } from "@/lib/utils";
 import { ARTE_ROW_Y, gerarFluxoDaDemanda, gerarSubfluxoDaDemanda, ROW_H } from "@/lib/flow/generator";
 import { IMAGE_GEN_DEFAULTS } from "@/lib/ai/imagegen/defaults";
-import type { FlowGraph, SaidaArteData } from "@/lib/flow/types";
+import type { FlowGraph, ListaImagensData, SaidaArteData } from "@/lib/flow/types";
 import type { CreativeDemand } from "@/types/demand";
 
 // ─── Stable maps (outside component) ─────────────────────────────────────
@@ -240,13 +240,14 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
     }, 1500);
   }, [save]);
 
-  const saveNow = useCallback(async () => {
+  const saveNow = useCallback(async (): Promise<boolean> => {
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     const ok = await save(true);
     if (ok) {
       setAutoSavedFlash(true);
       setTimeout(() => setAutoSavedFlash(false), 1800);
     }
+    return ok;
   }, [save]);
 
   // Wrapped change handlers that trigger auto-save on user actions
@@ -261,89 +262,127 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
     [onNodesChange, scheduleAutoSave]
   );
 
+  // ─── Listas: itens gerados materializados por origem ─────────────────────
+  //
+  // Imagens GERADAS (pilha de um node arte) só existem em runtime, então são
+  // copiadas para `items` da lista com a origem em `itemSources` — é isso que o
+  // servidor usa no fan-out. Os itens seguem a origem: regerar/desconectar a
+  // origem troca/remove os itens dela (nada de imagem escondida na lista).
+
+  /** Pilha atual de imagens geradas por um node arte/saidaArte. */
+  const generatedStackOf = useCallback((n: Node | undefined): string[] => {
+    if (!n || (n.type !== "arte" && n.type !== "saidaArte")) return [];
+    const d = n.data as SaidaArteData;
+    if (d.resultUrls?.length) return d.resultUrls.map((r) => r.url);
+    return d.resultUrl ? [d.resultUrl] : [];
+  }, []);
+
+  /** Substitui na lista os itens vindos de `sourceId` por `urls`. */
+  const withSourceItems = useCallback(
+    (list: Node, sourceId: string, urls: string[]): Node => {
+      const d = list.data as ListaImagensData;
+      const sources = d.itemSources ?? {};
+      const kept = (d.items ?? []).filter((u) => sources[u] !== sourceId && !urls.includes(u));
+      const itemSources: Record<string, string> = {};
+      for (const u of kept) if (sources[u]) itemSources[u] = sources[u];
+      for (const u of urls) itemSources[u] = sourceId;
+      return { ...list, data: { ...d, items: [...kept, ...urls], itemSources } };
+    },
+    []
+  );
+
+  /** Edges removidas que chegavam numa lista: tira os itens daquela origem. */
+  const purgeListItems = useCallback(
+    (removed: { source: string; target: string }[]) => {
+      if (removed.length === 0) return;
+      setNodes((ns) =>
+        ns.map((n) => {
+          if (n.type !== "listaImagens") return n;
+          const gone = removed.filter((e) => e.target === n.id).map((e) => e.source);
+          return gone.reduce((acc, src) => withSourceItems(acc, src, []), n);
+        })
+      );
+    },
+    [setNodes, withSourceItems]
+  );
+
   const handleEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
+      const removedIds = new Set(changes.flatMap((c) => (c.type === "remove" ? [c.id] : [])));
+      if (removedIds.size > 0) {
+        purgeListItems(getEdges().filter((e) => removedIds.has(e.id)));
+      }
       onEdgesChange(changes);
       if (changes.length > 0) scheduleAutoSave();
     },
-    [onEdgesChange, scheduleAutoSave]
+    [onEdgesChange, scheduleAutoSave, purgeListItems, getEdges]
   );
 
   const handleConnect = useCallback(
     (connection: Connection) => {
       setEdges((eds) => addEdge({ ...connection, ...EDGE_DEFAULTS }, eds));
+      // Ligou numa lista um node que já gerou imagens: os itens entram na hora.
+      const stack = generatedStackOf(getNodes().find((n) => n.id === connection.source));
+      if (stack.length > 0) {
+        setNodes((ns) =>
+          ns.map((n) =>
+            n.id === connection.target && n.type === "listaImagens"
+              ? withSourceItems(n, connection.source, stack)
+              : n
+          )
+        );
+      }
       scheduleAutoSave();
     },
-    [setEdges, scheduleAutoSave]
+    [setEdges, setNodes, getNodes, scheduleAutoSave, generatedStackOf, withSourceItems]
   );
 
-  // URLs atuais (pilha completa) de um node que produz imagem.
-  const stackUrlsOf = useCallback((n: Node): string[] => {
-    if (n.type === "arte" || n.type === "saidaArte") {
-      const d = n.data as SaidaArteData;
-      if (d.resultUrls?.length) return d.resultUrls.map((r) => r.url);
-      return d.resultUrl ? [d.resultUrl] : [];
-    }
-    if (n.type === "referenciaImagem") {
-      const u = (n.data as { imageUrl?: string | null }).imageUrl;
-      return u ? [u] : [];
-    }
-    if (n.type === "clienteReferencias") {
-      return ((n.data as { referenceUrls?: string[] }).referenceUrls ?? []);
-    }
-    if (n.type === "clienteLogo") {
-      const u = (n.data as { logoUrl?: string | null }).logoUrl;
-      return u ? [u] : [];
-    }
-    return [];
-  }, []);
-
-  // Depois que um node termina de gerar: materializa as listas conectadas (para
-  // o servidor fazer o fan-out) e, se o node gerou várias imagens sem nenhuma
-  // lista conectada, cria uma lista automaticamente com elas.
+  // Depois que um node termina de gerar: troca os itens dele nas listas
+  // conectadas pela pilha nova e, se gerou várias imagens sem lista a jusante,
+  // cria uma lista automaticamente com elas.
   const syncListsAfterGeneration = useCallback(
     (finishedNodeId: string) => {
       const curNodes = getNodes();
       const curEdges = getEdges();
-
-      // 1. Materializa `items` de cada lista a partir das fontes conectadas.
-      const materialized = curNodes.map((n) => {
-        if (n.type !== "listaImagens") return n;
-        const items = curEdges
-          .filter((e) => e.target === n.id)
-          .flatMap((e) => {
-            const src = curNodes.find((x) => x.id === e.source);
-            return src ? stackUrlsOf(src) : [];
-          });
-        return { ...n, data: { ...n.data, items } };
-      });
-
-      // 2. Auto-cria lista se o node terminou com >1 imagem e não há lista a jusante.
       const finished = curNodes.find((x) => x.id === finishedNodeId);
-      const stack = finished ? stackUrlsOf(finished) : [];
-      const hasListDownstream = curEdges.some(
-        (e) => e.source === finishedNodeId && curNodes.find((x) => x.id === e.target)?.type === "listaImagens"
+      const stack = generatedStackOf(finished);
+      if (!finished || stack.length === 0) return;
+
+      const listTargets = new Set(
+        curEdges
+          .filter((e) => e.source === finishedNodeId)
+          .map((e) => e.target)
+          .filter((t) => curNodes.find((x) => x.id === t)?.type === "listaImagens")
       );
 
-      if (stack.length > 1 && !hasListDownstream && finished) {
+      const updated = curNodes.map((n) =>
+        listTargets.has(n.id) ? withSourceItems(n, finishedNodeId, stack) : n
+      );
+
+      if (stack.length > 1 && listTargets.size === 0) {
         const listId = `listaImagens-${Date.now()}`;
         const listNode: Node = {
           id: listId,
           type: "listaImagens",
-          position: { x: finished.position.x + 300, y: finished.position.y },
-          data: { label: "Geradas", mode: "list", items: stack },
+          position: { x: finished.position.x + 360, y: finished.position.y },
+          data: {
+            label: "Geradas",
+            mode: "list",
+            items: stack,
+            itemSources: Object.fromEntries(stack.map((u) => [u, finishedNodeId])),
+          } satisfies ListaImagensData,
         };
-        setNodes([...materialized, listNode]);
+        setNodes([...updated, listNode]);
         setEdges((es) => [
           ...es,
           { id: `e-${finishedNodeId}-${listId}`, source: finishedNodeId, target: listId, ...EDGE_DEFAULTS },
         ]);
       } else {
-        setNodes(materialized);
+        setNodes(updated);
       }
       scheduleAutoSave();
     },
-    [getNodes, getEdges, setNodes, setEdges, scheduleAutoSave, stackUrlsOf]
+    [getNodes, getEdges, setNodes, setEdges, scheduleAutoSave, generatedStackOf, withSourceItems]
   );
 
   // ─── Hidrata resultados já existentes ao montar ───────────────────────
@@ -450,7 +489,8 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
             })
           );
 
-          if (job.status === "succeeded") {
+          // Falha/pausa no meio de um lote pode ter deixado versões prontas.
+          if (job.status === "succeeded" || job.status === "failed") {
             // art_version é inserido antes do job virar succeeded — seguro ler já.
             // Buscamos TODAS as versões (a pilha), não só a current.
             const { data: versions } = await supabase
@@ -480,7 +520,7 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
                       resultUrl,
                       resultUrls: stack,
                       jobId: job.id,
-                      generatingStatus: "succeeded" as const,
+                      generatingStatus: status,
                     },
                   };
                 })
@@ -693,6 +733,7 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
   }
 
   function deleteNode(nodeId: string) {
+    purgeListItems(getEdges().filter((e) => e.source === nodeId));
     setNodes((ns) => ns.filter((n) => n.id !== nodeId));
     setEdges((es) => es.filter((e) => e.source !== nodeId && e.target !== nodeId));
     setNodeMenu(null);

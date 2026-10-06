@@ -4,14 +4,13 @@ import { createContext, useContext } from "react";
 
 type FlowCanvasContextValue = {
   scheduleAutoSave: () => void;
-  saveNow: () => Promise<void>;
+  /** Salva já (cancela o debounce). Resolve `true` se salvou. */
+  saveNow: () => Promise<boolean>;
 };
-
-const noop = async () => {};
 
 export const FlowCanvasContext = createContext<FlowCanvasContextValue>({
   scheduleAutoSave: () => {},
-  saveNow: noop,
+  saveNow: async () => false,
 });
 
 export function useFlowCanvas() {

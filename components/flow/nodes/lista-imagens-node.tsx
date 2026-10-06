@@ -1,7 +1,8 @@
 "use client";
 
 import { Handle, Position, useEdges, useReactFlow } from "@xyflow/react";
-import { ListChecks, ImageIcon } from "lucide-react";
+import type { Node } from "@xyflow/react";
+import { ListChecks, ImageIcon, Eraser } from "lucide-react";
 import { useFlowCanvas } from "@/components/flow/flow-canvas-context";
 import {
   FLOW_NODE_TONE,
@@ -15,66 +16,127 @@ import type {
   ClienteReferenciasData,
   ListaImagensData,
   ReferenciaImagemData,
-  SaidaArteData,
 } from "@/lib/flow/types";
 
 type Props = { id: string; data: ListaImagensData; selected?: boolean };
 
-type IncomingImage = { url: string; sourceId: string };
+/**
+ * Item exibido na lista. `materialized` = imagem gerada guardada em `data.items`
+ * (persistida); senão vem ao vivo de um node estático conectado (imagem, logo,
+ * refs). É exatamente o conjunto que o servidor usa (ver collectListItems).
+ */
+type ListItem = { url: string; sourceId: string | null; materialized: boolean };
 
-/** Imagens que chegam na lista (estáticas ou já geradas), com o node de origem. */
-function useIncomingImages(id: string): IncomingImage[] {
+function useListItems(id: string, data: ListaImagensData): ListItem[] {
   const edges = useEdges();
   const { getNode } = useReactFlow();
-  const out: IncomingImage[] = [];
+  const out: ListItem[] = [];
+  const seen = new Set<string>();
+  const push = (url: string | null | undefined, sourceId: string | null, materialized: boolean) => {
+    if (!url?.trim() || seen.has(url)) return;
+    seen.add(url);
+    out.push({ url, sourceId, materialized });
+  };
+
+  for (const url of data.items ?? []) push(url, data.itemSources?.[url] ?? null, true);
+
   for (const edge of edges) {
     if (edge.target !== id) continue;
     const node = getNode(edge.source);
     if (!node) continue;
-    const push = (url?: string | null) => {
-      if (url) out.push({ url, sourceId: edge.source });
-    };
-    if (node.type === "referenciaImagem") push((node.data as ReferenciaImagemData).imageUrl);
+    if (node.type === "referenciaImagem") push((node.data as ReferenciaImagemData).imageUrl, edge.source, false);
     else if (node.type === "clienteReferencias")
-      (node.data as ClienteReferenciasData).referenceUrls?.forEach(push);
-    else if (node.type === "clienteLogo") push((node.data as { logoUrl?: string | null }).logoUrl);
-    else if (node.type === "saidaArte" || node.type === "arte")
-      push((node.data as SaidaArteData).resultUrl);
+      (node.data as ClienteReferenciasData).referenceUrls?.forEach((u) => push(u, edge.source, false));
+    else if (node.type === "clienteLogo")
+      push((node.data as { logoUrl?: string | null }).logoUrl, edge.source, false);
   }
   return out;
 }
 
 export function ListaImagensNode({ id, data, selected }: Props) {
-  const { setNodes, setEdges } = useReactFlow();
+  const { setNodes, setEdges, getNode } = useReactFlow();
   const { scheduleAutoSave } = useFlowCanvas();
-  const images = useIncomingImages(id);
+  const items = useListItems(id, data);
   const mode = data.mode ?? "reference";
 
-  function setMode(next: "reference" | "list") {
+  function patchSelf(fn: (d: ListaImagensData) => Partial<ListaImagensData>) {
     setNodes((ns) =>
-      ns.map((n) => (n.id === id ? { ...n, data: { ...n.data, mode: next } } : n))
+      ns.map((n) =>
+        n.id === id ? { ...n, data: { ...n.data, ...fn(n.data as ListaImagensData) } } : n
+      )
     );
     scheduleAutoSave();
   }
 
-  // "Joga para fora": desconecta a origem daquela imagem da lista.
-  function detach(sourceId: string) {
-    setEdges((es) => es.filter((e) => !(e.target === id && e.source === sourceId)));
-    scheduleAutoSave();
+  function setMode(next: "reference" | "list") {
+    patchSelf(() => ({ mode: next }));
+  }
+
+  function dropMaterialized(url: string) {
+    patchSelf((d) => {
+      const { [url]: _drop, ...itemSources } = d.itemSources ?? {};
+      return { items: (d.items ?? []).filter((u) => u !== url), itemSources };
+    });
+  }
+
+  // Remove o item: gerado → sai da lista; estático → desconecta a origem.
+  function remove(item: ListItem) {
+    if (item.materialized) {
+      dropMaterialized(item.url);
+      return;
+    }
+    if (item.sourceId) {
+      setEdges((es) => es.filter((e) => !(e.target === id && e.source === item.sourceId)));
+      scheduleAutoSave();
+    }
+  }
+
+  // "Joga para fora": vira um node de imagem solto ao lado (e sai da lista).
+  function popOut(item: ListItem, index: number) {
+    if (!item.materialized) {
+      remove(item);
+      return;
+    }
+    const self = getNode(id);
+    const imageNode: Node = {
+      id: `referenciaImagem-${Date.now()}`,
+      type: "referenciaImagem",
+      position: self
+        ? { x: self.position.x + 280, y: self.position.y + index * 48 }
+        : { x: 0, y: 0 },
+      data: { imageUrl: item.url, label: "Imagem" } satisfies ReferenciaImagemData,
+    };
+    setNodes((ns) => [...ns, imageNode]);
+    dropMaterialized(item.url);
+  }
+
+  function clearAll() {
+    patchSelf(() => ({ items: [], itemSources: {} }));
+    setEdges((es) => es.filter((e) => e.target !== id));
   }
 
   return (
     <NodeShell
       tone={FLOW_NODE_TONE.listaImagens}
       icon={ListChecks}
-      title="Lista"
+      title={data.label || "Lista"}
       selected={selected}
-      className="w-60"
+      className="w-72"
       meta={
-        images.length > 0 && (
-          <span className="rounded-md bg-muted px-1.5 py-px text-[0.625rem] font-bold tabular-nums text-muted-foreground">
-            {images.length}
-          </span>
+        items.length > 0 && (
+          <div className="flex items-center gap-1">
+            <span className="rounded-md bg-muted px-1.5 py-px text-[0.625rem] font-bold tabular-nums text-muted-foreground">
+              {items.length}
+            </span>
+            <button
+              type="button"
+              onClick={clearAll}
+              title="Limpar lista (remove todos os itens e conexões)"
+              className="nodrag flex size-5 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-tone-red/10 hover:text-tone-red"
+            >
+              <Eraser className="size-3" />
+            </button>
+          </div>
         )
       }
     >
@@ -104,17 +166,25 @@ export function ListaImagensNode({ id, data, selected }: Props) {
         ))}
       </div>
 
-      {images.length > 0 ? (
-        <div className="grid grid-cols-2 gap-1.5">
-          {images.map((img, i) => (
-            <NodeThumb
-              key={`${img.sourceId}-${i}`}
-              url={img.url}
-              alt={`Item ${i + 1}`}
-              onPopOut={() => detach(img.sourceId)}
-            />
-          ))}
-        </div>
+      {items.length > 0 ? (
+        <>
+          <div className="nowheel grid max-h-96 grid-cols-3 gap-1.5 overflow-y-auto pr-0.5 [scrollbar-width:thin]">
+            {items.map((item, i) => (
+              <NodeThumb
+                key={`${item.url}-${i}`}
+                url={item.url}
+                alt={`Item ${i + 1}`}
+                onPopOut={() => popOut(item, i)}
+                onRemove={() => remove(item)}
+              />
+            ))}
+          </div>
+          <p className="mt-2 text-[0.625rem] text-muted-foreground">
+            {mode === "list"
+              ? `Gera ${items.length} ${items.length === 1 ? "imagem" : "imagens"} — 1 por item`
+              : `${items.length} ${items.length === 1 ? "imagem entra" : "imagens entram"} como referência`}
+          </p>
+        </>
       ) : (
         <NodeImagePlaceholder icon={ImageIcon} className="aspect-video">
           <span className="text-[0.625rem] text-muted-foreground">Conecte imagens</span>

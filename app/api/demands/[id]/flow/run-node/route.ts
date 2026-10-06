@@ -1,15 +1,13 @@
 import { NextResponse, after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { runWorker } from "@/lib/ai/imagegen/worker";
-import { extractFlowJobParams, flowJobParamsToRow } from "@/lib/flow/extract-flow-jobs";
-import { enrichFlowGraphWithProfile } from "@/lib/flow/enrich-graph";
-import { loadFlowCreativeProfile } from "@/lib/flow/load-creative-profile";
-import { getClientFlowGraph, syncAndPersistDemandReferences } from "@/services/flow";
-import type { FlowGraph } from "@/lib/flow/types";
+import { flowJobParamsToRow } from "@/lib/flow/extract-flow-jobs";
+import { extractNodeJob } from "@/lib/flow/node-job";
 
-// Cobre o worker de geração (rodado via after() abaixo) — cada job tem seu próprio
-// timeout de 2min (IMAGE_JOB_TIMEOUT_MS em lib/ai/imagegen/worker.ts), mas isso só
-// funciona se a função em si não for encerrada antes disso.
+// Cobre o worker de geração (rodado via after() abaixo) — as gerações do lote
+// rodam em paralelo, cada uma com seu timeout (IMAGE_JOB_TIMEOUT_MS em
+// lib/ai/imagegen/worker.ts), mas isso só funciona se a função em si não for
+// encerrada antes disso.
 export const maxDuration = 300;
 
 type Params = { params: Promise<{ id: string }> };
@@ -32,48 +30,13 @@ export async function POST(req: Request, { params }: Params) {
     return NextResponse.json({ error: "artIndex é obrigatório" }, { status: 400 });
   }
 
+  const result = await extractNodeJob(demandId, body.artIndex);
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error }, { status: result.status });
+  }
+  const { demand, job } = result;
+
   const supabase = createAdminClient();
-
-  const { data: demand, error: demandError } = await supabase
-    .from("creative_demands")
-    .select("id, client_id, briefing, flow_graph")
-    .eq("id", demandId)
-    .single();
-
-  if (demandError || !demand) {
-    return NextResponse.json({ error: "Demanda não encontrada" }, { status: 404 });
-  }
-
-  const savedGraph = demand.client_id
-    ? await getClientFlowGraph(demand.client_id)
-    : ((demand.flow_graph as FlowGraph | null) ?? null);
-
-  if (!savedGraph || !savedGraph.nodes?.length) {
-    return NextResponse.json(
-      { error: "Nenhum fluxo salvo — salve o fluxo antes de executar" },
-      { status: 400 }
-    );
-  }
-
-  // Sincroniza referências cadastradas na página da demanda antes de gerar —
-  // ver run/route.ts para o motivo.
-  const graph = await syncAndPersistDemandReferences(demand, savedGraph);
-
-  const profile = await loadFlowCreativeProfile(demand.client_id ?? null);
-
-  const enrichedGraph = enrichFlowGraphWithProfile(graph, profile);
-  const briefing = (demand.briefing as { titulo?: string; tipo?: string }) ?? {};
-  const job = extractFlowJobParams(enrichedGraph, briefing, {
-    demandId,
-    includeStory: true,
-  }).find((entry) => entry.art_index === body.artIndex);
-
-  if (!job) {
-    return NextResponse.json(
-      { error: "Pipeline da arte não encontrado no fluxo salvo" },
-      { status: 404 }
-    );
-  }
 
   // Reaproveita o MESMO job (mesma linha, mesmo id) ao regerar — nunca cria um
   // job novo pra essa art_index. art_version referencia job_id: um job novo
