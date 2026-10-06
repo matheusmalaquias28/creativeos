@@ -68,28 +68,44 @@ function AspectGlyph({ aspect }: { aspect: string }) {
   return <span className="shrink-0 rounded-[3px] border-[1.5px] border-current" style={{ width, height }} />;
 }
 
+/** Mesma normalização do extractor (normalizeRefName): `@(Foto Produto)` = `foto-produto`. */
+function mentionKey(name: string): string {
+  return name.toLowerCase().trim().replace(/\s+/g, "-");
+}
+
 /**
- * Texto do prompt com as menções `@(nome)` renderizadas como chip — SÓ quando
- * a menção casa com uma referência realmente conectada ao node (badge verde
- * com o nome). `@(algo)` sem vínculo é texto solto igual ao resto — não vira
- * badge nenhum, pra não parecer uma referência que não existe de verdade.
+ * Texto do prompt com as menções `@(nome)` coloridas: VERDE quando casa com uma
+ * imagem realmente conectada ao node (é ela que vai na geração), VERMELHO
+ * sublinhado quando não há imagem com esse nome (vai como texto solto).
+ *
+ * Só muda cor/fundo — nunca largura (sem padding/peso de fonte) — porque a
+ * mesma marcação fica POR TRÁS da textarea durante a edição e precisa casar
+ * letra a letra com o texto digitado.
  */
-function PromptPreview({ text, linked }: { text: string; linked: Set<string> }) {
+function MentionText({ text, linked }: { text: string; linked: Set<string> }) {
   return (
     <>
-      {text.split(/(@\([^)]+\))/g).map((part, i) => {
-        const m = /^@\(([^)]+)\)$/.exec(part);
-        const isLinked = m && linked.has(part.toLowerCase());
-        if (!isLinked) return <span key={i}>{part}</span>;
+      {text.split(/(@\([^)]*\))/g).map((part, i) => {
+        const m = /^@\(([^)]*)\)$/.exec(part);
+        if (!m) return <span key={i}>{part}</span>;
+        const isLinked = linked.has(mentionKey(m[1]));
         return (
           <span
             key={i}
-            className="mx-0.5 rounded-md bg-emerald-500/85 px-1.5 py-px text-[0.75rem] font-semibold text-white"
+            title={isLinked ? "Imagem conectada — vai na geração" : "Nenhuma imagem conectada com esse nome — vai como texto"}
+            className={cn(
+              "rounded-[4px]",
+              isLinked
+                ? "bg-emerald-500/85 text-white shadow-[0_0_0_2px_rgb(16_185_129/0.85)]"
+                : "text-red-300 underline decoration-red-400 decoration-wavy underline-offset-4"
+            )}
           >
-            @{m[1]}
+            {part}
           </span>
         );
       })}
+      {/* Mantém a altura da última linha vazia igual à da textarea. */}
+      {text.endsWith("\n") && "\u200b"}
     </>
   );
 }
@@ -167,8 +183,20 @@ export function ArteNode({ id, data, selected }: Props) {
       }
       return [];
     });
-  // Tokens de referências realmente conectadas — menção com vínculo fica verde.
-  const linkedTokens = new Set(mentionable.map((m) => m.token.toLowerCase()));
+  // Menções que apontam para uma imagem que EXISTE e está conectada — ficam
+  // verdes. Inclui as refs do cliente (`@(ref-cliente-N)`), que o extractor resolve.
+  const linkedKeys = new Set(
+    mentionable.filter((m) => m.url).map((m) => mentionKey(m.token.slice(2, -1)))
+  );
+  for (const e of edges) {
+    if (e.target !== id) continue;
+    const n = getNode(e.source);
+    if (n?.type !== "clienteReferencias") continue;
+    (n.data as { referenceUrls?: string[] }).referenceUrls?.forEach((url, i) => {
+      if (url) linkedKeys.add(`ref-cliente-${i + 1}`);
+    });
+  }
+  const backdropRef = useRef<HTMLDivElement>(null);
   const mentionOpts = mention
     ? mentionable.filter((m) => m.label.toLowerCase().includes(mention.query.toLowerCase()))
     : [];
@@ -611,11 +639,22 @@ export function ArteNode({ id, data, selected }: Props) {
 
             <div className={cn("relative flex min-h-0 flex-col", promptOpen && "flex-1")}>
               {promptOpen ? (
+                <div className="relative flex min-h-0 flex-1 flex-col">
+                <div
+                  ref={backdropRef}
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words pr-1 text-[0.875rem] leading-relaxed text-white [scrollbar-gutter:stable] [scrollbar-width:thin]"
+                >
+                  <MentionText text={draft} linked={linkedKeys} />
+                </div>
                 <textarea
                   ref={taRef}
                   autoFocus
                   value={draft}
                   placeholder={"Descreva a arte…\nHeadline: …\nSubheadline: …\nCTA: …"}
+                  onScroll={(e) => {
+                    if (backdropRef.current) backdropRef.current.scrollTop = e.currentTarget.scrollTop;
+                  }}
                   onChange={(e) => {
                     const v = e.target.value;
                     setDraft(v);
@@ -643,8 +682,10 @@ export function ArteNode({ id, data, selected }: Props) {
                     }
                     if (e.key === "Escape") { e.stopPropagation(); e.currentTarget.blur(); }
                   }}
-                  className="nodrag nowheel min-h-0 w-full flex-1 resize-none bg-transparent pr-1 text-[0.875rem] leading-relaxed text-white placeholder:text-white/40 focus:outline-none [scrollbar-color:rgba(255,255,255,0.3)_transparent] [scrollbar-width:thin]"
+                  // Texto transparente: o que aparece é a camada colorida por trás.
+                  className="nodrag nowheel relative min-h-0 w-full flex-1 resize-none break-words bg-transparent pr-1 text-[0.875rem] leading-relaxed text-transparent caret-white placeholder:text-white/40 selection:bg-white/25 focus:outline-none [scrollbar-color:rgba(255,255,255,0.3)_transparent] [scrollbar-gutter:stable] [scrollbar-width:thin]"
                 />
+                </div>
               ) : (
                 <button
                   type="button"
@@ -652,7 +693,7 @@ export function ArteNode({ id, data, selected }: Props) {
                   title="Editar prompt"
                   className="nodrag line-clamp-3 w-full text-left text-[0.875rem] leading-relaxed text-white/95"
                 >
-                  {draft.trim() ? <PromptPreview text={draft} linked={linkedTokens} /> : <span className="text-white/45">Descreva a arte…</span>}
+                  {draft.trim() ? <MentionText text={draft} linked={linkedKeys} /> : <span className="text-white/45">Descreva a arte…</span>}
                 </button>
               )}
 
