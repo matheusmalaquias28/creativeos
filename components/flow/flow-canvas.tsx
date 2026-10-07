@@ -808,7 +808,7 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
 
       {/* Canvas */}
       <div ref={wrapperRef} className="relative min-h-0 flex-1 bg-background">
-        <FlowCanvasContext.Provider value={{ scheduleAutoSave, saveNow }}>
+        <FlowCanvasContext.Provider value={{ scheduleAutoSave, saveNow, demandId: demanda.id }}>
           <ReactFlow
             nodes={nodes}
             edges={edges}

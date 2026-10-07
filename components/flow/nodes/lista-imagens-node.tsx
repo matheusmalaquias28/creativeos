@@ -1,8 +1,10 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { Handle, Position, useEdges, useReactFlow } from "@xyflow/react";
 import type { Node } from "@xyflow/react";
-import { ListChecks, ImageIcon, Eraser } from "lucide-react";
+import { ListChecks, ImageIcon, Eraser, Upload, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { useFlowCanvas } from "@/components/flow/flow-canvas-context";
 import {
   FLOW_NODE_TONE,
@@ -55,8 +57,11 @@ function useListItems(id: string, data: ListaImagensData): ListItem[] {
 
 export function ListaImagensNode({ id, data, selected }: Props) {
   const { setNodes, setEdges, getNode } = useReactFlow();
-  const { scheduleAutoSave } = useFlowCanvas();
+  const { scheduleAutoSave, demandId } = useFlowCanvas();
   const items = useListItems(id, data);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(0);
+  const [dragOver, setDragOver] = useState(false);
   const mode = data.mode ?? "reference";
 
   function patchSelf(fn: (d: ListaImagensData) => Partial<ListaImagensData>) {
@@ -110,21 +115,87 @@ export function ListaImagensNode({ id, data, selected }: Props) {
     dropMaterialized(item.url);
   }
 
+  // Envia arquivos do computador: sobem pro Storage (o grafo guarda só a URL)
+  // e entram como itens da lista — mesmo caminho das imagens materializadas,
+  // então valem no fan-out e na referência, e podem ser removidos/soltos.
+  async function uploadFiles(fileList: FileList | File[]) {
+    const files = Array.from(fileList).filter((f) => f.type.startsWith("image/"));
+    if (files.length === 0) return;
+    if (!demandId) {
+      toast.error("Abra o canvas de uma demanda para enviar imagens");
+      return;
+    }
+    setUploading((n) => n + files.length);
+    await Promise.all(
+      files.map(async (file) => {
+        try {
+          const body = new FormData();
+          body.append("file", file);
+          const res = await fetch(`/api/demands/${demandId}/flow/upload`, { method: "POST", body });
+          const json = (await res.json()) as { url?: string; error?: string };
+          if (!res.ok || !json.url) throw new Error(json.error ?? "Falha no upload");
+          const url = json.url;
+          patchSelf((d) => ({ items: [...(d.items ?? []).filter((u) => u !== url), url] }));
+        } catch (err) {
+          toast.error("Erro ao enviar imagem", {
+            description: err instanceof Error ? err.message : String(err),
+          });
+        } finally {
+          setUploading((n) => n - 1);
+        }
+      })
+    );
+  }
+
+  // Arquivo solto em cima da lista entra nela (e não vira node solto no canvas).
+  function onDragOver(e: React.DragEvent) {
+    if (!e.dataTransfer.types.includes("Files")) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "copy";
+    setDragOver(true);
+  }
+
+  function onDrop(e: React.DragEvent) {
+    if (!e.dataTransfer.types.includes("Files")) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+    void uploadFiles(e.dataTransfer.files);
+  }
+
   function clearAll() {
     patchSelf(() => ({ items: [], itemSources: {} }));
     setEdges((es) => es.filter((e) => e.target !== id));
   }
 
   return (
+    <div
+      onDragOver={onDragOver}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as globalThis.Node | null)) setDragOver(false);
+      }}
+      onDrop={onDrop}
+    >
     <NodeShell
       tone={FLOW_NODE_TONE.listaImagens}
       icon={ListChecks}
       title={data.label || "Lista"}
       selected={selected}
-      className="w-72"
+      className={cn("w-72", dragOver && "ring-2 ring-primary")}
       meta={
-        items.length > 0 && (
-          <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading > 0}
+            title="Enviar imagens do computador para a lista"
+            className="nodrag flex size-5 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-60"
+          >
+            {uploading > 0 ? <Loader2 className="size-3 animate-spin" /> : <Upload className="size-3" />}
+          </button>
+          {items.length > 0 && (
+            <>
             <span className="rounded-md bg-muted px-1.5 py-px text-[0.625rem] font-bold tabular-nums text-muted-foreground">
               {items.length}
             </span>
@@ -136,11 +207,24 @@ export function ListaImagensNode({ id, data, selected }: Props) {
             >
               <Eraser className="size-3" />
             </button>
-          </div>
-        )
+            </>
+          )}
+        </div>
       }
     >
       <Handle type="target" position={Position.Left} className={flowHandleClass} />
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files) void uploadFiles(e.target.files);
+          e.target.value = "";
+        }}
+      />
 
       {/* Modo: referência (1 geração) vs lista (fan-out, 1 por item) */}
       <div className="mb-2 flex overflow-hidden rounded-lg border border-border">
@@ -186,12 +270,26 @@ export function ListaImagensNode({ id, data, selected }: Props) {
           </p>
         </>
       ) : (
-        <NodeImagePlaceholder icon={ImageIcon} className="aspect-video">
-          <span className="text-[0.625rem] text-muted-foreground">Conecte imagens</span>
-        </NodeImagePlaceholder>
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="nodrag block w-full"
+        >
+          <NodeImagePlaceholder icon={uploading > 0 ? Loader2 : ImageIcon} className="aspect-video">
+            <span className="text-[0.625rem] text-muted-foreground">
+              {uploading > 0 ? "Enviando…" : "Conecte, arraste ou clique para enviar imagens"}
+            </span>
+          </NodeImagePlaceholder>
+        </button>
+      )}
+      {uploading > 0 && items.length > 0 && (
+        <p className="mt-1 text-[0.625rem] text-muted-foreground">
+          Enviando {uploading} {uploading === 1 ? "imagem" : "imagens"}…
+        </p>
       )}
 
       <Handle type="source" position={Position.Right} className={flowHandleClass} />
     </NodeShell>
+    </div>
   );
 }
