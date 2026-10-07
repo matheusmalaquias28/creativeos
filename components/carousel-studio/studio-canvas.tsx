@@ -714,6 +714,11 @@ export function StudioCanvas(props: StudioCanvasProps) {
                     width: b.width,
                     height: b.height,
                     transform: single.rotation ? `rotate(${single.rotation}deg)` : undefined,
+                    // A moldura cobre a camada selecionada: sem isto ela engole o
+                    // clique (que não acha [data-layer-id]) e arrastar a camada já
+                    // selecionada virava "clique no vazio" (desseleciona + área).
+                    // Só os puxadores recebem ponteiro.
+                    pointerEvents: "none",
                   }}
                 >
                   {HANDLES.filter((h) => !(autoText && h.hy !== 0 && h.hx === 0)).map((h) => (
