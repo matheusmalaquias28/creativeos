@@ -273,7 +273,9 @@ export async function deleteDemandExportFileAction(
 
 export async function deliverDemandExportAction(
   demandId: string,
-  overrideFolderUrl?: string
+  overrideFolderUrl?: string,
+  /** Entrega só os arquivos deste formato (ex.: só os stories, vindos do Space). */
+  opts?: { format?: ExportFormat }
 ): Promise<DemandExportActionState> {
   const auth = await requireUser();
   if ("error" in auth && !("user" in auth)) return { error: auth.error };
@@ -290,11 +292,13 @@ export async function deliverDemandExportAction(
   if (demandError) return { error: demandError.message };
   if (!demand) return { error: "Demanda não encontrada" };
 
-  const { data: files, error: filesError } = await admin
+  let filesQuery = admin
     .from("demand_export_files")
     .select("*")
     .eq("demand_id", demandId)
     .order("art_index", { ascending: true });
+  if (opts?.format) filesQuery = filesQuery.eq("format", opts.format);
+  const { data: files, error: filesError } = await filesQuery;
 
   if (filesError) return { error: filesError.message };
   if (!files?.length) {
@@ -429,7 +433,20 @@ export async function deliverDemandExportAction(
     )
   );
 
-  const status = failed.length === 0 ? "done" : sent > 0 ? "error" : "error";
+  // Entrega parcial (só um formato): se ainda há arquivo de outro formato
+  // esperando, a demanda segue pendente — não marca "entregue".
+  let othersPending = false;
+  if (opts?.format) {
+    const { count } = await admin
+      .from("demand_export_files")
+      .select("id", { count: "exact", head: true })
+      .eq("demand_id", demandId)
+      .neq("format", opts.format)
+      .is("drive_file_id", null);
+    othersPending = (count ?? 0) > 0;
+  }
+
+  const status = failed.length > 0 ? "error" : othersPending ? "pending" : "done";
   const errorMessage =
     failed.length === 0
       ? null
@@ -617,4 +634,104 @@ export async function sendArtToDemandSlotAction(params: {
 
   revalidatePath(`/demands/${params.targetDemandId}`);
   return { success: true, file: saved as DemandExportFile };
+}
+
+export type ListDriveSlot = {
+  url: string;
+  /** Slot (1-based) resolvido pela origem da imagem; null = não deu para saber. */
+  artIndex: number | null;
+};
+
+/**
+ * Para cada imagem de uma Lista do Space, descobre de qual arte da demanda ela
+ * é. Story gerada em fan-out → `art_version.source_url` aponta a arte do feed
+ * que a originou → o job dela diz o art_index. Arte do feed → o próprio job.
+ * Imagem enviada à mão ou gerada antes do registro da origem → null.
+ */
+export async function resolveListDriveSlotsAction(params: {
+  demandId: string;
+  urls: string[];
+}): Promise<{ error?: string; slots?: ListDriveSlot[] }> {
+  const auth = await requireUser();
+  if ("error" in auth && !("user" in auth)) return { error: auth.error };
+  if (params.urls.length === 0) return { slots: [] };
+
+  const admin = createAdminClient();
+  const { data: versions, error } = await admin
+    .from("art_version")
+    .select("result_url, source_url, job_id")
+    .in("result_url", params.urls);
+  if (error) return { error: error.message };
+
+  const sources = (versions ?? []).map((v) => v.source_url).filter((u): u is string => !!u);
+  const { data: sourceVersions } = sources.length
+    ? await admin.from("art_version").select("result_url, job_id").in("result_url", sources)
+    : { data: [] as { result_url: string; job_id: string }[] };
+
+  const jobIds = [
+    ...new Set([...(versions ?? []), ...(sourceVersions ?? [])].map((v) => v.job_id)),
+  ];
+  const { data: jobs } = jobIds.length
+    ? await admin
+        .from("art_generation_job")
+        .select("id, demand_id, art_index, params")
+        .in("id", jobIds)
+    : { data: [] as { id: string; demand_id: string; art_index: number; params: unknown }[] };
+  const jobById = new Map((jobs ?? []).map((j) => [j.id, j]));
+  const versionByUrl = new Map((versions ?? []).map((v) => [v.result_url, v]));
+  const sourceJobByUrl = new Map((sourceVersions ?? []).map((v) => [v.result_url, v.job_id]));
+
+  const slotOfJob = (jobId: string | undefined) => {
+    const job = jobId ? jobById.get(jobId) : undefined;
+    return job && job.demand_id === params.demandId ? job.art_index + 1 : null;
+  };
+
+  const slots = params.urls.map((url): ListDriveSlot => {
+    const version = versionByUrl.get(url);
+    if (!version) return { url, artIndex: null };
+    if (version.source_url) return { url, artIndex: slotOfJob(sourceJobByUrl.get(version.source_url)) };
+    // Sem origem: só vale o próprio job se ele for uma arte do feed (o job de
+    // stories tem art_index próprio, que não é o de nenhuma arte).
+    const job = jobById.get(version.job_id);
+    const isStoryJob = (job?.params as { skip_logo?: boolean } | null)?.skip_logo === true;
+    return { url, artIndex: isStoryJob ? null : slotOfJob(version.job_id) };
+  });
+
+  return { slots };
+}
+
+/**
+ * Manda as imagens de uma Lista do Space para os slots da demanda (Arte N, no
+ * formato escolhido) e entrega SÓ esse formato ao Drive — stories caem na
+ * pasta "Stories" da demanda.
+ */
+export async function sendListToDriveAction(params: {
+  demandId: string;
+  format: string;
+  items: { url: string; artIndex: number }[];
+}): Promise<DemandExportActionState> {
+  const auth = await requireUser();
+  if ("error" in auth && !("user" in auth)) return { error: auth.error };
+  if (!isExportFormat(params.format)) return { error: "Formato inválido" };
+  if (params.items.length === 0) return { error: "Nenhuma imagem para enviar" };
+
+  const slots = new Set<number>();
+  for (const item of params.items) {
+    if (slots.has(item.artIndex)) {
+      return { error: `Duas imagens no mesmo slot (Arte ${item.artIndex})` };
+    }
+    slots.add(item.artIndex);
+  }
+
+  for (const item of params.items) {
+    const result = await sendArtToDemandSlotAction({
+      targetDemandId: params.demandId,
+      artIndex: item.artIndex,
+      format: params.format,
+      sourceUrl: item.url,
+    });
+    if (result.error) return { error: `Arte ${item.artIndex}: ${result.error}` };
+  }
+
+  return deliverDemandExportAction(params.demandId, undefined, { format: params.format });
 }

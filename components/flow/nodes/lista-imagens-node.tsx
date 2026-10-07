@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { Handle, Position, useEdges, useReactFlow } from "@xyflow/react";
 import type { Node } from "@xyflow/react";
-import { ListChecks, ImageIcon, Eraser, Upload, Loader2 } from "lucide-react";
+import { ListChecks, ImageIcon, Eraser, Upload, Loader2, FolderUp } from "lucide-react";
 import { toast } from "sonner";
 import { useFlowCanvas } from "@/components/flow/flow-canvas-context";
 import {
@@ -13,8 +13,10 @@ import {
   flowHandleClass,
 } from "@/components/flow/nodes/node-shell";
 import { NodeThumb } from "@/components/flow/nodes/node-image";
+import { SendListToDriveDialog } from "@/components/flow/send-list-to-drive-dialog";
 import { cn } from "@/lib/utils";
 import type {
+  ArteData,
   ClienteReferenciasData,
   ListaImagensData,
   ReferenciaImagemData,
@@ -62,6 +64,13 @@ export function ListaImagensNode({ id, data, selected }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(0);
   const [dragOver, setDragOver] = useState(false);
+  // URLs congeladas ao abrir o diálogo do Drive (null = fechado).
+  const [driveUrls, setDriveUrls] = useState<string[] | null>(null);
+  // Lista alimentada por um node de stories → o Drive abre na pasta Stories.
+  const isStoryList = items.some((item) => {
+    const src = item.sourceId ? getNode(item.sourceId) : undefined;
+    return src?.type === "arte" && (src.data as ArteData).format === "story";
+  });
   const mode = data.mode ?? "reference";
 
   function patchSelf(fn: (d: ListaImagensData) => Partial<ListaImagensData>) {
@@ -194,6 +203,16 @@ export function ListaImagensNode({ id, data, selected }: Props) {
           >
             {uploading > 0 ? <Loader2 className="size-3 animate-spin" /> : <Upload className="size-3" />}
           </button>
+          {items.length > 0 && demandId && (
+            <button
+              type="button"
+              onClick={() => setDriveUrls(items.map((item) => item.url))}
+              title="Enviar as imagens da lista para o Drive da demanda"
+              className="nodrag flex size-5 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <FolderUp className="size-3" />
+            </button>
+          )}
           {items.length > 0 && (
             <>
             <span className="rounded-md bg-muted px-1.5 py-px text-[0.625rem] font-bold tabular-nums text-muted-foreground">
@@ -289,6 +308,15 @@ export function ListaImagensNode({ id, data, selected }: Props) {
       )}
 
       <Handle type="source" position={Position.Right} className={flowHandleClass} />
+
+      {driveUrls && demandId && (
+        <SendListToDriveDialog
+          demandId={demandId}
+          urls={driveUrls}
+          defaultFormat={isStoryList ? "story" : "feed"}
+          onClose={() => setDriveUrls(null)}
+        />
+      )}
     </NodeShell>
     </div>
   );

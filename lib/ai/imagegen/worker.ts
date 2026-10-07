@@ -169,6 +169,8 @@ async function publishVersion(
     instruction: string | null;
     /** TTL: quando setado, a imagem é apagada pela limpeza do Space (jobs efêmeros). */
     expiresAt?: string | null;
+    /** Fan-out: item da Lista que originou esta versão (ex.: a arte do feed de uma story). */
+    sourceUrl?: string | null;
   }
 ): Promise<void> {
   await supabase
@@ -186,6 +188,7 @@ async function publishVersion(
     instruction: params.instruction,
     is_current: true,
     expires_at: params.expiresAt ?? null,
+    source_url: params.sourceUrl ?? null,
   });
 
   if (error) throw new Error(error.message);
@@ -640,7 +643,7 @@ async function runJob(
   // Publica uma geração: upload + galeria + nova versão. Serializado — a
   // numeração lê o máximo e soma 1, então duas publicações juntas colidiriam.
   const publishLock = pLimit(1);
-  const publish = (best: Candidate, isListItem: boolean) =>
+  const publish = (best: Candidate, sourceUrl: string | null) =>
     publishLock(async () => {
       // Upload ao Storage — final (com logo) e raw (sem logo, insumo dos ajustes).
       const versionNumber = await nextVersionNumber(supabase, job.id, "feed");
@@ -672,8 +675,9 @@ async function runJob(
         versionNumber,
         resultUrl: publicUrl,
         storagePath,
-        instruction: isListItem ? "item da lista" : versionNumber > 1 ? "variação" : null,
+        instruction: sourceUrl ? "item da lista" : versionNumber > 1 ? "variação" : null,
         expiresAt: ttlExpiresAt(job.ephemeral),
+        sourceUrl,
       });
     });
 
@@ -692,7 +696,7 @@ async function runJob(
         try {
           const best = await withTimeout(generateBestCandidate(item), JOB_TIMEOUT_MS, `geração do job ${job.id}`);
           if (await isCancelled()) return;
-          await publish(best, item !== null);
+          await publish(best, item?.url ?? null);
           lastBest = best;
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);

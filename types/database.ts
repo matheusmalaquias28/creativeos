@@ -865,6 +865,8 @@ export type Database = {
           instruction: string | null;
           is_current: boolean;
           expires_at: string | null;
+          /** Fan-out: URL do item da Lista que originou esta versão. */
+          source_url: string | null;
           created_at: string;
         };
         Insert: {
@@ -875,6 +877,7 @@ export type Database = {
           result_url: string;
           storage_path: string;
           instruction?: string | null;
+          source_url?: string | null;
           is_current?: boolean;
           expires_at?: string | null;
           created_at?: string;
