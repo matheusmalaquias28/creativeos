@@ -1,7 +1,11 @@
 import { IMAGE_GEN_DEFAULTS } from "@/lib/ai/imagegen/defaults";
 import { buildLogoDirective } from "@/lib/flow/logo-directive";
 import { BRAND_IDENTITY_LABEL, extractLabeledLine, extractMentionInstruction } from "@/lib/flow/mention-text";
-import { getPromptArteEditorText, resolvePromptArteFields } from "@/lib/flow/prompt-arte-text";
+import {
+  getPromptArteEditorText,
+  parsePromptArteText,
+  resolvePromptArteFields,
+} from "@/lib/flow/prompt-arte-text";
 import type { Json } from "@/types/database";
 import type {
   ArteData,
@@ -393,7 +397,10 @@ function extractArteJob(
     }
   }
 
-  const rawPrompt = resolvePromptArteFields(data);
+  // Campos SÓ do texto atual do node — sem herdar headline/CTA salvos do
+  // briefing: se o operador reescreveu a linha do CTA, o valor antigo não pode
+  // voltar por fora (ex.: a revisão exigindo o CTA velho).
+  const rawPrompt = parsePromptArteText(fullText, data.artIndex);
   const headline = resolveNamedRefTokens(rawPrompt.headline, namedRefMap, refs, seen);
   const subheadline = resolveNamedRefTokens(rawPrompt.subheadline, namedRefMap, refs, seen);
   const cta = resolveNamedRefTokens(rawPrompt.cta, namedRefMap, refs, seen);

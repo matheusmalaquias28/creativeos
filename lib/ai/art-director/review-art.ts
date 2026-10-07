@@ -88,9 +88,43 @@ Check:
 - fixes: one short, objective correction in English per defect found above (empty if none). Give concrete layout or type corrections for execution defects; preserve intentional negative space.`;
 }
 
+/**
+ * Revisão do Space: o prompt do node é a ÚNICA fonte da verdade. Nada de copy
+ * vinda de campos parseados/briefing (que podem estar velhos) nem de regra de
+ * layout fixa (logo no topo centro, logo composta) — tudo sai do prompt.
+ */
+function masterReviewPrompt(masterPrompt: string): string {
+  return `You are the QA lead of a design agency. Review this finished Instagram/Facebook ad before it goes to the client.
+
+The ad was generated from the operator's prompt below. That prompt is the SINGLE source of truth: the copy the ad must show, its layout, colours, CTA style and logo placement are whatever the prompt says. Never require anything that is not in it or that contradicts it.
+
+<operator_prompt>
+${masterPrompt}
+</operator_prompt>
+
+Check execution of hierarchy, typography and spacing as well as technical defects. Intentional negative space is not a defect. Do not enforce a single aesthetic or layout.
+
+Check:
+- text_exact: every piece of copy the prompt asks to display (headline, subheadline, CTA and any other quoted/labelled copy) appears exactly (same words, accents, letter case). Labels like "Headline:", "CTA ...:" and layout/colour/position instructions in the prompt are NOT copy. Line breaks and emphasis styling are fine.
+- extra_text: list only READABLE words that are not part of that copy (e.g. "CONTRACT" on a paper, a word on a screen or sign, an invented phrase, a watermark). NOT extra text: the client's logo; soft illegible lines on papers.
+- logo_present: if the prompt asks for the logo, true only if a visible, legible logo is present where the prompt places it. If the prompt does not ask for a logo, true.
+- logo_zone_clean: false only if text or objects collide with, cover or crowd the logo so it is not fully legible. True when there is no logo.
+- cta_ok: if the prompt asks for a CTA, it is legible, styled and placed as the prompt says, inside safe margins, not crowded or clipped. True when the prompt asks for no CTA.
+- drawn_logo_or_brand: the image model drew some OTHER logo, monogram, brand name or car/product badge.
+- garbled_glyphs: clearly distorted, merged or duplicated letters in the ad's text.
+- score: 1–10 for finish. Assess distinct headline/support/CTA hierarchy, legibility at phone size, coherent type pairing, line spacing, alignment, negative space and purposeful imagery. Penalize cramped type, competing focal points and decorative clutter. 7 = publishable, 9 = excellent.
+- fixes: one short, objective correction in English per defect found above (empty if none). Every fix must agree with the operator's prompt; never ask to change copy, colours or positions the prompt defines.`;
+}
+
+export function buildReviewPrompt(spec: TechnicalBlockSpec, masterPrompt?: string | null): string {
+  return masterPrompt?.trim() ? masterReviewPrompt(masterPrompt.trim()) : reviewPrompt(spec);
+}
+
 export async function reviewArt(params: {
   image: Buffer;
   spec: TechnicalBlockSpec;
+  /** Space: prompt do node (master). Quando presente, a revisão julga só por ele. */
+  masterPrompt?: string | null;
 }): Promise<ArtReview> {
   const anthropic = getAnthropicClient();
   const image = await bufferToVisionBlock(params.image, 1200);
@@ -106,7 +140,7 @@ export async function reviewArt(params: {
     messages: [
       {
         role: "user",
-        content: [image, { type: "text", text: reviewPrompt(params.spec) }],
+        content: [image, { type: "text", text: buildReviewPrompt(params.spec, params.masterPrompt) }],
       },
     ],
   });
@@ -124,7 +158,13 @@ export async function reviewArt(params: {
 
   const out = JSON.parse(text) as ReviewOutput;
   const fixes = [...(out.fixes ?? [])];
-  if (!out.logo_present) fixes.push("The final composited logo is missing or illegible. Check the logo asset and compositing; do not ask the image model to invent one.");
+  if (!out.logo_present) {
+    fixes.push(
+      params.masterPrompt?.trim()
+        ? "The client logo the prompt asks for is missing or illegible. Reproduce the attached logo faithfully, exactly where the prompt places it."
+        : "The final composited logo is missing or illegible. Check the logo asset and compositing; do not ask the image model to invent one."
+    );
+  }
   if (out.extra_text?.length) {
     fixes.push(`Remove these words that must not appear: ${out.extra_text.map((t) => `"${t}"`).join(", ")}.`);
   }

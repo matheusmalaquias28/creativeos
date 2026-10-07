@@ -584,7 +584,9 @@ async function runJob(
       let review: ArtReview | null = null;
       if (REVIEW_ENABLED) {
         try {
-          review = await reviewArt({ image: final, spec: textSpec });
+          // Space: a revisão julga pelo prompt do node (master), nunca pelos
+          // campos headline/CTA parseados, que podem não refletir o texto.
+          review = await reviewArt({ image: final, spec: textSpec, masterPrompt: space?.body ?? null });
         } catch (err) {
           // Revisão é filtro de qualidade: se falhar, a arte segue para a curadoria.
           console.warn("[worker] revisão falhou:", (err as Error)?.message ?? err);

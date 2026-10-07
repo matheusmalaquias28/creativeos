@@ -101,6 +101,20 @@ describe("extractFlowJobParams", () => {
     expect(job.prompt_text).toBe(text);
   });
 
+  it("CTA reescrito no prompt não herda o CTA antigo do briefing", () => {
+    const graph = gerarFluxoDaDemanda(demanda, 1);
+    const arteNode = graph.nodes.find((n) => n.type === "arte" && n.data.format === "feed");
+    if (arteNode?.type === "arte") {
+      arteNode.data.cta = "https://drive.google.com/link-errado";
+      arteNode.data.promptText =
+        "Headline: TEM MEDO?\nCTA CENTRALIZADA NA COR VERDE: FALE COM UM ADVOGADO";
+    }
+
+    const [job] = extractFlowJobParams(graph, demanda.briefing);
+    expect(job.cta).not.toBe("https://drive.google.com/link-errado");
+    expect(JSON.stringify(job)).not.toContain("link-errado");
+  });
+
   it("Lista em modo reference achata os itens como referências", () => {
     const [job] = extractFlowJobParams(graphWithList("reference"), {});
     expect(job.fanout_reference_urls).toBeNull();
