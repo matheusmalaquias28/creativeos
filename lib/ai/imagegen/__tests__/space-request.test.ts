@@ -62,18 +62,36 @@ describe("buildSpaceRequest", () => {
     expect(spacePromptFor(req, req.batch[0])).toContain("- Imagem 1 (Item da lista)");
   });
 
-  it("o prompt ABRE com as imagens numeradas na ordem enviada", () => {
+  it("o prompt do node ABRE; as imagens vêm depois, numeradas na ordem enviada", () => {
     const req = buildSpaceRequest(
       {
-        informacoesExtras: "cena",
+        prompt_text: "cena",
         flow_references: [{ url: "https://x/a.png", role: "replique o layout", category: "style" }],
       },
       defaults
     );
     const prompt = spacePromptFor(req, null);
-    expect(prompt.startsWith("IMAGENS ANEXADAS")).toBe(true);
+    expect(prompt.startsWith("cena")).toBe(true);
     expect(prompt).toContain("- Imagem 1 (Estilo): replique o layout");
-    expect(prompt.indexOf("Imagem 1")).toBeLessThan(prompt.indexOf("cena"));
+    expect(prompt.indexOf("cena")).toBeLessThan(prompt.indexOf("IMAGENS ANEXADAS"));
+  });
+
+  it("prompt_text é o corpo literal: nada descartado, nada injetado por fora", () => {
+    const text =
+      "Headline escrita em papel com caneta vermelha, fixado numa lousa de rolha. Headline: TEM MEDO?\nSubheadline: Sub.\nCTA: ENTENDA";
+    const req = buildSpaceRequest(
+      {
+        prompt_text: text,
+        headline: "TEM MEDO?",
+        subheadline: "Sub.",
+        cta: "ENTENDA",
+        briefing_titulo: "[ARTES] Campanha",
+      },
+      defaults
+    );
+    expect(req.body).toBe(`${text}\n\nFormato: proporção 4:5, resolução 2K.`);
+    expect(req.body).not.toContain("Campanha");
+    expect(req.body).not.toContain("botão gráfico");
   });
 
   it("sem referências o prompt é só o corpo", () => {

@@ -90,6 +90,17 @@ describe("extractFlowJobParams", () => {
     expect(job.headline).toBe("Texto via promptText");
   });
 
+  it("texto livre ao lado de Headline/CTA não é descartado (prompt master)", () => {
+    const graph = gerarFluxoDaDemanda(demanda, 1);
+    const arteNode = graph.nodes.find((n) => n.type === "arte" && n.data.format === "feed");
+    const text =
+      "Headline escrita em papel com caneta vermelha, numa lousa de rolha. Headline: TEM MEDO?\nSubheadline: Sub.\nCTA: ENTENDA";
+    if (arteNode?.type === "arte") arteNode.data.promptText = text;
+
+    const [job] = extractFlowJobParams(graph, demanda.briefing);
+    expect(job.prompt_text).toBe(text);
+  });
+
   it("Lista em modo reference achata os itens como referências", () => {
     const [job] = extractFlowJobParams(graphWithList("reference"), {});
     expect(job.fanout_reference_urls).toBeNull();

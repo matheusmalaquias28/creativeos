@@ -6,9 +6,10 @@
  * entra o que está no grafo — prompt do node (onde a identidade da marca e a
  * frase da logo já estão como linhas visíveis), logo/refs/listas conectadas.
  *
- * As referências abrem o prompt, numeradas na ordem em que as imagens vão
- * (Imagem 1, 2…), como a diretiva principal da arte. A ordem importa: o modelo
- * preserva melhor as primeiras imagens, então o sujeito (pessoa/produto) vai na
+ * O prompt do node é o MASTER: vai primeiro e literal, inteiro. As imagens
+ * anexadas vêm depois, numeradas na ordem em que vão (Imagem 1, 2…), cada uma
+ * com o seu papel e subordinadas ao prompt. A ordem das imagens importa: o
+ * modelo preserva melhor as primeiras, então o sujeito (pessoa/produto) vai na
  * frente, depois a logo, e por último as referências de estilo/ambiente.
  */
 
@@ -29,6 +30,8 @@ export type SpaceJobParams = {
   logo_position?: string | null;
   logo_size?: string | null;
   logo_directive?: string | null;
+  /** Texto inteiro do node `arte` — quando presente, é o corpo do prompt. */
+  prompt_text?: string | null;
   briefing_titulo?: string | null;
   briefing_tipo?: string | null;
   flow_logo_url?: string | null;
@@ -141,7 +144,10 @@ export function buildSpaceRequest(
   const aspectRatio = params.aspect_ratio ?? defaults.aspectRatio;
   const imageSize = params.image_size ?? defaults.imageSize;
 
-  const body = compileSpacePrompt(
+  const masterText = params.prompt_text?.trim();
+  const body = masterText
+    ? masterBody(masterText, aspectRatio, imageSize)
+    : compileSpacePrompt(
     NO_PROFILE,
     { titulo: params.briefing_titulo ?? undefined, tipo: params.briefing_tipo ?? undefined },
     {
@@ -166,6 +172,15 @@ export function buildSpaceRequest(
   };
 }
 
+/**
+ * Corpo do prompt quando o node tem texto: o texto do operador, literal e
+ * inteiro, + só o formato escolhido nos controles do node. Nada de campanha,
+ * copy reescrita ou instrução de CTA por fora — o que está no node é o prompt.
+ */
+function masterBody(text: string, aspectRatio: string, imageSize: string): string {
+  return `${text}\n\nFormato: proporção ${aspectRatio}, resolução ${imageSize}.`;
+}
+
 /** Referências de UMA geração do lote: item do fan-out primeiro, depois as fixas. */
 export function spaceReferencesFor(
   request: SpaceRequest,
@@ -177,16 +192,16 @@ export function spaceReferencesFor(
 }
 
 /**
- * Prompt de UMA geração: abre com as imagens anexadas (numeradas na ordem em
- * que vão, cada uma com o seu papel) e segue com o corpo. As imagens são a
- * diretiva principal — o texto diz o que muda em cima delas.
+ * Prompt de UMA geração: o corpo (prompt do node, MASTER) primeiro; depois as
+ * imagens anexadas, numeradas na ordem em que vão, cada uma com o seu papel.
+ * Em conflito, o prompt vence — as imagens servem ao que o texto pede.
  */
 export function spacePromptFor(request: SpaceRequest, item: SpaceReference | null): string {
   const refs = spaceReferencesFor(request, item);
   if (refs.length === 0) return request.body;
   const block = [
-    "IMAGENS ANEXADAS — elas são a base desta arte. Siga cada uma exatamente no papel indicado:",
+    "IMAGENS ANEXADAS — use cada uma no papel indicado, sempre a serviço do prompt acima (se algo conflitar, o prompt acima vence):",
     ...refs.map((r, i) => `- Imagem ${i + 1} (${r.label}): ${r.intent}`),
   ].join("\n");
-  return `${block}\n\n${request.body}`;
+  return `${request.body}\n\n${block}`;
 }

@@ -53,6 +53,12 @@ export type FlowJobParams = {
    * continuam existindo para o seletor da UI refletir o valor atual.
    */
   logo_directive?: string | null;
+  /**
+   * Prompt MASTER do node `arte`: o texto inteiro do node, literal (só os
+   * tokens `@(nome)` viram o nome). No Space ele é o corpo do prompt — nada
+   * do que o operador escreveu é descartado ou reescrito.
+   */
+  prompt_text?: string | null;
   briefing_titulo?: string | null;
   briefing_tipo?: string | null;
   flow_logo_url: string | null;
@@ -434,6 +440,7 @@ function extractArteJob(
     logo_position: data.logoPosition ?? null,
     logo_size: data.logoSize ?? null,
     logo_directive: logoDirective,
+    prompt_text: resolveNamedRefTokens(fullText, namedRefMap, refs, seen)?.trim() || null,
     briefing_titulo: briefing.titulo ?? null,
     briefing_tipo: briefing.tipo ?? null,
     flow_logo_url: logoUrl,
@@ -461,6 +468,7 @@ export function flowJobParamsToRow(p: FlowJobParams): Json {
     logo_position: p.logo_position ?? null,
     logo_size: p.logo_size ?? null,
     logo_directive: p.logo_directive ?? null,
+    prompt_text: p.prompt_text ?? null,
     briefing_titulo: p.briefing_titulo,
     briefing_tipo: p.briefing_tipo,
     flow_logo_url: p.flow_logo_url,

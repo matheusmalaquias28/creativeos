@@ -91,6 +91,7 @@ type JobRow = {
     logo_position?: string | null;
     logo_size?: string | null;
     logo_directive?: string | null;
+    prompt_text?: string | null;
     briefing_titulo?: string | null;
     briefing_tipo?: string | null;
     extra_reference_urls?: string[] | null;
