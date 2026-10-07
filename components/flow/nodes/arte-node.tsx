@@ -710,7 +710,9 @@ export function ArteNode({ id, data, selected }: Props) {
         <Handle type="source" position={Position.Right} className={flowHandleClass} />
       </div>
 
-      {lightbox && current && <ImageLightbox url={current.url} onClose={() => setLightbox(false)} />}
+      {lightbox && current && (
+        <ImageLightbox url={current.url} filename={downloadFilename} onClose={() => setLightbox(false)} />
+      )}
 
       {pickerOpen && (
         <LibraryPickerDialog

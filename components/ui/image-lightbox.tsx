@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useCallback, useEffect } from "react";
 import { ChevronLeft, ChevronRight, Download, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { downloadImageUrl } from "@/lib/flow/download-image";
 
 export type LightboxItem = {
   url: string;
@@ -57,11 +58,9 @@ export function ImageLightbox({ items, index, onClose, onNavigate }: Props) {
 
   const handleDownload = useCallback(() => {
     if (!current) return;
-    const a = document.createElement("a");
-    a.href = current.url;
-    a.download = current.downloadName ?? `${current.label}.png`;
-    a.target = "_blank";
-    a.click();
+    // Baixa como blob: com a URL do Storage (outra origem) o `download` do
+    // <a> é ignorado e o navegador só abria a imagem numa aba nova.
+    void downloadImageUrl(current.url, current.downloadName ?? `${current.label}.png`);
   }, [current]);
 
   if (!open || !current) return null;

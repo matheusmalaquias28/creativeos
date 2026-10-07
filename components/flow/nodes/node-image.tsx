@@ -4,9 +4,19 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, ArrowUpRight, Trash2, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { downloadImageUrl, imageFilename } from "@/lib/flow/download-image";
 
 /** Lightbox simples (portal) — duplo-clique numa imagem do canvas abre aqui. */
-export function ImageLightbox({ url, onClose }: { url: string; onClose: () => void }) {
+export function ImageLightbox({
+  url,
+  onClose,
+  filename,
+}: {
+  url: string;
+  onClose: () => void;
+  /** Nome do arquivo ao baixar (padrão: nome do arquivo na URL). */
+  filename?: string;
+}) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -20,13 +30,28 @@ export function ImageLightbox({ url, onClose }: { url: string; onClose: () => vo
       className="nodrag nopan nowheel fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-8 backdrop-blur-sm"
       onClick={onClose}
     >
-      <button
-        type="button"
-        className="absolute right-4 top-4 flex size-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition hover:bg-white/20"
-        onClick={onClose}
-      >
-        <X className="size-4" />
-      </button>
+      <div className="absolute right-4 top-4 flex gap-2">
+        <button
+          type="button"
+          title="Baixar imagem"
+          className="flex size-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition hover:bg-white/20"
+          onClick={(e) => {
+            e.stopPropagation();
+            const base = url.split("?")[0].split("/").pop()?.replace(/\.[^.]+$/, "") || "imagem";
+            void downloadImageUrl(url, filename ?? imageFilename(base, url));
+          }}
+        >
+          <Download className="size-4" />
+        </button>
+        <button
+          type="button"
+          title="Fechar"
+          className="flex size-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition hover:bg-white/20"
+          onClick={onClose}
+        >
+          <X className="size-4" />
+        </button>
+      </div>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={url}
@@ -196,7 +221,9 @@ export function NodeImage({
         </span>
       )}
 
-      {lightbox && url && <ImageLightbox url={url} onClose={() => setLightbox(false)} />}
+      {lightbox && url && (
+        <ImageLightbox url={url} filename={imageFilename(name, url)} onClose={() => setLightbox(false)} />
+      )}
     </div>
   );
 }
