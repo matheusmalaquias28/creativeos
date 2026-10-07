@@ -1,5 +1,6 @@
 import { IMAGE_GEN_DEFAULTS } from "@/lib/ai/imagegen/defaults";
 import { buildLogoDirective } from "@/lib/flow/logo-directive";
+import { STORY_QUALITY } from "@/lib/flow/story-defaults";
 import { BRAND_IDENTITY_LABEL, extractLabeledLine, extractMentionInstruction } from "@/lib/flow/mention-text";
 import {
   getPromptArteEditorText,
@@ -440,7 +441,7 @@ function extractArteJob(
     aspect_ratio: data.aspectRatio ?? IMAGE_GEN_DEFAULTS.aspectRatio,
     image_size: data.imageSize ?? IMAGE_GEN_DEFAULTS.imageSize,
     model: data.model ?? IMAGE_GEN_DEFAULTS.model,
-    quality: data.quality ?? IMAGE_GEN_DEFAULTS.quality,
+    quality: data.format === "story" ? STORY_QUALITY : data.quality ?? IMAGE_GEN_DEFAULTS.quality,
     count: Math.max(1, data.count ?? 1),
     fanout_reference_urls: fanoutUrls,
     skip_logo: data.format === "story",

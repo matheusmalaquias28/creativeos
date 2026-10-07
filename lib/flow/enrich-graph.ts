@@ -2,6 +2,7 @@ import { IMAGE_GEN_DEFAULTS } from "@/lib/ai/imagegen/defaults";
 import { BRAND_IDENTITY_LABEL, seedLabeledLineIfMissing } from "@/lib/flow/mention-text";
 import { getPromptArteEditorText } from "@/lib/flow/prompt-arte-text";
 import { upgradeLegacyInstructions } from "@/lib/image-library/categories";
+import { LEGACY_STORY_PROMPTS, STORY_PROMPT, STORY_QUALITY } from "@/lib/flow/story-defaults";
 import type { ArteData, FlowGraph, FlowNode, ReferenciaImagemData } from "@/lib/flow/types";
 
 type CreativeProfileRow = {
@@ -41,11 +42,26 @@ function upgradeReferenceInstructions(node: FlowNode): FlowNode {
   return node;
 }
 
+/**
+ * Node de stories: texto padrão antigo vira o novo (só se o operador não mexeu
+ * nele) e o esforço é sempre low. Fica visível no node.
+ */
+function upgradeStoryNode(node: FlowNode): FlowNode {
+  if (node.type !== "arte" || node.data.format !== "story") return node;
+  const d = node.data as ArteData;
+  const legacy = typeof d.promptText === "string" && LEGACY_STORY_PROMPTS.includes(d.promptText.trim());
+  if (!legacy && d.quality === STORY_QUALITY) return node;
+  return {
+    ...node,
+    data: { ...d, quality: STORY_QUALITY, ...(legacy ? { promptText: STORY_PROMPT } : {}) },
+  };
+}
+
 export function enrichFlowGraphWithProfile(
   rawGraph: FlowGraph,
   profile: CreativeProfileRow | null
 ): FlowGraph {
-  const graph: FlowGraph = { ...rawGraph, nodes: rawGraph.nodes.map(upgradeReferenceInstructions) };
+  const graph: FlowGraph = { ...rawGraph, nodes: rawGraph.nodes.map((n) => upgradeStoryNode(upgradeReferenceInstructions(n))) };
   if (!profile) return graph;
 
   const brandContent = [

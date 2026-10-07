@@ -1,6 +1,7 @@
 import type { FlowGraph, FlowNode, FlowEdge } from './types';
 import type { CreativeDemand } from '@/types/demand';
 import { IMAGE_GEN_DEFAULTS } from '@/lib/ai/imagegen/defaults';
+import { STORY_PROMPT, STORY_QUALITY } from '@/lib/flow/story-defaults';
 
 /**
  * Layout do Space: logo + referências do cliente ficam num bloco fixo acima
@@ -18,9 +19,6 @@ export const ROW_H = 560;
 const FEED_ASPECT = "4:5";
 const FEED_QUALITY = "medium" as const;
 const STORY_ASPECT = "9:16";
-// Instrução de reenquadramento (espelha STORY_ADAPT_PROMPT de lib/ai/imagegen/
-// story.ts — inline aqui para o generator não puxar o provider/sharp pro client).
-const STORY_PROMPT = "Adapte essas artes para o formato stories 9:16, sem adicionar textos e distorcer imagens";
 
 /** Dados do node unificado `arte` (feed) — prompt + controles + saída. */
 function feedArteData(
@@ -86,7 +84,7 @@ function appendStoriesBlock(
       aspectRatio: STORY_ASPECT,
       imageSize: IMAGE_GEN_DEFAULTS.imageSize,
       model: IMAGE_GEN_DEFAULTS.model,
-      quality: FEED_QUALITY,
+      quality: STORY_QUALITY,
       count: 1,
       demandId: demanda.id,
       clientId: demanda.client_id ?? "",

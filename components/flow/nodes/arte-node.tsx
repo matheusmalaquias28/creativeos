@@ -37,6 +37,7 @@ import {
   type LogoSize,
 } from "@/lib/flow/logo-directive";
 import { upsertMentionLine } from "@/lib/flow/mention-text";
+import { STORY_QUALITY } from "@/lib/flow/story-defaults";
 import { slugify } from "@/lib/utils/slug";
 import {
   getPromptArteEditorText,
@@ -699,9 +700,10 @@ export function ArteNode({ id, data, selected }: Props) {
                 onChange={(v) => update({ imageSize: v })} />
             </div>
             <div className="flex items-center gap-1.5">
-              <NodeSelect variant="glass" title="Esforço" value={data.quality ?? "medium"}
+              <NodeSelect variant="glass" title={isStory ? "Esforço (stories: sempre Low)" : "Esforço"}
+                value={isStory ? STORY_QUALITY : data.quality ?? "medium"}
                 leading={<Gauge className="size-3.5 text-white/70" />}
-                options={QUALITY_OPTIONS.map((v) => ({ value: v, label: v[0].toUpperCase() + v.slice(1) }))}
+                options={(isStory ? [STORY_QUALITY] : QUALITY_OPTIONS).map((v) => ({ value: v, label: v[0].toUpperCase() + v.slice(1) }))}
                 onChange={(v) => update({ quality: v as ArteData["quality"] })} />
               <div className="ml-auto">
                 {isGenerating ? (

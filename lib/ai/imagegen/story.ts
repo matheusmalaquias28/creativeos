@@ -7,14 +7,14 @@
  * catálogo, briefing ou bloco técnico, que reabririam decisões já fechadas.
  */
 
+import { STORY_PROMPT, STORY_QUALITY } from "@/lib/flow/story-defaults";
 import { generateArtImage } from "./provider";
 
 /** Formato do story. Fixo: é o que a etapa inteira existe para produzir. */
 export const STORY_ASPECT_RATIO = "9:16" as const;
 
 /** A instrução do operador, literal. É ela que define a etapa. */
-export const STORY_ADAPT_PROMPT =
-  "Adapte essas artes para o formato stories 9:16, sem adicionar textos e distorcer imagens";
+export const STORY_ADAPT_PROMPT = STORY_PROMPT;
 
 /**
  * Reforço determinístico em inglês. O modelo de imagem entende a instrução em
@@ -59,5 +59,6 @@ export async function adaptArtToStory(params: {
     ],
     imageSize: params.imageSize ?? "2K",
     aspectRatio: STORY_ASPECT_RATIO,
+    quality: STORY_QUALITY,
   });
 }
