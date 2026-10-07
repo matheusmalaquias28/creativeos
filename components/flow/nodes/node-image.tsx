@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, ArrowUpRight, Trash2 } from "lucide-react";
+import { X, ArrowUpRight, Trash2, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /** Lightbox simples (portal) — duplo-clique numa imagem do canvas abre aqui. */
@@ -102,6 +102,7 @@ export function NodeImage({
   name,
   alt,
   onRename,
+  onDownload,
   selected,
   className,
 }: {
@@ -109,6 +110,8 @@ export function NodeImage({
   name: string;
   alt?: string;
   onRename?: (name: string) => void;
+  /** Mostra o botão de baixar no hover da imagem. */
+  onDownload?: () => void;
   selected?: boolean;
   className?: string;
 }) {
@@ -135,7 +138,8 @@ export function NodeImage({
   return (
     <div className={cn("flex w-40 flex-col items-center gap-1", className)}>
       {url ? (
-        // eslint-disable-next-line @next/next/no-img-element
+        <div className="group/img relative w-full">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={url}
           alt={alt ?? name}
@@ -147,6 +151,17 @@ export function NodeImage({
             selected ? "ring-2 ring-primary/60" : "ring-1 ring-border"
           )}
         />
+        {onDownload && (
+          <button
+            type="button"
+            onClick={onDownload}
+            title="Baixar imagem"
+            className="nodrag absolute right-1.5 top-1.5 flex size-6 items-center justify-center rounded-md border border-border bg-card/85 text-foreground opacity-0 backdrop-blur transition-premium hover:bg-primary hover:text-primary-foreground group-hover/img:opacity-100"
+          >
+            <Download className="size-3.5" />
+          </button>
+        )}
+        </div>
       ) : (
         <div className="flex aspect-video w-full items-center justify-center rounded-lg border border-dashed border-border-strong bg-surface text-[0.625rem] text-muted-foreground">
           sem imagem

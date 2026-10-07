@@ -3,6 +3,7 @@
 import { Handle, Position, useReactFlow } from "@xyflow/react";
 import { useFlowCanvas } from "@/components/flow/flow-canvas-context";
 import { NodeImage } from "@/components/flow/nodes/node-image";
+import { downloadImageUrl, imageFilename } from "@/lib/flow/download-image";
 import { flowHandleClass } from "@/components/flow/nodes/node-shell";
 import type { ReferenciaImagemData } from "@/lib/flow/types";
 
@@ -31,6 +32,11 @@ export function ReferenciaImagemNode({
         alt={data.label || "Referência"}
         selected={selected}
         onRename={rename}
+        onDownload={
+          data.imageUrl
+            ? () => void downloadImageUrl(data.imageUrl!, imageFilename(data.label || "imagem", data.imageUrl!))
+            : undefined
+        }
       />
       <Handle type="source" position={Position.Right} className={flowHandleClass} />
     </div>

@@ -38,6 +38,7 @@ import {
 } from "@/lib/flow/logo-directive";
 import { upsertMentionLine } from "@/lib/flow/mention-text";
 import { STORY_QUALITY } from "@/lib/flow/story-defaults";
+import { downloadImageUrl } from "@/lib/flow/download-image";
 import { slugify } from "@/lib/utils/slug";
 import {
   getPromptArteEditorText,
@@ -361,28 +362,9 @@ export function ArteNode({ id, data, selected }: Props) {
     return `${slugify(demandName) || "arte"}-${data.artIndex + 1}.png`;
   })();
 
-  // Baixa de verdade (não abre aba nova): a URL do Storage é de outra origem,
-  // então `<a download>` sozinho é ignorado pelo navegador — baixa como blob
-  // same-origin e aciona o download a partir dele.
-  async function downloadUrl(url: string, filename: string) {
-    try {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("download falhou");
-      const blob = await res.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = blobUrl;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(blobUrl);
-    } catch {
-      toast.error("Não foi possível baixar a imagem");
-    }
-  }
-
   function download() {
     if (!current) return;
-    void downloadUrl(current.url, downloadFilename);
+    void downloadImageUrl(current.url, downloadFilename);
   }
 
   const statusPill =
@@ -538,7 +520,7 @@ export function ArteNode({ id, data, selected }: Props) {
                     title="Baixar esta versão"
                     onClick={(e) => {
                       e.stopPropagation();
-                      void downloadUrl(item.url, downloadFilename);
+                      void downloadImageUrl(item.url, downloadFilename);
                     }}
                     className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 transition-opacity group-hover:opacity-100"
                   >
