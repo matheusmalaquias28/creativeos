@@ -70,28 +70,78 @@ function AspectGlyph({ aspect }: { aspect: string }) {
   return <span className="shrink-0 rounded-[3px] border-[1.5px] border-current" style={{ width, height }} />;
 }
 
+type MentionRef = { token: string; label: string; url: string | null | undefined };
+
 /**
- * Texto do prompt com as menções `@(nome)` renderizadas como chip — SÓ quando
+ * Texto do prompt com as menções `@(nome)` renderizadas como badge — SÓ quando
  * a menção casa com uma referência realmente conectada ao node (badge verde
- * com o nome). `@(algo)` sem vínculo é texto solto igual ao resto — não vira
- * badge nenhum, pra não parecer uma referência que não existe de verdade.
+ * com a miniatura e o nome). `@(algo)` sem vínculo fica marcado em âmbar
+ * tracejado: dá pra ver na hora que aquela menção não aponta pra nada.
  */
-function PromptPreview({ text, linked }: { text: string; linked: Set<string> }) {
+function PromptPreview({ text, refs }: { text: string; refs: Map<string, MentionRef> }) {
   return (
     <>
       {text.split(/(@\([^)]+\))/g).map((part, i) => {
         const m = /^@\(([^)]+)\)$/.exec(part);
-        const isLinked = m && linked.has(part.toLowerCase());
-        if (!isLinked) return <span key={i}>{part}</span>;
+        if (!m) return <span key={i}>{part}</span>;
+        const ref = refs.get(part.toLowerCase());
+        if (!ref) {
+          return (
+            <span key={i} title="Referência não conectada a este node" className="text-amber-300 underline decoration-dashed underline-offset-2">
+              {part}
+            </span>
+          );
+        }
         return (
           <span
             key={i}
-            className="mx-0.5 rounded-md bg-emerald-500/85 px-1.5 py-px text-[0.75rem] font-semibold text-white"
+            title={`Referência conectada: ${ref.label}`}
+            className="mx-0.5 inline-flex translate-y-[2px] items-center gap-1 rounded-md bg-emerald-500/90 py-px pr-1.5 pl-0.5 align-baseline text-[0.75rem] leading-[1.1rem] font-semibold text-white shadow-sm ring-1 ring-emerald-300/40"
           >
+            {ref.url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={ref.url} alt="" draggable={false} className={cn("size-4 rounded-[4px] bg-white/20", ref.label === "logo" ? "object-contain" : "object-cover")} />
+            ) : null}
             @{m[1]}
           </span>
         );
       })}
+    </>
+  );
+}
+
+/**
+ * Camada espelho atrás do textarea: o mesmo texto, com a MESMA métrica (fonte,
+ * peso, quebra), mas com as menções pintadas como badge. O textarea fica com o
+ * texto transparente e só o cursor visível — o operador digita "em cima" do
+ * badge. Por isso aqui nada pode mudar a largura do texto (sem padding, sem
+ * negrito): o destaque é fundo + box-shadow, que não ocupam espaço.
+ */
+function PromptHighlight({ text, refs }: { text: string; refs: Map<string, MentionRef> }) {
+  return (
+    <>
+      {text.split(/(@\([^)]+\))/g).map((part, i) => {
+        const m = /^@\(([^)]+)\)$/.exec(part);
+        if (!m) return <span key={i}>{part}</span>;
+        const linked = refs.has(part.toLowerCase());
+        return (
+          <span
+            key={i}
+            className={cn(
+              "rounded-[5px]",
+              linked
+                ? "bg-emerald-500/90 text-white shadow-[0_0_0_2px_rgb(16_185_129_/_0.9)]"
+                : "bg-amber-400/15 text-amber-200 shadow-[0_0_0_2px_rgb(251_191_36_/_0.25)]"
+            )}
+          >
+            @<span className="opacity-60">(</span>
+            {m[1]}
+            <span className="opacity-60">)</span>
+          </span>
+        );
+      })}
+      {/* Quebra final: sem isto a última linha vazia do textarea não tem altura no espelho. */}
+      {"\n"}
     </>
   );
 }
@@ -170,7 +220,8 @@ export function ArteNode({ id, data, selected }: Props) {
       return [];
     });
   // Tokens de referências realmente conectadas — menção com vínculo fica verde.
-  const linkedTokens = new Set(mentionable.map((m) => m.token.toLowerCase()));
+  const linkedRefs = new Map<string, MentionRef>(mentionable.map((m) => [m.token.toLowerCase(), m]));
+  const highlightRef = useRef<HTMLDivElement>(null);
   const mentionOpts = mention
     ? mentionable.filter((m) => m.label.toLowerCase().includes(mention.query.toLowerCase()))
     : [];
@@ -276,7 +327,14 @@ export function ArteNode({ id, data, selected }: Props) {
 
   async function handleGenerate() {
     if (!data.demandId) { toast.error("Salve o fluxo antes de gerar"); return; }
+    if (triggering || isGenerating) return;
     setTriggering(true);
+    // Marca "na fila" ANTES da chamada: se o status fosse gravado só depois que a
+    // resposta volta, um retorno atrasado chegava depois do "succeeded" do
+    // Realtime e sobrescrevia a arte pronta — o node girava para sempre e o
+    // operador gerava (e pagava) de novo.
+    const previousStatus = data.generatingStatus;
+    update({ generatingStatus: "queued" });
     try {
       // A geração lê o fluxo SALVO: salva já, senão o que acabou de ser
       // apagado/editado no canvas (ainda no debounce) iria na geração.
@@ -287,8 +345,8 @@ export function ArteNode({ id, data, selected }: Props) {
         body: JSON.stringify({ artIndex: data.artIndex }),
       });
       if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error ?? "Erro");
-      update({ generatingStatus: "queued" });
     } catch (err) {
+      update({ generatingStatus: previousStatus });
       toast.error("Erro ao gerar", { description: err instanceof Error ? err.message : String(err) });
     } finally {
       setTriggering(false);
@@ -581,7 +639,7 @@ export function ArteNode({ id, data, selected }: Props) {
                   onClick={() => insertToken(m.token)}
                   className={cn(
                     "nodrag size-9 shrink-0 overflow-hidden rounded-xl border-2 bg-white/10 transition-colors",
-                    draft.includes(m.token) ? "border-primary" : "border-transparent hover:border-white/40"
+                    draft.toLowerCase().includes(m.token.toLowerCase()) ? "border-emerald-400 ring-2 ring-emerald-400/30" : "border-transparent hover:border-white/40"
                   )}>
                   {m.url && (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -594,6 +652,14 @@ export function ArteNode({ id, data, selected }: Props) {
 
             <div className={cn("relative flex min-h-0 flex-col", promptOpen && "flex-1")}>
               {promptOpen ? (
+                <div className="relative flex min-h-0 w-full flex-1">
+                <div
+                  ref={highlightRef}
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 overflow-hidden pr-1 text-[0.875rem] leading-relaxed break-words whitespace-pre-wrap text-white [scrollbar-gutter:stable] [scrollbar-width:thin]"
+                >
+                  <PromptHighlight text={draft} refs={linkedRefs} />
+                </div>
                 <textarea
                   ref={taRef}
                   autoFocus
@@ -605,6 +671,9 @@ export function ArteNode({ id, data, selected }: Props) {
                     setMention(detectMention(v, e.target.selectionStart ?? v.length));
                     setMentionIdx(0);
                     scheduleCommit(v);
+                  }}
+                  onScroll={(e) => {
+                    if (highlightRef.current) highlightRef.current.scrollTop = e.currentTarget.scrollTop;
                   }}
                   onBlur={() => {
                     if (commitTimer.current) clearTimeout(commitTimer.current);
@@ -626,8 +695,10 @@ export function ArteNode({ id, data, selected }: Props) {
                     }
                     if (e.key === "Escape") { e.stopPropagation(); e.currentTarget.blur(); }
                   }}
-                  className="nodrag nowheel min-h-0 w-full flex-1 resize-none bg-transparent pr-1 text-[0.875rem] leading-relaxed text-white placeholder:text-white/40 focus:outline-none [scrollbar-color:rgba(255,255,255,0.3)_transparent] [scrollbar-width:thin]"
+                  spellCheck={false}
+                  className="nodrag nowheel relative min-h-0 w-full flex-1 resize-none bg-transparent pr-1 text-[0.875rem] leading-relaxed break-words whitespace-pre-wrap text-transparent caret-white selection:bg-sky-400/40 selection:text-transparent placeholder:text-white/40 focus:outline-none [scrollbar-color:rgba(255,255,255,0.3)_transparent] [scrollbar-gutter:stable] [scrollbar-width:thin]"
                 />
+                </div>
               ) : (
                 <button
                   type="button"
@@ -635,7 +706,7 @@ export function ArteNode({ id, data, selected }: Props) {
                   title="Editar prompt"
                   className="nodrag line-clamp-3 w-full text-left text-[0.875rem] leading-relaxed text-white/95"
                 >
-                  {draft.trim() ? <PromptPreview text={draft} linked={linkedTokens} /> : <span className="text-white/45">Descreva a arte…</span>}
+                  {draft.trim() ? <PromptPreview text={draft} refs={linkedRefs} /> : <span className="text-white/45">Descreva a arte…</span>}
                 </button>
               )}
 

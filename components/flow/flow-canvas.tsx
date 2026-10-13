@@ -392,51 +392,59 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
   // o node volta a ficar vazio até a PRÓXIMA geração, mesmo com a arte
   // salva e intacta no art_version. Nenhuma arte gerada pode ficar invisível
   // assim — carrega o job/versão atual de cada node assim que o canvas monta.
-  useEffect(() => {
-    let cancelled = false;
+  //
+  // A mesma leitura roda em polling enquanto houver arte gerando (ver abaixo):
+  // se o Realtime perder o evento de "succeeded" (socket caiu, aba em segundo
+  // plano), o node não pode ficar girando para sempre com a arte já pronta.
+  const loadJobsSnapshot = useCallback(async () => {
     const supabase = createClient();
+    const { data: jobs } = await supabase
+      .from("art_generation_job")
+      .select("id, art_index, status, created_at, updated_at")
+      .eq("demand_id", demanda.id)
+      .order("created_at", { ascending: false });
+    if (!jobs?.length) return null;
 
-    (async () => {
-      const { data: jobs } = await supabase
-        .from("art_generation_job")
-        .select("id, art_index, status, created_at")
-        .eq("demand_id", demanda.id)
-        .order("created_at", { ascending: false });
-      if (cancelled || !jobs?.length) return;
-
-      // Job mais recente por art_index — pode haver duplicatas de antes da
-      // dedupe em run/run-node (ver app/api/demands/[id]/flow/run*/route.ts).
-      const jobByIndex = new Map<number, { id: string; status: string }>();
-      for (const j of jobs) {
-        if (!jobByIndex.has(j.art_index)) {
-          jobByIndex.set(j.art_index, { id: j.id, status: j.status });
-        }
+    // Job mais recente por art_index — pode haver duplicatas de antes da
+    // dedupe em run/run-node (ver app/api/demands/[id]/flow/run*/route.ts).
+    const jobByIndex = new Map<number, { id: string; status: string; updatedAt: string }>();
+    for (const j of jobs) {
+      if (!jobByIndex.has(j.art_index)) {
+        jobByIndex.set(j.art_index, { id: j.id, status: j.status, updatedAt: j.updated_at });
       }
+    }
 
-      const jobIds = Array.from(jobByIndex.values(), (j) => j.id);
-      const { data: versions } = await supabase
-        .from("art_version")
-        .select("id, job_id, result_url, is_current, version_number, format")
-        .in("job_id", jobIds)
-        .order("version_number", { ascending: true });
-      if (cancelled) return;
+    const jobIds = Array.from(jobByIndex.values(), (j) => j.id);
+    const { data: versions } = await supabase
+      .from("art_version")
+      .select("id, job_id, result_url, is_current, version_number, format")
+      .in("job_id", jobIds)
+      .order("version_number", { ascending: true });
 
-      const versionsByJob = new Map<string, NonNullable<typeof versions>>();
-      for (const v of versions ?? []) {
-        const list = versionsByJob.get(v.job_id) ?? [];
-        list.push(v);
-        versionsByJob.set(v.job_id, list);
-      }
+    const versionsByJob = new Map<string, NonNullable<typeof versions>>();
+    for (const v of versions ?? []) {
+      const list = versionsByJob.get(v.job_id) ?? [];
+      list.push(v);
+      versionsByJob.set(v.job_id, list);
+    }
+    return { jobByIndex, versionsByJob };
+  }, [demanda.id]);
 
+  type JobsSnapshot = NonNullable<Awaited<ReturnType<typeof loadJobsSnapshot>>>;
+
+  /** Aplica o estado do banco nos nodes. `shouldApply` filtra quais jobs entram. */
+  const applyJobsSnapshot = useCallback(
+    (snapshot: JobsSnapshot, shouldApply: (job: { id: string; updatedAt: string }) => boolean = () => true) => {
+      const finished: string[] = [];
       setNodes((ns) =>
         ns.map((n) => {
           if (n.type !== "arte" && n.type !== "saidaArte") return n;
           const d = n.data as SaidaArteData;
-          const job = jobByIndex.get(d.artIndex);
-          if (!job) return n;
+          const job = snapshot.jobByIndex.get(d.artIndex);
+          if (!job || !shouldApply(job)) return n;
 
           const format = d.format === "story" ? "story" : "feed";
-          const jobVersions = (versionsByJob.get(job.id) ?? []).filter(
+          const jobVersions = (snapshot.versionsByJob.get(job.id) ?? []).filter(
             (v) => v.format === format && v.result_url
           );
           const status = job.status as SaidaArteData["generatingStatus"];
@@ -446,18 +454,29 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
           const stack = jobVersions.map((v) => ({ versionId: v.id, url: v.result_url as string }));
           const current = jobVersions.find((v) => v.is_current);
           const resultUrl = current?.result_url ?? stack[stack.length - 1].url;
+          if (status === "succeeded" && d.resultUrl !== resultUrl) finished.push(n.id);
           return {
             ...n,
             data: { ...n.data, resultUrl, resultUrls: stack, jobId: job.id, generatingStatus: status },
           };
         })
       );
-    })();
+      return finished;
+    },
+    [setNodes]
+  );
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const snapshot = await loadJobsSnapshot();
+      if (cancelled || !snapshot) return;
+      applyJobsSnapshot(snapshot);
+    })();
     return () => {
       cancelled = true;
     };
-  }, [demanda.id, setNodes]);
+  }, [loadJobsSnapshot, applyJobsSnapshot]);
 
   // ─── Real-time: art_generation_job ────────────────────────────────────
 
@@ -664,6 +683,33 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
     const status = (n.data as SaidaArteData).generatingStatus;
     return status === "queued" || status === "processing";
   });
+
+  // Rede de segurança do Realtime: enquanto algum node estiver gerando, confere
+  // o banco a cada 5s. Só aplica jobs que MUDARAM desde que o polling começou —
+  // senão o "succeeded" antigo do job (ainda não reenfileirado pela rota)
+  // desfaria o "na fila" otimista do clique em Gerar.
+  useEffect(() => {
+    if (!hasActiveJobs) return;
+    let cancelled = false;
+    let baseline: Map<string, string> | null = null;
+    const tick = async () => {
+      const snapshot = await loadJobsSnapshot();
+      if (cancelled || !snapshot) return;
+      if (!baseline) {
+        baseline = new Map(Array.from(snapshot.jobByIndex.values(), (j) => [j.id, j.updatedAt]));
+        return;
+      }
+      const base = baseline;
+      const finished = applyJobsSnapshot(snapshot, (job) => base.get(job.id) !== job.updatedAt);
+      for (const nodeId of finished) setTimeout(() => syncListsAfterGeneration(nodeId), 60);
+    };
+    void tick();
+    const timer = setInterval(() => void tick(), 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [hasActiveJobs, loadJobsSnapshot, applyJobsSnapshot, syncListsAfterGeneration]);
 
   async function pause() {
     try {
