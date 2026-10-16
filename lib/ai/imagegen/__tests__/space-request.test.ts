@@ -5,6 +5,7 @@ import {
   spaceReferencesFor,
   SPACE_MAX_COUNT,
 } from "../space-request";
+import { SPACE_CTA_DIRECTIVE } from "../prompt-compiler";
 import { CATEGORY_META, upgradeLegacyInstructions } from "@/lib/image-library/categories";
 
 const defaults = { aspectRatio: "4:5", imageSize: "2K" };
@@ -76,7 +77,7 @@ describe("buildSpaceRequest", () => {
     expect(prompt.indexOf("cena")).toBeLessThan(prompt.indexOf("IMAGENS ANEXADAS"));
   });
 
-  it("prompt_text é o corpo literal: nada descartado, nada injetado por fora", () => {
+  it("prompt_text é o corpo literal: nada descartado, só a regra do CTA + formato", () => {
     const text =
       "Headline escrita em papel com caneta vermelha, fixado numa lousa de rolha. Headline: TEM MEDO?\nSubheadline: Sub.\nCTA: ENTENDA";
     const req = buildSpaceRequest(
@@ -89,9 +90,41 @@ describe("buildSpaceRequest", () => {
       },
       defaults
     );
-    expect(req.body).toBe(`${text}\n\nFormato: proporção 4:5, resolução 2K.`);
+    expect(req.body).toBe(
+      `${text}\n\n${SPACE_CTA_DIRECTIVE}\n\nFormato: proporção 4:5, resolução 2K.`
+    );
     expect(req.body).not.toContain("Campanha");
-    expect(req.body).not.toContain("botão gráfico");
+  });
+
+  it("CTA com rótulo livre no texto também recebe a regra do botão", () => {
+    const req = buildSpaceRequest(
+      { prompt_text: "Headline: X\nCTA CENTRALIZADA NA COR VERDE: FALE CONOSCO" },
+      defaults
+    );
+    expect(req.body).toContain(SPACE_CTA_DIRECTIVE);
+  });
+
+  it("sem CTA no node, nenhuma regra de CTA", () => {
+    const req = buildSpaceRequest({ prompt_text: "cena sem texto" }, defaults);
+    expect(req.body).not.toContain(SPACE_CTA_DIRECTIVE);
+  });
+
+  it("sem prompt_text, o CTA também é botão centralizado de cor sólida", () => {
+    const req = buildSpaceRequest({ headline: "Oi", cta: "COMPRE" }, defaults);
+    expect(req.body).toContain(SPACE_CTA_DIRECTIVE);
+  });
+
+  it("com referência de Estilo/Marca, lembra que a arte é nova (não cópia)", () => {
+    const comEstilo = buildSpaceRequest(
+      { prompt_text: "cena", flow_references: [{ url: "https://x/a.png", role: "x", category: "style" }] },
+      defaults
+    );
+    expect(spacePromptFor(comEstilo, null)).toContain("a arte final tem que ser NOVA");
+    const soSujeito = buildSpaceRequest(
+      { prompt_text: "cena", flow_references: [{ url: "https://x/p.png", role: "x", category: "subject" }] },
+      defaults
+    );
+    expect(spacePromptFor(soSujeito, null)).not.toContain("a arte final tem que ser NOVA");
   });
 
   it("sem referências o prompt é só o corpo", () => {
@@ -107,6 +140,15 @@ describe("upgradeLegacyInstructions", () => {
     const up = upgradeLegacyInstructions(old);
     expect(up).toBe(`@(estilo) — ${CATEGORY_META.style.instruction}. Destaque do dr`);
     expect(up).not.toContain("só inspiração");
+  });
+
+  it("troca a instrução de estilo que mandava replicar a referência de perto", () => {
+    const old =
+      "@(estilo) — é a referência de estilo: replique de perto a composição, o enquadramento, o layout, a iluminação, as cores e o tratamento desta imagem — troque apenas os textos, a logo e o conteúdo pelos desta arte";
+    const up = upgradeLegacyInstructions(old);
+    expect(up).toBe(`@(estilo) — ${CATEGORY_META.style.instruction}`);
+    expect(up).toContain("NOVA");
+    expect(up).not.toContain("replique");
   });
 
   it("não mexe em texto escrito pelo operador", () => {

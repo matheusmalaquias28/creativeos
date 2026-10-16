@@ -21,6 +21,14 @@ type CategoryMeta = {
   instruction: string;
 };
 
+/**
+ * Marca/estilo servem para o modelo ENTENDER a identidade visual do cliente
+ * (cores e tipografia, principalmente) — a arte tem que ser nova, não uma
+ * cópia da referência.
+ */
+export const IDENTITY_ONLY = (what: string) =>
+  `${what}: use só para entender a identidade visual do cliente — principalmente a paleta de cores e a tipografia, e o tipo de acabamento. Crie uma arte NOVA e original: não copie a composição, o layout, o enquadramento nem os elementos desta imagem`;
+
 export const CATEGORY_META: Record<ReferenceCategory, CategoryMeta> = {
   subject: {
     label: "Fotos do Sujeito / Produto",
@@ -33,15 +41,13 @@ export const CATEGORY_META: Record<ReferenceCategory, CategoryMeta> = {
     label: "Identidade da Marca",
     short: "Marca",
     mentionName: "Marca",
-    instruction:
-      "é a identidade da marca: siga fielmente a paleta, a tipografia, os grafismos e o acabamento desta imagem (troque só os textos)",
+    instruction: IDENTITY_ONLY("é a identidade da marca"),
   },
   style: {
     label: "Inspirações de Estilo",
     short: "Estilo",
     mentionName: "Estilo",
-    instruction:
-      "é a referência de estilo: replique de perto a composição, o enquadramento, o layout, a iluminação, as cores e o tratamento desta imagem — troque apenas os textos, a logo e o conteúdo pelos desta arte",
+    instruction: IDENTITY_ONLY("é a referência de estilo"),
   },
   environment: {
     label: "Inspirações de Ambiente",
@@ -69,6 +75,12 @@ const LEGACY_INSTRUCTIONS: Record<string, ReferenceCategory> = {
   "é só inspiração de estilo (luz, tratamento, composição geral): não copie textos, logos nem elementos literais":
     "style",
   "é inspiração de ambiente: use como referência de cenário, fundo e atmosfera": "environment",
+  // De 2026-10-06 a 2026-10-16: mandavam copiar a referência de perto, e as
+  // artes saíam quase iguais a ela.
+  "é a identidade da marca: siga fielmente a paleta, a tipografia, os grafismos e o acabamento desta imagem (troque só os textos)":
+    "brand",
+  "é a referência de estilo: replique de perto a composição, o enquadramento, o layout, a iluminação, as cores e o tratamento desta imagem — troque apenas os textos, a logo e o conteúdo pelos desta arte":
+    "style",
 };
 
 export function upgradeLegacyInstructions(text: string): string {

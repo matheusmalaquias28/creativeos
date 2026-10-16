@@ -1,6 +1,7 @@
 import { IMAGE_GEN_DEFAULTS } from "@/lib/ai/imagegen/defaults";
 import { buildLogoDirective } from "@/lib/flow/logo-directive";
 import { STORY_QUALITY } from "@/lib/flow/story-defaults";
+import { IDENTITY_ONLY } from "@/lib/image-library/categories";
 import { BRAND_IDENTITY_LABEL, extractLabeledLine, extractMentionInstruction } from "@/lib/flow/mention-text";
 import {
   getPromptArteEditorText,
@@ -17,6 +18,9 @@ import type {
   ReferenciaImagemData,
   SaidaArteData,
 } from "@/lib/flow/types";
+
+/** Referências fixas do cliente: só identidade visual, nunca um layout a copiar. */
+const CLIENT_REF_ROLE = IDENTITY_ONLY("é uma referência visual do cliente");
 
 export type FlowReferenceEntry = {
   url: string;
@@ -270,7 +274,7 @@ function extractPipelineJob(
           refs,
           seen,
           url,
-          "siga o estilo visual desta referência do cliente",
+          CLIENT_REF_ROLE,
           "style"
         );
       }
@@ -375,7 +379,7 @@ function extractArteJob(
     if (node.type === "clienteReferencias") {
       (node.data.referenceUrls ?? []).forEach((url, i) => {
         namedRefMap.set(`ref-cliente-${i + 1}`, { url, skipAutoAdd: true });
-        addReference(refs, seen, url, "siga o estilo visual desta referência do cliente", "style");
+        addReference(refs, seen, url, CLIENT_REF_ROLE, "style");
       });
       continue;
     }

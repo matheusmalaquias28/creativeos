@@ -167,6 +167,13 @@ export function compilePrompt(
 }
 
 /**
+ * Regra fixa do CTA nas artes do Space: botão centralizado embaixo, com fundo
+ * de cor sólida. Se o prompt do node já disser a cor, ela vence.
+ */
+export const SPACE_CTA_DIRECTIVE =
+  "O CTA é um BOTÃO: SEMPRE centralizado na parte inferior da arte, com fundo de cor sólida (sem gradiente, sem transparência) e o texto do CTA em cor de alto contraste. Se o prompt indicar a cor do CTA, use essa cor.";
+
+/**
  * Compilador do "Space" (canvas node-based) — ao contrário do `compilePrompt`
  * do pipeline estruturado, aqui o texto do operador é DIREÇÃO CRIATIVA e vai
  * praticamente literal. Sem o colete de força "a imagem deve conter SOMENTE
@@ -214,9 +221,7 @@ export function compileSpacePrompt(
       "Textos a exibir na arte (use exatamente estes como copy, sem inventar outros):\n" +
         copy.map((l) => `- ${l}`).join("\n")
     );
-    if (artSpec.cta) {
-      parts.push("Renderize o CTA como um botão gráfico, centralizado na parte inferior.");
-    }
+    if (artSpec.cta) parts.push(SPACE_CTA_DIRECTIVE);
   }
 
   // 5. Paleta como referência de cor (NÃO forçada como fundo).

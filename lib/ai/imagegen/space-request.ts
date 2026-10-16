@@ -14,7 +14,7 @@
  */
 
 import { buildLogoDirective } from "@/lib/flow/logo-directive";
-import { compileSpacePrompt, type CreativeProfile } from "./prompt-compiler";
+import { compileSpacePrompt, SPACE_CTA_DIRECTIVE, type CreativeProfile } from "./prompt-compiler";
 
 export type SpaceJobParams = {
   headline?: string | null;
@@ -74,6 +74,11 @@ const CATEGORY_LABEL: Record<string, string> = {
   style: "Estilo",
   environment: "Ambiente",
 };
+
+/** Referências que só passam identidade visual — nunca um layout a copiar. */
+const IDENTITY_LABELS = new Set([CATEGORY_LABEL.brand, CATEGORY_LABEL.style]);
+const IDENTITY_REMINDER =
+  "As imagens de Marca/Estilo definem só a identidade visual (cores e tipografia, principalmente): a arte final tem que ser NOVA, com composição e layout próprios — não uma versão parecida dessas imagens.";
 
 /** Ordem de envio: sujeito → logo → marca → sem categoria → ambiente → estilo. */
 const CATEGORY_RANK: Record<string, number> = {
@@ -146,7 +151,7 @@ export function buildSpaceRequest(
 
   const masterText = params.prompt_text?.trim();
   const body = masterText
-    ? masterBody(masterText, aspectRatio, imageSize)
+    ? masterBody(masterText, Boolean(params.cta?.trim()), aspectRatio, imageSize)
     : compileSpacePrompt(
     NO_PROFILE,
     { titulo: params.briefing_titulo ?? undefined, tipo: params.briefing_tipo ?? undefined },
@@ -174,11 +179,14 @@ export function buildSpaceRequest(
 
 /**
  * Corpo do prompt quando o node tem texto: o texto do operador, literal e
- * inteiro, + só o formato escolhido nos controles do node. Nada de campanha,
- * copy reescrita ou instrução de CTA por fora — o que está no node é o prompt.
+ * inteiro, + a regra fixa do CTA (quando a arte tem CTA) + o formato escolhido
+ * nos controles do node. Nada de campanha ou copy reescrita por fora.
  */
-function masterBody(text: string, aspectRatio: string, imageSize: string): string {
-  return `${text}\n\nFormato: proporção ${aspectRatio}, resolução ${imageSize}.`;
+function masterBody(text: string, hasCta: boolean, aspectRatio: string, imageSize: string): string {
+  // CTA com rótulo livre ("CTA CENTRALIZADA NA COR VERDE: ...") não vira
+  // `params.cta` no parse — por isso também olha o texto.
+  const cta = hasCta || /\bCTA\b/i.test(text) ? `\n\n${SPACE_CTA_DIRECTIVE}` : "";
+  return `${text}${cta}\n\nFormato: proporção ${aspectRatio}, resolução ${imageSize}.`;
 }
 
 /** Referências de UMA geração do lote: item do fan-out primeiro, depois as fixas. */
@@ -202,6 +210,7 @@ export function spacePromptFor(request: SpaceRequest, item: SpaceReference | nul
   const block = [
     "IMAGENS ANEXADAS — use cada uma no papel indicado, sempre a serviço do prompt acima (se algo conflitar, o prompt acima vence):",
     ...refs.map((r, i) => `- Imagem ${i + 1} (${r.label}): ${r.intent}`),
-  ].join("\n");
-  return `${request.body}\n\n${block}`;
+  ];
+  if (refs.some((r) => IDENTITY_LABELS.has(r.label))) block.push(IDENTITY_REMINDER);
+  return `${request.body}\n\n${block.join("\n")}`;
 }
