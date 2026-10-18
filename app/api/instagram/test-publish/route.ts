@@ -2,9 +2,10 @@
  * POST /api/instagram/test-publish  { carouselId, dryRun? }
  *
  * Spike: publica um carrossel pronto do Studio na conta de TESTE do Instagram
- * configurada no env (INSTAGRAM_TEST_IG_USER_ID + INSTAGRAM_TEST_ACCESS_TOKEN).
- * Só admin. `dryRun: true` converte e sobe os JPEGs e consulta a cota, mas
- * não publica nada. Ver lib/instagram/README.md.
+ * configurada no env: INSTAGRAM_ACCESS_TOKEN (ou INSTAGRAM_TEST_ACCESS_TOKEN) e,
+ * opcionalmente, INSTAGRAM_TEST_IG_USER_ID — sem ele, com token do Instagram
+ * Login (IGAA…), o id sai de GET /me. Só admin. `dryRun: true` converte e sobe
+ * os JPEGs e mostra conta + cota, mas não publica nada. Ver lib/instagram/README.md.
  */
 
 import { NextResponse } from "next/server";
@@ -12,7 +13,14 @@ import { z } from "zod";
 import { isAdminRole } from "@/lib/auth/permissions";
 import { getCurrentUserProfile } from "@/services/users";
 import { InstagramPublishError } from "@/lib/instagram/errors";
-import { getPublishingQuota, publishCarousel, validateCarouselInput } from "@/lib/instagram/publish";
+import {
+  getInstagramAccount,
+  getPublishingQuota,
+  graphHostForToken,
+  publishCarousel,
+  validateCarouselInput,
+  type InstagramAccount,
+} from "@/lib/instagram/publish";
 import { prepareStudioCarouselImages, StudioImagesError } from "@/lib/instagram/studio-images";
 
 // Conversão + polling dos containers (até 2min por etapa).
@@ -30,11 +38,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Acesso restrito a administradores" }, { status: 403 });
   }
 
-  const igUserId = process.env.INSTAGRAM_TEST_IG_USER_ID?.trim();
-  const accessToken = process.env.INSTAGRAM_TEST_ACCESS_TOKEN?.trim();
-  if (!igUserId || !accessToken) {
+  const accessToken = (process.env.INSTAGRAM_ACCESS_TOKEN || process.env.INSTAGRAM_TEST_ACCESS_TOKEN)?.trim();
+  const envIgUserId = process.env.INSTAGRAM_TEST_IG_USER_ID?.trim() || null;
+  const isInstagramLogin = accessToken ? graphHostForToken(accessToken) === "graph.instagram.com" : false;
+  if (!accessToken) {
     return NextResponse.json(
-      { error: "Configure INSTAGRAM_TEST_IG_USER_ID e INSTAGRAM_TEST_ACCESS_TOKEN no ambiente (ver lib/instagram/README.md)." },
+      { error: "Configure INSTAGRAM_ACCESS_TOKEN no ambiente (ver lib/instagram/README.md)." },
+      { status: 503 }
+    );
+  }
+  if (!envIgUserId && !isInstagramLogin) {
+    return NextResponse.json(
+      { error: "Com token do Facebook Login (EAA…), defina também INSTAGRAM_TEST_IG_USER_ID (ver lib/instagram/README.md)." },
       { status: 503 }
     );
   }
@@ -46,7 +61,23 @@ export async function POST(request: Request) {
   const { carouselId, dryRun } = parsed.data;
 
   try {
-    // Cota primeiro: é barata e já pega token inválido antes de converter imagens.
+    // Conta e cota primeiro: são baratas e já pegam token inválido antes de
+    // converter imagens. No Instagram Login o /me diz de quem é o token.
+    let account: InstagramAccount = { igUserId: envIgUserId ?? "", username: null };
+    if (isInstagramLogin) {
+      const me = await getInstagramAccount({ accessToken });
+      if (envIgUserId && envIgUserId !== me.igUserId) {
+        return NextResponse.json(
+          {
+            error: `INSTAGRAM_TEST_IG_USER_ID (${envIgUserId}) não é a conta do token (@${me.username ?? "?"}, ${me.igUserId}). Corrija ou remova a variável.`,
+          },
+          { status: 422 }
+        );
+      }
+      account = me;
+    }
+    const igUserId = account.igUserId;
+
     const quota = await getPublishingQuota({ igUserId, accessToken });
     if (quota.total !== null && quota.used >= quota.total) {
       return NextResponse.json(
@@ -60,7 +91,7 @@ export async function POST(request: Request) {
     validateCarouselInput({ imageUrls, caption });
 
     if (dryRun) {
-      return NextResponse.json({ dryRun: true, imageUrls, caption, quota, warnings });
+      return NextResponse.json({ dryRun: true, account, imageUrls, caption, quota, warnings });
     }
 
     const result = await publishCarousel(
@@ -69,6 +100,7 @@ export async function POST(request: Request) {
     );
     console.log(`[instagram/test-publish] ${carouselId} publicado: ${result.mediaId} ${result.permalink ?? ""}`);
     return NextResponse.json({
+      account,
       mediaId: result.mediaId,
       permalink: result.permalink,
       imageUrls,

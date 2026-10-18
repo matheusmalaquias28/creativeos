@@ -231,6 +231,33 @@ export async function publishCarousel(
   return { mediaId, permalink, containerId, childIds };
 }
 
+export type InstagramAccount = { igUserId: string; username: string | null };
+
+/**
+ * GET graph.instagram.com/me?fields=user_id,username — conta dona do token.
+ * Só existe no Instagram Login (`IGAA…`); no Facebook Login o /me é o usuário
+ * do Facebook, e o id da conta vem de /me/accounts (ver README).
+ */
+export async function getInstagramAccount(
+  params: Pick<PublishCarouselParams, "accessToken">,
+  opts: Pick<PublishCarouselOptions, "fetchImpl" | "graphHost"> = {}
+): Promise<InstagramAccount> {
+  const host = opts.graphHost ?? graphHostForToken(params.accessToken);
+  if (host !== "graph.instagram.com") {
+    throw new InstagramPublishError(
+      "Com token do Facebook Login (EAA…) o ID da conta não sai do /me: defina INSTAGRAM_TEST_IG_USER_ID (ver lib/instagram/README.md).",
+      { step: "account" }
+    );
+  }
+  const graph = createGraphClient(params.accessToken, { ...opts, graphHost: host });
+  const me = await graph.call<{ user_id?: string | number; id?: string; username?: string }>("account", "GET", "me", {
+    fields: "user_id,username",
+  });
+  const igUserId = me.user_id != null ? String(me.user_id) : null;
+  if (!igUserId) throw new InstagramPublishError("O /me do Instagram não devolveu o user_id da conta.", { step: "account" });
+  return { igUserId, username: me.username ?? null };
+}
+
 export type PublishingQuota = { used: number; total: number | null };
 
 /** GET /{ig-user-id}/content_publishing_limit — publicações via API nas últimas 24h. */
