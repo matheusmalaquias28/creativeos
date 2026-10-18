@@ -1,16 +1,48 @@
-# Instagram — spike de publicação de carrossel
+# Instagram — publicar carrosséis do Studio
 
-Publica um carrossel pronto do Carrossel Studio numa conta profissional **de teste**
-via Instagram Graph API (Content Publishing). É um spike: uma conta fixa no env,
-sem OAuth, sem agendamento.
+O editor do Carrossel Studio tem **Exportar → Publicar no Instagram**. Esse comando abre um
+diálogo onde você escolhe e ordena os cards (de 2 a 10), edita a legenda (máx. 2.200
+caracteres) e decide entre **Agora** ou **Agendar** (data e hora no horário de Brasília).
+O diálogo mostra a conta de destino (@username) e pede uma confirmação final: "Vai publicar
+N cards em @conta". **Nada publica sozinho.** Só sai post depois de alguém clicar e
+confirmar. O cron só publica o que alguém agendou.
+
+## Fluxo
+
+1. **Navegador** ([publish-dialog.tsx](../../components/instagram/publish-dialog.tsx)):
+   renderiza os cards escolhidos com o mesmo `FrameRenderer` e `renderFrameToBlob` da
+   exportação PNG e converte para JPEG no canvas (qualidade 0.92, fundo branco).
+   Não depende de PNG no Storage nem no Drive.
+2. `POST /api/instagram/posts/upload` reserva o id do post e devolve URLs assinadas. O
+   navegador sobe os JPEGs direto no bucket público `instagram-posts`
+   (`<carouselId>/<postId>/card-NN.jpg`).
+3. `POST /api/instagram/posts` confere cada card no servidor (caminho, JPEG, proporção,
+   8MB), confirma que a conta não mudou desde a confirmação e grava a linha em
+   `instagram_posts`. Se for **agora**, publica na mesma requisição. Se for agendado,
+   a linha fica como `scheduled`.
+4. **Cron** (`/api/cron/instagram-publish`): publica os `scheduled` vencidos.
+5. **Histórico:** fica no próprio diálogo e na página da demanda (Realtime), com status,
+   link do post, **Cancelar agendamento** e **Tentar de novo**.
+
+**Nunca publica duas vezes.** O post só é publicado por quem consegue trocar o status para
+`publishing` num único `UPDATE … WHERE id = ? AND status IN (…) RETURNING`. Dois cliques,
+botão e cron juntos, ou dois crons ao mesmo tempo: só uma chamada recebe a linha. Se um post
+ficar em `publishing` por mais de 15 min, a execução morreu no meio. O cron marca esse post
+como `failed`, com o aviso para conferir no Instagram, e não tenta de novo sozinho.
 
 | Arquivo | O que faz |
 | --- | --- |
-| `publish.ts` | `publishCarousel({ igUserId, accessToken, imageUrls, caption })`: cria os containers, espera `FINISHED`, publica e devolve `{ mediaId, permalink }`. `getPublishingQuota()` lê a cota de 24h e `getInstagramAccount()` lê o `/me` (id + username) com token do Instagram Login. |
-| `errors.ts` | Traduz os erros da Graph API (token, permissão, limites, subcódigos 2207xxx) para português. |
-| `jpeg.ts` | PNG → JPEG sRGB (sharp, qualidade 90, fundo branco no lugar do alpha), valida proporção e 8MB. |
-| `studio-images.ts` | Pega as páginas do Studio já enviadas para a demanda, converte e sobe no bucket público `generated-images/instagram/<carouselId>/<data>/`. |
-| `app/api/instagram/test-publish/route.ts` | `POST { carouselId, dryRun? }`, só admin. |
+| `publish.ts` | `publishCarousel()`: containers → `FINISHED` → `CAROUSEL` → `media_publish` → permalink. Também tem `getPublishingQuota()` e `getInstagramAccount()` (`/me`). |
+| `posts.ts` | Tabela `instagram_posts`: criar, conferir os cards, reivindicar atomicamente, publicar, cancelar e rodar o cron. |
+| `account.ts` | Conta de destino. Hoje é a do env; depois, a conta conectada de cada cliente. |
+| `schedule.ts` | Horário de Brasília ↔ UTC e validação do agendamento (de 5 min a 75 dias). |
+| `jpeg.ts` / `format.ts` | Regras de imagem do feed; o 9:16 é recusado. |
+| `errors.ts` | Erros da Graph API em português. |
+| `http.ts` | Só admin publica; formato das respostas de erro. |
+
+Rotas: `GET /api/instagram/account`, `GET|POST /api/instagram/posts`,
+`POST /api/instagram/posts/upload`, `POST /api/instagram/posts/[id]/publish` (agora ou tentar
+de novo), `POST /api/instagram/posts/[id]/cancel` e `GET|POST /api/cron/instagram-publish`.
 
 ## O que a documentação da Meta diz hoje (conferido em 18/10/2026, API v25.0)
 
@@ -124,31 +156,49 @@ Com esse tipo de token, o código usa `graph.facebook.com`.
   do Instagram. Por isso `INSTAGRAM_TEST_IG_USER_ID` é **obrigatório** aqui: é o
   `instagram_business_account.id` de `GET /me/accounts?fields=name,instagram_business_account`.
 
-## Como rodar o teste
+## Cron dos agendados
 
-Pré-requisitos: o carrossel do Studio precisa estar **ligado a uma demanda**, ter de 2 a 10
-páginas em 4:5 ou 1:1, ter a legenda preenchida no painel da página e ter as páginas
-enviadas com **"Enviar para a demanda"** no editor. É desse envio que saem os PNGs.
-Se a demanda já foi entregue ao Drive, as cópias saíram do Storage e é preciso enviar de novo.
+O projeto **não tem `vercel.json` nem `vercel.ts`**. No plano Hobby da Vercel, o cron roda
+no máximo uma vez por dia, e no Pro pode rodar a cada minuto. A rota aceita os dois jeitos
+de disparo e recusa tudo se não houver segredo configurado:
 
-1. Rode `npm run dev` e entre como **admin**.
-2. Pegue o `carouselId` na URL do editor (`/carousel/studio/<carouselId>`).
-3. No console do navegador (a sessão vai pelo cookie), rode primeiro o **dry run**. Ele
-   converte e sobe os JPEGs e mostra a conta (`account.username`) e a cota, sem publicar nada:
-   ```js
-   await fetch("/api/instagram/test-publish", {
-     method: "POST",
-     headers: { "Content-Type": "application/json" },
-     body: JSON.stringify({ carouselId: "<id>", dryRun: true }),
-   }).then((r) => r.json())
+- **Vercel Cron (plano Pro):** `GET` com `Authorization: Bearer $CRON_SECRET`, que a Vercel
+  envia sozinha. Basta um `vercel.ts`/`vercel.json` com `crons: [{ path: "/api/cron/instagram-publish", schedule: "*/5 * * * *" }]`.
+- **pg_cron + pg_net do Supabase (qualquer plano):** é o que o projeto já usa na limpeza do
+  Space (`20261002000000_spaces_ttl.sql`). A chamada é um `POST` com `x-cron-secret: $INSTAGRAM_CRON_SECRET`:
+  ```sql
+  alter database postgres set app.instagram_cron_url = 'https://SEU-APP/api/cron/instagram-publish';
+  alter database postgres set app.instagram_cron_secret = 'o-mesmo-INSTAGRAM_CRON_SECRET';
+  select cron.schedule('instagram-publish', '*/5 * * * *', $$
+    select net.http_post(
+      url := current_setting('app.instagram_cron_url', true),
+      headers := jsonb_build_object('Content-Type', 'application/json',
+                                    'x-cron-secret', current_setting('app.instagram_cron_secret', true)),
+      body := '{}'::jsonb)
+    where current_setting('app.instagram_cron_url', true) is not null;
+  $$);
+  ```
+- **Make:** um cenário agendado a cada 5 min que faz o mesmo `POST`.
+
+**Ainda não ativado:** a escolha fica com o time. Sem cron, os agendados ficam esperando.
+O botão "Publicar agora" funciona sem cron.
+
+## Como testar
+
+1. No `.env.local`: `INSTAGRAM_ACCESS_TOKEN` (e opcionalmente `INSTAGRAM_TEST_IG_USER_ID`),
+   como no passo a passo acima. Para testar o cron, defina também `INSTAGRAM_CRON_SECRET`.
+2. Rode `npm run dev`, entre como **admin** e abra um carrossel 4:5 ou 1:1 no Studio.
+3. Clique em **Exportar → Publicar no Instagram**. Confira a conta no topo, escolha e ordene
+   os cards, ajuste a legenda e clique em **Agendar** para daqui a uns 10 min (agendar pode
+   ser cancelado e não posta nada antes da hora).
+   **Publicar agora posta de verdade na conta mostrada.**
+4. O agendamento aparece no histórico do diálogo e na página da demanda. Para disparar o
+   cron à mão depois do horário:
+   ```bash
+   curl -X POST http://localhost:3000/api/cron/instagram-publish -H "x-cron-secret: $INSTAGRAM_CRON_SECRET"
    ```
-   Confira se `account.username` é a conta certa, abra as `imageUrls` devolvidas e
-   confira as páginas e a legenda.
-4. Para publicar de verdade, rode o mesmo comando sem o `dryRun`. A resposta traz
-   `{ account, mediaId, permalink, imageUrls, warnings }`. Os erros vêm em português, com `step`,
-   `code`, `subcode` e `fbtraceId` para procurar no suporte da Meta.
-
-Os testes (`npm test`) usam a API mockada e não fazem nenhuma chamada real.
+5. `npm test` cobre os fluxos com a API e o banco mockados: claim simultâneo, cron, cancelar,
+   falhas e fuso horário.
 
 ## Decisões para a próxima etapa (multiusuário). Ainda não implementado
 
@@ -160,16 +210,14 @@ Os testes (`npm test`) usam a API mockada e não fazem nenhuma chamada real.
   criptografado, expires_at, scopes, status). Um cron renova o token quando faltarem
   cerca de 10 dias para vencer (`ig_refresh_token`) e marca a conta como "reconectar"
   se a renovação falhar ou se aparecer o erro 190.
-- **Fila:** tabela `instagram_posts` (studio_carousel_id, client_id, scheduled_at,
-  status `scheduled → preparing → publishing → published | failed`, ids dos containers,
-  media_id, permalink, erro). Um worker por cron minuto a minuto pega o que venceu, consulta
-  `content_publishing_limit`, cria os containers e publica. O que estiver `IN_PROGRESS`
-  volta para a fila em vez de bloquear a função. Containers valem 24h, então eles são
-  criados perto do horário agendado.
-- **Imagens:** o servidor não renderiza o Studio (o export é feito no navegador), e o
-  envio ao Drive apaga as cópias do Storage. Por isso, no momento de **agendar**, o editor
-  precisa renderizar e gravar os JPEGs num caminho próprio e permanente
-  (`generated-images/instagram/...`), sem depender de `demand-exports`.
+- **Fila:** feita (`instagram_posts` + cron). Para volume maior, falta consultar
+  `content_publishing_limit` antes de cada post. Também falta não segurar a função esperando
+  `IN_PROGRESS`: hoje ela espera até 2 min por etapa, e o ideal é devolver o post para a fila.
+- **Imagens:** feito. Os cards são gerados no navegador na hora de publicar ou agendar e
+  ficam no bucket `instagram-posts`. O que se edita no Studio depois de agendar **não entra**
+  no post: é uma foto daquele momento.
+- **Conta por cliente:** trocar `resolveAccountForClient()` em `account.ts` para ler a conta
+  conectada do cliente. A tabela já grava `client_id`, `ig_user_id` e `ig_username` por post.
 - **Meta:** para publicar em contas de clientes é preciso Advanced Access para
   `instagram_business_basic` e `instagram_business_content_publish`. Isso pede App Review
   (screencast do fluxo, política de privacidade, callback de exclusão de dados) e

@@ -1,8 +1,9 @@
 import sharp from "sharp";
 
 /**
- * Converte as páginas exportadas do Studio (PNG) no que o Instagram aceita:
- * JPEG sRGB, até 8MB, largura até 1440px e proporção entre 4:5 e 1.91:1.
+ * Regras de imagem do feed do Instagram: JPEG, até 8MB, largura até 1440px e
+ * proporção entre 4:5 e 1.91:1. O navegador gera os JPEGs (canvas); o
+ * servidor confere antes de gravar o post.
  */
 
 export const INSTAGRAM_MAX_BYTES = 8 * 1024 * 1024;
@@ -18,30 +19,20 @@ export function isInstagramFeedRatio(width: number, height: number): boolean {
   return ratio >= INSTAGRAM_MIN_RATIO - 0.005 && ratio <= INSTAGRAM_MAX_RATIO + 0.005;
 }
 
-export type InstagramJpeg = { buffer: Buffer; width: number; height: number };
+export { feedFormatError } from "./format";
 
-export async function toInstagramJpeg(input: Buffer, quality = 90): Promise<InstagramJpeg> {
-  const meta = await sharp(input).metadata();
+/** Confere um card já gerado. Lança com a mensagem do problema. */
+export async function checkInstagramJpeg(buffer: Buffer): Promise<{ width: number; height: number }> {
+  if (buffer.byteLength > INSTAGRAM_MAX_BYTES) {
+    throw new Error(`Imagem com ${(buffer.byteLength / 1024 / 1024).toFixed(1)}MB passa do limite de 8MB do Instagram.`);
+  }
+  const meta = await sharp(buffer).metadata();
+  if (meta.format !== "jpeg") throw new Error("O Instagram só aceita JPEG.");
   const width = meta.width ?? 0;
   const height = meta.height ?? 0;
+  if (width > INSTAGRAM_MAX_WIDTH) throw new Error(`Largura ${width}px passa do máximo de ${INSTAGRAM_MAX_WIDTH}px.`);
   if (!isInstagramFeedRatio(width, height)) {
-    throw new Error(
-      `Proporção ${width}×${height} não é aceita no feed do Instagram (precisa ficar entre 4:5 e 1.91:1).`
-    );
+    throw new Error(`Proporção ${width}×${height} não é aceita no feed do Instagram (de 4:5 a 1.91:1).`);
   }
-
-  const buffer = await sharp(input)
-    .rotate()
-    .resize({ width: INSTAGRAM_MAX_WIDTH, withoutEnlargement: true })
-    // PNG com transparência vira fundo branco (JPEG não tem alpha).
-    .flatten({ background: "#ffffff" })
-    .toColorspace("srgb")
-    .jpeg({ quality, mozjpeg: true, chromaSubsampling: "4:4:4" })
-    .toBuffer();
-
-  if (buffer.byteLength > INSTAGRAM_MAX_BYTES) {
-    throw new Error(`JPEG com ${(buffer.byteLength / 1024 / 1024).toFixed(1)}MB passa do limite de 8MB do Instagram.`);
-  }
-  const out = await sharp(buffer).metadata();
-  return { buffer, width: out.width ?? width, height: out.height ?? height };
+  return { width, height };
 }

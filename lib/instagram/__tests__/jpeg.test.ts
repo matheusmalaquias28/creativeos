@@ -1,33 +1,24 @@
 import { describe, expect, it } from "vitest";
 import sharp from "sharp";
-import { isInstagramFeedRatio, toInstagramJpeg } from "../jpeg";
-import { assertFeedFormat, StudioImagesError } from "../studio-images";
+import { checkInstagramJpeg, feedFormatError, isInstagramFeedRatio } from "../jpeg";
 
-function png(width: number, height: number) {
-  return sharp({
-    create: { width, height, channels: 4, background: { r: 200, g: 40, b: 90, alpha: 0.5 } },
-  })
-    .png()
-    .toBuffer();
+function image(width: number, height: number, format: "jpeg" | "png" = "jpeg") {
+  const base = sharp({ create: { width, height, channels: 3, background: { r: 200, g: 40, b: 90 } } });
+  return format === "jpeg" ? base.jpeg({ quality: 90 }).toBuffer() : base.png().toBuffer();
 }
 
-describe("toInstagramJpeg", () => {
-  it("converte a página 4:5 do Studio em JPEG sRGB sem alpha, mesmo tamanho", async () => {
-    const out = await toInstagramJpeg(await png(1080, 1350));
-    const meta = await sharp(out.buffer).metadata();
-    expect(meta.format).toBe("jpeg");
-    expect(meta.hasAlpha).toBe(false);
-    expect(meta.space).toBe("srgb");
-    expect([out.width, out.height]).toEqual([1080, 1350]);
+describe("checkInstagramJpeg", () => {
+  it("aceita o card 4:5 do Studio em JPEG", async () => {
+    await expect(checkInstagramJpeg(await image(1080, 1350))).resolves.toEqual({ width: 1080, height: 1350 });
   });
 
-  it("reduz para 1440px de largura quando passa do máximo", async () => {
-    const out = await toInstagramJpeg(await png(2160, 2160));
-    expect([out.width, out.height]).toEqual([1440, 1440]);
+  it("recusa PNG", async () => {
+    await expect(checkInstagramJpeg(await image(1080, 1350, "png"))).rejects.toThrow(/só aceita JPEG/);
   });
 
-  it("recusa 9:16", async () => {
-    await expect(toInstagramJpeg(await png(1080, 1920))).rejects.toThrow(/não é aceita no feed/);
+  it("recusa 9:16 e largura acima de 1440", async () => {
+    await expect(checkInstagramJpeg(await image(1080, 1920))).rejects.toThrow(/não é aceita no feed/);
+    await expect(checkInstagramJpeg(await image(1600, 1600))).rejects.toThrow(/1440px/);
   });
 });
 
@@ -40,9 +31,9 @@ describe("proporções", () => {
     expect(isInstagramFeedRatio(1080, 500)).toBe(false);
   });
 
-  it("assertFeedFormat recusa o formato 9:16 do Studio", () => {
-    expect(() => assertFeedFormat("4:5")).not.toThrow();
-    expect(() => assertFeedFormat("1:1")).not.toThrow();
-    expect(() => assertFeedFormat("9:16")).toThrow(StudioImagesError);
+  it("feedFormatError recusa o formato 9:16 do Studio", () => {
+    expect(feedFormatError("4:5")).toBeNull();
+    expect(feedFormatError("1:1")).toBeNull();
+    expect(feedFormatError("9:16")).toMatch(/9:16/);
   });
 });

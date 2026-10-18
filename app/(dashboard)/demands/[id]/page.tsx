@@ -35,6 +35,7 @@ import { getGoogleDriveAuth } from "@/lib/google/drive";
 import { isCarouselDemand } from "@/lib/carousel-studio/demand";
 import { ensureStudioForDemand } from "@/services/carousel-studio";
 import { DemandStudioSection } from "@/components/carousel-studio/demand-studio-section";
+import { InstagramPostHistory } from "@/components/instagram/post-history";
 
 export const maxDuration = 300;
 
@@ -248,7 +249,10 @@ export default async function DemandDetailPage({ params }: PageProps) {
         </Surface>
 
         {studio ? (
-          <DemandStudioSection initial={studio} hasClient={Boolean(demand.client_id)} />
+          <>
+            <DemandStudioSection initial={studio} hasClient={Boolean(demand.client_id)} />
+            <InstagramPostHistory carouselId={studio.id} />
+          </>
         ) : (
           !demand.client_not_found && <DemandSpaceSection demand={demand} />
         )}
