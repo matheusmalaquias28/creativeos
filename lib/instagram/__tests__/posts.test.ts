@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import sharp from "sharp";
-import { cancelPost, claimPost, publishDuePosts, publishPostNow, verifyUploadedItems } from "../posts";
+import { cancelPost, claimPost, prepareDemandItems, publishDuePosts, publishPostNow, verifyUploadedItems } from "../posts";
 import { InstagramPublishError } from "../errors";
 
 /**
@@ -55,6 +55,10 @@ function fakeAdmin(rows: Row[], files: Record<string, Buffer> = {}) {
         download: async (path: string) =>
           files[path] ? { data: new Blob([new Uint8Array(files[path])]), error: null } : { data: null, error: { message: "not found" } },
         getPublicUrl: (path: string) => ({ data: { publicUrl: `https://cdn.test/instagram-posts/${path}` } }),
+        upload: async (path: string, bytes: Buffer) => {
+          files[path] = bytes;
+          return { data: { path }, error: null };
+        },
       }),
     },
   };
@@ -194,5 +198,58 @@ describe("verifyUploadedItems", () => {
     await expect(verifyUploadedItems(admin, { carouselId: "c", postId: "p", items: [{ path: "c/p/card-01.jpg" }] })).rejects.toThrow(
       /de 2 a 10 cards/
     );
+  });
+});
+
+describe("prepareDemandItems (demanda normal)", () => {
+  const png = (w: number, h: number) =>
+    sharp({ create: { width: w, height: h, channels: 4, background: { r: 10, g: 20, b: 30, alpha: 0.5 } } }).png().toBuffer();
+
+  it("usa a arte do Storage ou baixa do Drive, converte para JPEG e mantém a ordem", async () => {
+    const files: Record<string, Buffer> = { "d/arte-feed-1.png": await png(1080, 1350) };
+    const { admin } = fakeAdmin(
+      [
+        { id: "f1", demand_id: "d", art_index: 1, format: "feed", storage_path: "d/arte-feed-1.png", drive_file_id: null },
+        { id: "f2", demand_id: "d", art_index: 2, format: "feed", storage_path: "d/arte-feed-2.png", drive_file_id: "drive-2" },
+      ],
+      files
+    );
+    const drivePng = await png(1080, 1080);
+    const downloadDrive = vi.fn(async () => drivePng);
+
+    const items = await prepareDemandItems(admin, { demandId: "d", postId: "p", fileIds: ["f2", "f1"] }, { downloadDrive });
+
+    expect(downloadDrive).toHaveBeenCalledWith("drive-2");
+    expect(items.map((i) => i.path)).toEqual(["demand/d/p/card-01.jpg", "demand/d/p/card-02.jpg"]);
+    expect(items.map((i) => i.export_file_id)).toEqual(["f2", "f1"]);
+    const first = await sharp(files["demand/d/p/card-01.jpg"]).metadata();
+    const second = await sharp(files["demand/d/p/card-02.jpg"]).metadata();
+    expect([first.format, first.width, first.height, first.hasAlpha]).toEqual(["jpeg", 1080, 1080, false]);
+    expect([second.format, second.width, second.height]).toEqual(["jpeg", 1080, 1350]);
+  });
+
+  it("aceita uma arte só (post simples)", async () => {
+    const { admin } = fakeAdmin(
+      [{ id: "f1", demand_id: "d", art_index: 1, format: "feed", storage_path: "d/a.png", drive_file_id: null }],
+      { "d/a.png": await png(1080, 1350) }
+    );
+    await expect(prepareDemandItems(admin, { demandId: "d", postId: "p", fileIds: ["f1"] })).resolves.toHaveLength(1);
+  });
+
+  it("recusa stories, arte de outra demanda e arte sumida", async () => {
+    const { admin } = fakeAdmin(
+      [
+        { id: "s1", demand_id: "d", art_index: 1, format: "story", storage_path: "d/s.png", drive_file_id: null },
+        { id: "x1", demand_id: "outra", art_index: 1, format: "feed", storage_path: "o/x.png", drive_file_id: null },
+        { id: "g1", demand_id: "d", art_index: 3, format: "feed", storage_path: "d/sumiu.png", drive_file_id: null },
+      ],
+      { "d/s.png": await png(1080, 1920) }
+    );
+    await expect(prepareDemandItems(admin, { demandId: "d", postId: "p", fileIds: ["s1"] })).rejects.toThrow(/só a arte do feed/);
+    await expect(prepareDemandItems(admin, { demandId: "d", postId: "p", fileIds: ["x1"] })).rejects.toThrow(/não está na entrega/);
+    await expect(prepareDemandItems(admin, { demandId: "d", postId: "p", fileIds: ["g1"] })).rejects.toThrow(
+      /Arte 3: o arquivo não está mais no Storage nem no Drive/
+    );
+    await expect(prepareDemandItems(admin, { demandId: "d", postId: "p", fileIds: [] })).rejects.toThrow(/de 1 a 10/);
   });
 });

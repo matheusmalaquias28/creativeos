@@ -21,6 +21,30 @@ export function isInstagramFeedRatio(width: number, height: number): boolean {
 
 export { feedFormatError } from "./format";
 
+/**
+ * Converte uma arte qualquer (PNG/WebP/JPEG da entrega da demanda) no que o
+ * feed aceita: JPEG sRGB qualidade 90, fundo branco no lugar do alpha, até
+ * 1440px de largura. Recusa proporção fora de 4:5–1.91:1 (ex.: stories).
+ */
+export async function toInstagramJpeg(input: Buffer, quality = 90): Promise<{ buffer: Buffer; width: number; height: number }> {
+  const meta = await sharp(input).rotate().metadata();
+  const portrait = (meta.orientation ?? 1) >= 5;
+  const width = (portrait ? meta.height : meta.width) ?? 0;
+  const height = (portrait ? meta.width : meta.height) ?? 0;
+  if (!isInstagramFeedRatio(width, height)) {
+    throw new Error(`Proporção ${width}×${height} não é aceita no feed do Instagram (de 4:5 a 1.91:1). Use a arte do feed, não a do stories.`);
+  }
+  const buffer = await sharp(input)
+    .rotate()
+    .resize({ width: INSTAGRAM_MAX_WIDTH, withoutEnlargement: true })
+    .flatten({ background: "#ffffff" })
+    .toColorspace("srgb")
+    .jpeg({ quality, mozjpeg: true, chromaSubsampling: "4:4:4" })
+    .toBuffer();
+  const out = await checkInstagramJpeg(buffer);
+  return { buffer, ...out };
+}
+
 /** Confere um card já gerado. Lança com a mensagem do problema. */
 export async function checkInstagramJpeg(buffer: Buffer): Promise<{ width: number; height: number }> {
   if (buffer.byteLength > INSTAGRAM_MAX_BYTES) {

@@ -1,5 +1,5 @@
 /**
- * GET /api/instagram/account?carouselId=…
+ * GET /api/instagram/account?carouselId=… | ?demandId=…
  * Conta de destino (@username) para o diálogo mostrar onde vai postar.
  */
 
@@ -12,11 +12,17 @@ export async function GET(request: Request) {
   const auth = await requireInstagramAdmin();
   if ("response" in auth) return auth.response;
 
-  const carouselId = new URL(request.url).searchParams.get("carouselId");
+  const search = new URL(request.url).searchParams;
+  const carouselId = search.get("carouselId");
+  const demandId = search.get("demandId");
   try {
     let clientId: string | null = null;
+    const admin = createAdminClient();
     if (carouselId) {
-      const { data } = await createAdminClient().from("studio_carousels").select("client_id").eq("id", carouselId).maybeSingle();
+      const { data } = await admin.from("studio_carousels").select("client_id").eq("id", carouselId).maybeSingle();
+      clientId = data?.client_id ?? null;
+    } else if (demandId) {
+      const { data } = await admin.from("creative_demands").select("client_id").eq("id", demandId).maybeSingle();
       clientId = data?.client_id ?? null;
     }
     const account = await resolveAccountForClient(clientId);

@@ -98,6 +98,19 @@ describe("publishCarousel", () => {
     expect(lastChildPoll).toBeLessThan(carouselIdx);
   });
 
+  it("com uma imagem só, publica post simples com a legenda no próprio container", async () => {
+    const { fetchImpl, calls } = fakeGraph({ statuses: { "child-1": ["IN_PROGRESS", "FINISHED"] } });
+    const result = await publishCarousel({ ...base, imageUrls: ["https://cdn.test/1.jpg"] }, { fetchImpl, sleep: noSleep });
+
+    expect(result).toMatchObject({ mediaId: "media-99", containerId: "child-1", childIds: [] });
+    const creates = calls.filter((c) => c.method === "POST" && c.path === "1784/media");
+    expect(creates).toHaveLength(1);
+    expect(creates[0].params.get("image_url")).toBe("https://cdn.test/1.jpg");
+    expect(creates[0].params.get("caption")).toBe("Legenda #teste");
+    expect(creates[0].params.has("is_carousel_item")).toBe(false);
+    expect(calls.find((c) => c.path === "1784/media_publish")!.params.get("creation_id")).toBe("child-1");
+  });
+
   it("usa graph.instagram.com para token do Instagram Login e graph.facebook.com para token do Facebook", async () => {
     expect(graphHostForToken("IGAAxyz")).toBe("graph.instagram.com");
     expect(graphHostForToken("EAAxyz")).toBe("graph.facebook.com");
@@ -166,7 +179,7 @@ describe("publishCarousel", () => {
     const { fetchImpl, calls } = fakeGraph({});
     const run = (over: Partial<typeof base>) => publishCarousel({ ...base, ...over }, { fetchImpl, sleep: noSleep });
 
-    await expect(run({ imageUrls: ["https://cdn.test/1.jpg"] })).rejects.toThrow(/pelo menos 2 imagens/);
+    await expect(run({ imageUrls: [] })).rejects.toThrow(/pelo menos uma imagem/);
     await expect(run({ imageUrls: Array.from({ length: 11 }, (_, i) => `https://cdn.test/${i}.jpg`) })).rejects.toThrow(
       /no máximo 10 itens/
     );

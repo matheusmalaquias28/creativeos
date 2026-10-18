@@ -1,5 +1,5 @@
 /**
- * GET  /api/instagram/posts?carouselId=…   histórico do carrossel
+ * GET  /api/instagram/posts?carouselId=… | ?demandId=…   histórico
  * POST /api/instagram/posts                 cria o post (cards já no Storage)
  *   { postId, carouselId, items: [{ path, page_id }], caption, scheduledAt: ISO | null, igUserId }
  *   scheduledAt null = publica agora, nesta mesma requisição.
@@ -26,12 +26,14 @@ export async function GET(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
 
-  const carouselId = new URL(request.url).searchParams.get("carouselId");
-  if (!carouselId) return NextResponse.json({ error: "carouselId obrigatório" }, { status: 400 });
+  const search = new URL(request.url).searchParams;
+  const carouselId = search.get("carouselId");
+  const demandId = search.get("demandId");
+  if (!carouselId && !demandId) return NextResponse.json({ error: "carouselId ou demandId obrigatório" }, { status: 400 });
   const { data, error } = await supabase
     .from("instagram_posts")
     .select("*")
-    .eq("studio_carousel_id", carouselId)
+    .eq(carouselId ? "studio_carousel_id" : "demand_id", (carouselId ?? demandId)!)
     .order("created_at", { ascending: false })
     .limit(30);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -67,7 +69,7 @@ export async function POST(request: Request) {
     const admin = createAdminClient();
     const { data: carousel } = await admin
       .from("studio_carousels")
-      .select("id, format, client_id")
+      .select("id, format, client_id, demand_id")
       .eq("id", body.carouselId)
       .maybeSingle();
     if (!carousel) return NextResponse.json({ error: "Carrossel não encontrado" }, { status: 404 });
@@ -86,6 +88,7 @@ export async function POST(request: Request) {
     let post = await createPost(admin, {
       id: body.postId,
       carouselId: body.carouselId,
+      demandId: carousel.demand_id,
       clientId: carousel.client_id,
       account,
       items,

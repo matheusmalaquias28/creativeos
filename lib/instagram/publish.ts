@@ -1,9 +1,10 @@
 import { describeGraphError, InstagramPublishError, type GraphErrorPayload } from "./errors";
 
 /**
- * Publicação de carrossel no Instagram via Graph API (Content Publishing).
+ * Publicação no feed do Instagram via Graph API (Content Publishing).
  *
- * Fluxo (docs da Meta, v25.0):
+ * Uma imagem só = post simples: POST /media com image_url + caption, espera
+ * FINISHED e publica. Duas ou mais = carrossel (docs da Meta, v25.0):
  *   1. POST /{ig-user-id}/media  image_url + is_carousel_item=true   (1 container por imagem)
  *   2. espera cada container ficar status_code=FINISHED
  *   3. POST /{ig-user-id}/media  media_type=CAROUSEL + children + caption
@@ -18,6 +19,7 @@ import { describeGraphError, InstagramPublishError, type GraphErrorPayload } fro
 export const INSTAGRAM_API_VERSION = process.env.INSTAGRAM_API_VERSION || "v25.0";
 
 /** Limites da documentação (IG User Media reference). */
+export const POST_MIN_ITEMS = 1;
 export const CAROUSEL_MIN_ITEMS = 2;
 export const CAROUSEL_MAX_ITEMS = 10;
 export const CAPTION_MAX_CHARS = 2200;
@@ -62,8 +64,8 @@ export function graphHostForToken(accessToken: string): string {
 /** Valida o que dá para validar antes de gastar chamadas na API. */
 export function validateCarouselInput(params: Pick<PublishCarouselParams, "imageUrls" | "caption">): void {
   const { imageUrls } = params;
-  if (imageUrls.length < CAROUSEL_MIN_ITEMS) {
-    throw new InstagramPublishError(`Um carrossel precisa de pelo menos ${CAROUSEL_MIN_ITEMS} imagens.`, { step: "validate" });
+  if (imageUrls.length < POST_MIN_ITEMS) {
+    throw new InstagramPublishError("Escolha pelo menos uma imagem para publicar.", { step: "validate" });
   }
   if (imageUrls.length > CAROUSEL_MAX_ITEMS) {
     throw new InstagramPublishError(
@@ -189,29 +191,39 @@ export async function publishCarousel(
   const graph = createGraphClient(params.accessToken, opts);
   const ig = params.igUserId;
 
-  // 1. Containers dos itens. Em sequência: são no máximo 10 e evita estourar
-  //    o limite de chamadas por rajada.
+  let containerId: string;
   const childIds: string[] = [];
-  for (const [i, imageUrl] of params.imageUrls.entries()) {
-    opts.onProgress?.(`Criando item ${i + 1}/${params.imageUrls.length}…`);
-    const { id } = await graph.call<{ id: string }>(`item:${i + 1}`, "POST", `${ig}/media`, {
-      image_url: imageUrl,
-      is_carousel_item: "true",
-    });
-    childIds.push(id);
+  if (params.imageUrls.length === 1) {
+    // Post de uma imagem: o próprio container leva a legenda.
+    opts.onProgress?.("Criando a imagem…");
+    const single: Record<string, string> = { image_url: params.imageUrls[0] };
+    if (params.caption?.trim()) single.caption = params.caption;
+    ({ id: containerId } = await graph.call<{ id: string }>("image", "POST", `${ig}/media`, single));
+    await waitForContainers(graph, [containerId], "a imagem", opts);
+  } else {
+    // 1. Containers dos itens. Em sequência: são no máximo 10 e evita estourar
+    //    o limite de chamadas por rajada.
+    for (const [i, imageUrl] of params.imageUrls.entries()) {
+      opts.onProgress?.(`Criando item ${i + 1}/${params.imageUrls.length}…`);
+      const { id } = await graph.call<{ id: string }>(`item:${i + 1}`, "POST", `${ig}/media`, {
+        image_url: imageUrl,
+        is_carousel_item: "true",
+      });
+      childIds.push(id);
+    }
+
+    // 2. Itens prontos.
+    await waitForContainers(graph, childIds, "as imagens do carrossel", opts);
+
+    // 3. Container do carrossel.
+    opts.onProgress?.("Criando o carrossel…");
+    const carouselParams: Record<string, string> = { media_type: "CAROUSEL", children: childIds.join(",") };
+    if (params.caption?.trim()) carouselParams.caption = params.caption;
+    ({ id: containerId } = await graph.call<{ id: string }>("carousel", "POST", `${ig}/media`, carouselParams));
+
+    // 4. Carrossel pronto.
+    await waitForContainers(graph, [containerId], "o carrossel", opts);
   }
-
-  // 2. Itens prontos.
-  await waitForContainers(graph, childIds, "as imagens do carrossel", opts);
-
-  // 3. Container do carrossel.
-  opts.onProgress?.("Criando o carrossel…");
-  const carouselParams: Record<string, string> = { media_type: "CAROUSEL", children: childIds.join(",") };
-  if (params.caption?.trim()) carouselParams.caption = params.caption;
-  const { id: containerId } = await graph.call<{ id: string }>("carousel", "POST", `${ig}/media`, carouselParams);
-
-  // 4. Carrossel pronto.
-  await waitForContainers(graph, [containerId], "o carrossel", opts);
 
   // 5. Publica.
   opts.onProgress?.("Publicando…");

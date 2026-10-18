@@ -261,6 +261,21 @@ export async function findFileInFolder(
   return json.files?.[0] ?? null;
 }
 
+/** Baixa o conteúdo de um arquivo do Drive (ex.: arte já entregue). */
+export async function downloadDriveFile(fileId: string): Promise<Buffer> {
+  return withRetry(async () => {
+    const token = await getAccessToken();
+    const res = await driveFetch(
+      `${DRIVE_API}/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`,
+      { token }
+    );
+    if (!res.ok) {
+      throw new Error(`Download do Drive falhou: ${formatDriveError(await res.text())}`);
+    }
+    return Buffer.from(await res.arrayBuffer());
+  });
+}
+
 export async function findOrCreateFolder(
   parentId: string,
   name: string

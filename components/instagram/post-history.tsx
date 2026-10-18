@@ -18,32 +18,34 @@ const STATUS_VARIANT: Record<InstagramPostStatus, "secondary" | "blue" | "amber"
   canceled: "slate",
 };
 
-/** Posts do carrossel (agendados e publicados), ao vivo via Realtime. */
-export function useInstagramPosts(carouselId: string) {
+/** Posts do carrossel ou da demanda (agendados e publicados), ao vivo via Realtime. */
+export function useInstagramPosts(scope: { carouselId: string } | { demandId: string }) {
   const [posts, setPosts] = useState<InstagramPost[] | null>(null);
+  const [param, column, id] =
+    "carouselId" in scope
+      ? (["carouselId", "studio_carousel_id", scope.carouselId] as const)
+      : (["demandId", "demand_id", scope.demandId] as const);
 
   const reload = useCallback(async () => {
-    const res = await fetch(`/api/instagram/posts?carouselId=${carouselId}`);
+    const res = await fetch(`/api/instagram/posts?${param}=${id}`);
     const data = await res.json().catch(() => ({}));
     if (res.ok) setPosts(data.posts ?? []);
     else setPosts([]);
-  }, [carouselId]);
+  }, [param, id]);
 
   useEffect(() => {
     reload();
     const supabase = createBrowserSupabase();
     const channel = supabase
-      .channel(`instagram-posts-${carouselId}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "instagram_posts", filter: `studio_carousel_id=eq.${carouselId}` },
-        () => reload()
+      .channel(`instagram-posts-${column}-${id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "instagram_posts", filter: `${column}=eq.${id}` }, () =>
+        reload()
       )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [carouselId, reload]);
+  }, [column, id, reload]);
 
   return { posts, reload };
 }
@@ -141,15 +143,15 @@ export function InstagramPostList({
   );
 }
 
-/** Histórico na página da demanda. Some enquanto não houver post. */
-export function InstagramPostHistory({ carouselId }: { carouselId: string }) {
-  const { posts, reload } = useInstagramPosts(carouselId);
+/** Histórico na página da demanda (posts da demanda e do Studio dela). Some enquanto não houver post. */
+export function InstagramPostHistory({ demandId }: { demandId: string }) {
+  const { posts, reload } = useInstagramPosts({ demandId });
   if (!posts || posts.length === 0) return null;
   return (
     <section className="space-y-3">
       <div>
         <h2 className="text-base font-semibold tracking-heading text-foreground">Instagram</h2>
-        <p className="text-sm text-muted-foreground">Posts agendados e publicados deste carrossel.</p>
+        <p className="text-sm text-muted-foreground">Posts agendados e publicados desta demanda.</p>
       </div>
       <InstagramPostList posts={posts} onChanged={reload} />
     </section>

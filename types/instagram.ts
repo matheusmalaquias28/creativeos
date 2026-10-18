@@ -16,11 +16,14 @@ export type InstagramPostItem = {
   path: string;
   /** Página do Studio de onde o card saiu (só referência). */
   page_id?: string | null;
+  /** Arte da entrega da demanda de onde o card saiu (só referência). */
+  export_file_id?: string | null;
 };
 
 export type InstagramPost = {
   id: string;
   studio_carousel_id: string | null;
+  demand_id: string | null;
   client_id: string | null;
   ig_user_id: string;
   ig_username: string | null;

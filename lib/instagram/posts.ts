@@ -8,8 +8,15 @@ import {
 import type { Database, Json } from "@/types/database";
 import { credentialsForPost, type InstagramCredentials } from "./account";
 import { InstagramPublishError } from "./errors";
-import { checkInstagramJpeg } from "./jpeg";
-import { CAROUSEL_MAX_ITEMS, CAROUSEL_MIN_ITEMS, publishCarousel, validateCarouselInput } from "./publish";
+import { downloadDriveFile } from "@/lib/google/drive";
+import { checkInstagramJpeg, toInstagramJpeg } from "./jpeg";
+import {
+  CAROUSEL_MAX_ITEMS,
+  CAROUSEL_MIN_ITEMS,
+  POST_MIN_ITEMS,
+  publishCarousel,
+  validateCarouselInput,
+} from "./publish";
 
 /**
  * Posts do Instagram (tabela `instagram_posts`).
@@ -42,6 +49,11 @@ export function postFolder(carouselId: string, postId: string): string {
 
 export function cardPath(carouselId: string, postId: string, index: number): string {
   return `${postFolder(carouselId, postId)}/card-${String(index + 1).padStart(2, "0")}.jpg`;
+}
+
+/** Posts de demanda normal: `demand/<demandId>/<postId>/card-NN.jpg`. */
+export function demandCardPath(demandId: string, postId: string, index: number): string {
+  return `demand/${demandId}/${postId}/card-${String(index + 1).padStart(2, "0")}.jpg`;
 }
 
 // ─── Criação ─────────────────────────────────────────────────────────────────
@@ -89,11 +101,74 @@ export async function verifyUploadedItems(
   return out;
 }
 
+/**
+ * Demanda normal: as artes do feed que já estão na entrega (`demand_export_files`,
+ * formato feed). Lê do Storage; se a arte já foi entregue ao Drive (a cópia do
+ * Storage é apagada na entrega), baixa do Drive. Converte cada uma para JPEG
+ * e grava no bucket `instagram-posts`, na ordem escolhida.
+ */
+export async function prepareDemandItems(
+  admin: Admin,
+  params: { demandId: string; postId: string; fileIds: string[] },
+  deps: { downloadDrive?: (fileId: string) => Promise<Buffer> } = {}
+): Promise<InstagramPostItem[]> {
+  const { demandId, postId, fileIds } = params;
+  if (fileIds.length < POST_MIN_ITEMS || fileIds.length > CAROUSEL_MAX_ITEMS) {
+    throw new InstagramPostError(`Escolha de ${POST_MIN_ITEMS} a ${CAROUSEL_MAX_ITEMS} artes (vieram ${fileIds.length}).`);
+  }
+  if (new Set(fileIds).size !== fileIds.length) throw new InstagramPostError("A mesma arte foi escolhida duas vezes.", 400);
+
+  const { data: files, error } = await admin
+    .from("demand_export_files")
+    .select("id, art_index, format, storage_path, drive_file_id")
+    .eq("demand_id", demandId)
+    .in("id", fileIds);
+  if (error) throw new InstagramPostError(error.message, 500);
+  const byId = new Map((files ?? []).map((f) => [f.id as string, f]));
+
+  const downloadDrive = deps.downloadDrive ?? downloadDriveFile;
+  const out: InstagramPostItem[] = [];
+  for (const [i, fileId] of fileIds.entries()) {
+    const file = byId.get(fileId);
+    if (!file) throw new InstagramPostError(`Arte ${i + 1}: não está na entrega desta demanda.`, 400);
+    const label = `Arte ${file.art_index}`;
+    if (file.format !== "feed") throw new InstagramPostError(`${label}: só a arte do feed vai para o post (stories é 9:16).`);
+
+    let bytes: Buffer | null = null;
+    const stored = await admin.storage.from("demand-exports").download(file.storage_path as string);
+    if (stored.data) bytes = Buffer.from(await stored.data.arrayBuffer());
+    else if (file.drive_file_id) {
+      try {
+        bytes = await downloadDrive(file.drive_file_id as string);
+      } catch (e) {
+        throw new InstagramPostError(`${label}: não foi possível baixar do Drive (${e instanceof Error ? e.message : "erro"}).`);
+      }
+    }
+    if (!bytes) throw new InstagramPostError(`${label}: o arquivo não está mais no Storage nem no Drive. Envie a arte de novo em "Entregar demanda".`);
+
+    let jpeg: Buffer;
+    try {
+      jpeg = (await toInstagramJpeg(bytes)).buffer;
+    } catch (e) {
+      throw new InstagramPostError(`${label}: ${e instanceof Error ? e.message : "imagem inválida"}`);
+    }
+    const path = demandCardPath(demandId, postId, i);
+    const { error: uploadError } = await admin.storage
+      .from(INSTAGRAM_POSTS_BUCKET)
+      .upload(path, jpeg, { contentType: "image/jpeg", upsert: true });
+    if (uploadError) throw new InstagramPostError(`${label}: falha ao salvar a imagem (${uploadError.message}).`, 500);
+    const url = admin.storage.from(INSTAGRAM_POSTS_BUCKET).getPublicUrl(path).data.publicUrl;
+    out.push({ url, path, export_file_id: fileId });
+  }
+  return out;
+}
+
 export async function createPost(
   admin: Admin,
   input: {
     id: string;
-    carouselId: string;
+    carouselId: string | null;
+    demandId: string | null;
     clientId: string | null;
     account: Pick<InstagramCredentials, "igUserId" | "username">;
     items: InstagramPostItem[];
@@ -112,6 +187,7 @@ export async function createPost(
     .insert({
       id: input.id,
       studio_carousel_id: input.carouselId,
+      demand_id: input.demandId,
       client_id: input.clientId,
       ig_user_id: input.account.igUserId,
       ig_username: input.account.username,

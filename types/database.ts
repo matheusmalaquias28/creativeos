@@ -1340,6 +1340,7 @@ export type Database = {
         Row: {
           id: string;
           studio_carousel_id: string | null;
+          demand_id: string | null;
           client_id: string | null;
           ig_user_id: string;
           ig_username: string | null;
@@ -1359,6 +1360,7 @@ export type Database = {
         Insert: {
           id?: string;
           studio_carousel_id?: string | null;
+          demand_id?: string | null;
           client_id?: string | null;
           ig_user_id: string;
           ig_username?: string | null;

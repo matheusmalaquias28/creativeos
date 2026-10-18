@@ -1,6 +1,16 @@
-# Instagram — publicar carrosséis do Studio
+# Instagram — publicar carrosséis do Studio e artes das demandas
 
-O editor do Carrossel Studio tem **Exportar → Publicar no Instagram**. Esse comando abre um
+Há dois pontos de entrada, com o mesmo diálogo:
+
+- **Página da demanda:** o botão **Publicar no Instagram** fica ao lado de **Entregar demanda**
+  e vale para qualquer demanda. Ele usa as artes do **feed** que já estão na entrega. Uma
+  arte vira um post simples; duas ou mais viram carrossel. Se a arte já foi entregue ao
+  Drive (a cópia do Storage é apagada na entrega), o servidor baixa do Drive. O servidor
+  converte cada arte para JPEG (sharp, qualidade 90) e recusa a arte do stories (9:16).
+- **Editor do Carrossel Studio:** **Exportar → Publicar no Instagram**, com os cards
+  renderizados no navegador (veja o fluxo abaixo).
+
+No editor do Carrossel Studio, o comando **Exportar → Publicar no Instagram** Esse comando abre um
 diálogo onde você escolhe e ordena os cards (de 2 a 10), edita a legenda (máx. 2.200
 caracteres) e decide entre **Agora** ou **Agendar** (data e hora no horário de Brasília).
 O diálogo mostra a conta de destino (@username) e pede uma confirmação final: "Vai publicar
@@ -32,15 +42,16 @@ como `failed`, com o aviso para conferir no Instagram, e não tenta de novo sozi
 
 | Arquivo | O que faz |
 | --- | --- |
-| `publish.ts` | `publishCarousel()`: containers → `FINISHED` → `CAROUSEL` → `media_publish` → permalink. Também tem `getPublishingQuota()` e `getInstagramAccount()` (`/me`). |
-| `posts.ts` | Tabela `instagram_posts`: criar, conferir os cards, reivindicar atomicamente, publicar, cancelar e rodar o cron. |
+| `publish.ts` | `publishCarousel()`: com 1 imagem, faz um post simples; com 2 ou mais, segue containers → `FINISHED` → `CAROUSEL` → `media_publish` → permalink. Também tem `getPublishingQuota()` e `getInstagramAccount()` (`/me`). |
+| `posts.ts` | Tabela `instagram_posts`: criar, conferir os cards, preparar as artes da demanda (Storage ou Drive → JPEG), reivindicar atomicamente, publicar, cancelar e rodar o cron. |
 | `account.ts` | Conta de destino. Hoje é a do env; depois, a conta conectada de cada cliente. |
 | `schedule.ts` | Horário de Brasília ↔ UTC e validação do agendamento (de 5 min a 75 dias). |
 | `jpeg.ts` / `format.ts` | Regras de imagem do feed; o 9:16 é recusado. |
 | `errors.ts` | Erros da Graph API em português. |
 | `http.ts` | Só admin publica; formato das respostas de erro. |
 
-Rotas: `GET /api/instagram/account`, `GET|POST /api/instagram/posts`,
+Rotas: `GET /api/instagram/account` (`?carouselId=` ou `?demandId=`), `GET|POST /api/instagram/posts`,
+`POST /api/instagram/demand-posts` (artes da entrega da demanda),
 `POST /api/instagram/posts/upload`, `POST /api/instagram/posts/[id]/publish` (agora ou tentar
 de novo), `POST /api/instagram/posts/[id]/cancel` e `GET|POST /api/cron/instagram-publish`.
 

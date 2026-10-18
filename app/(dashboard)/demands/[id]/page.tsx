@@ -36,6 +36,7 @@ import { isCarouselDemand } from "@/lib/carousel-studio/demand";
 import { ensureStudioForDemand } from "@/services/carousel-studio";
 import { DemandStudioSection } from "@/components/carousel-studio/demand-studio-section";
 import { InstagramPostHistory } from "@/components/instagram/post-history";
+import { DemandInstagramButton } from "@/components/instagram/demand-publish-button";
 
 export const maxDuration = 300;
 
@@ -182,6 +183,7 @@ export default async function DemandDetailPage({ params }: PageProps) {
                 initialFiles={exportFiles}
                 driveAuth={driveAuth}
               />
+              <DemandInstagramButton demandId={demand.id} files={exportFiles} initialCaption={studio?.caption ?? ""} />
             </div>
           </div>
 
@@ -249,13 +251,12 @@ export default async function DemandDetailPage({ params }: PageProps) {
         </Surface>
 
         {studio ? (
-          <>
-            <DemandStudioSection initial={studio} hasClient={Boolean(demand.client_id)} />
-            <InstagramPostHistory carouselId={studio.id} />
-          </>
+          <DemandStudioSection initial={studio} hasClient={Boolean(demand.client_id)} />
         ) : (
           !demand.client_not_found && <DemandSpaceSection demand={demand} />
         )}
+
+        <InstagramPostHistory demandId={demand.id} />
 
         <section className="space-y-4">
           <SectionHeader
