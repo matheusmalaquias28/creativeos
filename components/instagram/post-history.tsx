@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { Ban, ExternalLink, Loader2, RotateCw } from "lucide-react";
 import { toast } from "sonner";
 import { createClient as createBrowserSupabase } from "@/lib/supabase/client";
@@ -21,6 +21,11 @@ const STATUS_VARIANT: Record<InstagramPostStatus, "secondary" | "blue" | "amber"
 /** Posts do carrossel ou da demanda (agendados e publicados), ao vivo via Realtime. */
 export function useInstagramPosts(scope: { carouselId: string } | { demandId: string }) {
   const [posts, setPosts] = useState<InstagramPost[] | null>(null);
+  // O cliente do navegador é único e reaproveita canais pelo nome: dois
+  // componentes com o mesmo nome (botão + histórico da demanda) fariam o
+  // segundo `.on()` cair num canal já inscrito, o que lança erro e derruba a
+  // página. Cada instância do hook tem o próprio canal.
+  const instance = useId().replace(/[^a-zA-Z0-9]/g, "");
   const [param, column, id] =
     "carouselId" in scope
       ? (["carouselId", "studio_carousel_id", scope.carouselId] as const)
@@ -37,7 +42,7 @@ export function useInstagramPosts(scope: { carouselId: string } | { demandId: st
     reload();
     const supabase = createBrowserSupabase();
     const channel = supabase
-      .channel(`instagram-posts-${column}-${id}`)
+      .channel(`instagram-posts-${column}-${id}-${instance}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "instagram_posts", filter: `${column}=eq.${id}` }, () =>
         reload()
       )
@@ -45,7 +50,7 @@ export function useInstagramPosts(scope: { carouselId: string } | { demandId: st
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [column, id, reload]);
+  }, [column, id, instance, reload]);
 
   return { posts, reload };
 }
