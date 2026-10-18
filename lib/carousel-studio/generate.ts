@@ -3,7 +3,12 @@
  *
  *   ficha do cliente ─┐
  *   briefing (artes) ─┼─▶ diretor de arte (IA) ─▶ layout em código ─▶ imagens (IA, em paralelo)
- *   referências ──────┘
+ *   referências ──────┤
+ *   estilo (acervo) ──┘  DNA + artes de exemplo, se o carrossel tiver um
+ *
+ * Com estilo que tem páginas-modelo, o layout sai dos modelos
+ * (`template-fill.ts`): a IA só escolhe o modelo de cada card e preenche os
+ * campos. Sem modelos, cai nos layouts de código (`layouts.ts`).
  *
  * Roda dentro de `after()` (function com maxDuration = 300). O documento é
  * salvo assim que o layout fica pronto — o editor já mostra textos e formas —
@@ -21,14 +26,18 @@ import type { Json } from "@/types/database";
 import type { DemandArte, DemandBriefing } from "@/types/demand";
 import {
   isStudioFormat,
+  STUDIO_FORMATS,
   type StudioDocument,
   type StudioGeneration,
   type StudioImageLayer,
 } from "@/types/carousel-studio";
+import { getCarouselStyle } from "@/services/carousel-styles";
+import { loadStyleTemplatePages, TEMPLATE_FORMAT } from "@/lib/carousel-styles/templates";
 import { loadStudioBrandKit } from "./brand-kit";
-import { directCarousel } from "./director";
+import { directCarousel, type DirectorStyle } from "./director";
 import { buildStudioDocument, type StudioImageJob } from "./layouts";
 import { generateStudioImage } from "./images";
+import { buildFromTemplates, buildTemplateCatalog, directFromTemplates } from "./template-fill";
 
 const IMAGE_CONCURRENCY = Number(process.env.CAROUSEL_STUDIO_IMAGE_CONCURRENCY) || 3;
 /** Teto de tempo da execução inteira (a function morre em 300s). */
@@ -148,19 +157,75 @@ export async function runStudioGeneration(carouselId: string): Promise<void> {
     const brand = await loadStudioBrandKit({ clientId, handle });
     const format = isStudioFormat(row.format) ? row.format : "4:5";
 
-    generation = { ...generation, message: "Diretor de arte montando o carrossel…" };
+    // Estilo do acervo: a tipografia é do estilo (ignora as fontes do perfil
+    // do cliente); as cores continuam do cliente, e a paleta das artes de
+    // exemplo só entra quando a ficha não tem paleta.
+    const style = row.style_id ? await getCarouselStyle(row.style_id, { admin: true }) : null;
+    const directorStyle: DirectorStyle | null =
+      style?.dna && style.active
+        ? { name: style.name, dna: style.dna, imageUrls: style.images.map((i) => i.storage_url) }
+        : null;
+    const designBrand = directorStyle
+      ? {
+          ...brand,
+          fontHeading: null,
+          fontBody: null,
+          palette: brand.palette.length
+            ? brand.palette
+            : [directorStyle.dna.color.palette.primary, directorStyle.dna.color.palette.accent, directorStyle.dna.color.palette.dark, directorStyle.dna.color.palette.light],
+        }
+      : brand;
+
+    generation = {
+      ...generation,
+      message: directorStyle ? `Diretor de arte aplicando o estilo ${directorStyle.name}…` : "Diretor de arte montando o carrossel…",
+    };
     await supabase.from("studio_carousels").update({ generation: asJson(generation) }).eq("id", carouselId);
 
     // 2. Direção + layout
-    const { plan, usedAi, error: directorError } = await directCarousel({
-      title,
-      artes,
-      brand,
-      format,
-      brief: row.brief,
-      demandReferenceUrls,
-    });
-    const { document, jobs } = buildStudioDocument({ plan, brand, format });
+    const templatePages = directorStyle && style ? await loadStyleTemplatePages(style.id) : [];
+    let document: StudioDocument;
+    let jobs: StudioImageJob[];
+    let caption: string;
+    let usedAi: boolean;
+    let directorError: string | undefined;
+    if (directorStyle && templatePages.length > 0) {
+      const catalog = buildTemplateCatalog(templatePages);
+      const result = await directFromTemplates({
+        title,
+        artes,
+        brand,
+        brief: row.brief,
+        demandReferenceUrls,
+        style: directorStyle,
+        catalog,
+      });
+      ({ document, jobs } = buildFromTemplates({
+        plan: result.plan,
+        catalog,
+        brand,
+        format,
+        templateHeight: STUDIO_FORMATS[TEMPLATE_FORMAT].height,
+        imageStyle: directorStyle.dna.imageStylePrompt,
+      }));
+      caption = result.plan.caption;
+      usedAi = result.usedAi;
+      directorError = result.error;
+    } else {
+      const result = await directCarousel({
+        title,
+        artes,
+        brand: designBrand,
+        format,
+        brief: row.brief,
+        demandReferenceUrls,
+        style: directorStyle,
+      });
+      ({ document, jobs } = buildStudioDocument({ plan: result.plan, brand: designBrand, format }));
+      caption = result.plan.caption;
+      usedAi = result.usedAi;
+      directorError = result.error;
+    }
 
     if (!(await isCurrentRun())) return;
     generation = {
@@ -169,7 +234,11 @@ export async function runStudioGeneration(carouselId: string): Promise<void> {
       message: jobs.length ? `Gerando ${jobs.length} imagens…` : "Finalizando…",
       done: 0,
       total: jobs.length,
-      error: usedAi ? null : `Diretor de arte indisponível, usado layout padrão (${directorError ?? "erro"})`,
+      error: usedAi
+        ? row.style_id && !directorStyle
+          ? "O estilo escolhido não tem DNA (analise o estilo no acervo); gerado sem estilo."
+          : null
+        : `Diretor de arte indisponível, usado layout padrão (${directorError ?? "erro"})`,
     };
     await supabase
       .from("studio_carousels")
@@ -178,13 +247,14 @@ export async function runStudioGeneration(carouselId: string): Promise<void> {
         name: title || row.name,
         document: asJson(document),
         brand: asJson(brand),
-        caption: plan.caption || null,
+        caption: caption || null,
         generation: asJson(generation),
       })
       .eq("id", carouselId);
 
-    // 3. Imagens — escritas serializadas sobre o documento em memória.
-    const referenceUrls = [...demandReferenceUrls, ...brand.referenceUrls];
+    // 3. Imagens — escritas serializadas sobre o documento em memória. Com
+    // estilo, as artes de exemplo vão primeiro: ditam o tratamento da imagem.
+    const referenceUrls = [...(directorStyle?.imageUrls ?? []), ...demandReferenceUrls, ...brand.referenceUrls];
     let writeChain: Promise<boolean> = Promise.resolve(true);
     const persist = () => {
       writeChain = writeChain.then(async (alive) => {
@@ -215,7 +285,7 @@ export async function runStudioGeneration(carouselId: string): Promise<void> {
                 kind: job.kind,
                 prompt: job.prompt,
                 aspectRatio: job.aspectRatio,
-                referenceUrls,
+                referenceUrls: [...(job.referenceUrls ?? []), ...referenceUrls],
               });
               layer.src = result.url;
               layer.status = null;

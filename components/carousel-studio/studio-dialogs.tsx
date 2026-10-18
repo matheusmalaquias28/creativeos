@@ -14,6 +14,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { StylePicker } from "@/components/carousel-styles/style-picker";
+import type { CarouselStyleOption } from "@/services/carousel-styles";
 
 // ─── Gerar de novo ────────────────────────────────────────────────────────────
 
@@ -21,27 +23,33 @@ export function RegenerateDialog({
   open,
   onOpenChange,
   initialBrief,
+  initialStyleId,
+  styles,
   onConfirm,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialBrief: string;
-  onConfirm: (brief: string) => Promise<void>;
+  initialStyleId: string | null;
+  styles: CarouselStyleOption[];
+  onConfirm: (brief: string, styleId: string | null) => Promise<void>;
 }) {
   const [brief, setBrief] = useState(initialBrief);
+  const [styleId, setStyleId] = useState(initialStyleId);
   const [sending, setSending] = useState(false);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className={styleId ? "max-w-4xl" : "max-w-xl"}>
         <DialogHeader>
           <DialogTitle>Gerar o carrossel de novo</DialogTitle>
           <DialogDescription>
-            A IA relê a ficha do cliente, o briefing e as referências e monta tudo do zero. O carrossel atual é
+            A IA relê a ficha do cliente, o briefing, as referências e o estilo escolhido e monta tudo do zero. O carrossel atual é
             substituído.
           </DialogDescription>
         </DialogHeader>
-        <DialogBody className="space-y-2">
-          <label className="text-sm font-medium">Instrução para esta versão (opcional)</label>
+        <DialogBody className="space-y-3">
+          <StylePicker styles={styles} value={styleId} onChange={setStyleId} disabled={sending} />
+          <label className="block text-sm font-medium">Instrução para esta versão (opcional)</label>
           <Textarea
             rows={5}
             value={brief}
@@ -58,7 +66,7 @@ export function RegenerateDialog({
             onClick={async () => {
               setSending(true);
               try {
-                await onConfirm(brief);
+                await onConfirm(brief, styleId);
                 onOpenChange(false);
               } finally {
                 setSending(false);

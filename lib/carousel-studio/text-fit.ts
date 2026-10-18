@@ -10,6 +10,8 @@ function charWidthEm(fontFamily: string, uppercase: boolean): number {
   const family = fontFamily.toLowerCase();
   let base = 0.54;
   if (family.includes("bebas")) base = 0.4;
+  else if (family.includes("caveat")) base = 0.4;
+  else if (family.includes("instrument-serif")) base = 0.44;
   else if (family.includes("oswald")) base = 0.46;
   else if (family.includes("archivo")) base = 0.52;
   else if (family.includes("playfair") || family.includes("lora") || family.includes("merriweather")) base = 0.52;

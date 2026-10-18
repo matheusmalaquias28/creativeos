@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { StudioEditor } from "@/components/carousel-studio/studio-editor";
 import { getStudioCarousel } from "@/services/carousel-studio";
 import { getDemandReferenceImages } from "@/services/art-gen";
+import { listCarouselStyleOptions } from "@/services/carousel-styles";
 
 export const maxDuration = 60;
 
@@ -12,14 +13,24 @@ export default async function CarouselStudioPage({ params }: PageProps) {
   const carousel = await getStudioCarousel(id);
   if (!carousel) notFound();
 
-  const demandRefs = carousel.demand_id ? await getDemandReferenceImages(carousel.demand_id).catch(() => []) : [];
+  const [demandRefs, styles] = await Promise.all([
+    carousel.demand_id ? getDemandReferenceImages(carousel.demand_id).catch(() => []) : Promise.resolve([]),
+    listCarouselStyleOptions().catch(() => []),
+  ]);
 
   return (
     <StudioEditor
       initial={carousel}
       demandReferenceUrls={demandRefs.map((r) => r.storage_url).filter(Boolean)}
-      backHref={carousel.demand_id ? `/demands/${carousel.demand_id}` : "/carousel"}
-      backLabel={carousel.demand_id ? "Demanda" : "Carrosséis"}
+      styles={styles}
+      backHref={
+        carousel.style_template_for
+          ? `/carousel/estilos/${carousel.style_template_for}`
+          : carousel.demand_id
+            ? `/demands/${carousel.demand_id}`
+            : "/carousel"
+      }
+      backLabel={carousel.style_template_for ? "Estilo" : carousel.demand_id ? "Demanda" : "Carrosséis"}
     />
   );
 }

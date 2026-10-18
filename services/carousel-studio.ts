@@ -53,6 +53,8 @@ export async function listStudioCarousels(limit = 60): Promise<StudioCarouselLis
   const { data } = await supabase
     .from("studio_carousels")
     .select("id, name, status, format, demand_id, client_id, thumbnail_url, updated_at, document")
+    // Páginas-modelo de estilo vivem na tela do estilo, não na lista.
+    .is("style_template_for", null)
     .order("updated_at", { ascending: false })
     .limit(limit);
   const rows = data ?? [];
@@ -124,7 +126,7 @@ export async function ensureStudioForDemand(demandId: string): Promise<StudioCar
  */
 export async function claimStudioGeneration(
   carouselId: string,
-  opts: { brief?: string | null; force?: boolean } = {}
+  opts: { brief?: string | null; styleId?: string | null; force?: boolean } = {}
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
   const supabase = createAdminClient();
   const { data: row } = await supabase
@@ -149,6 +151,7 @@ export async function claimStudioGeneration(
     generation: { stage: "queued", message: "Na fila…", queuedAt: new Date().toISOString() },
   };
   if (opts.brief !== undefined) update.brief = opts.brief;
+  if (opts.styleId !== undefined) update.style_id = opts.styleId;
   await supabase.from("studio_carousels").update(update).eq("id", carouselId);
   return { ok: true };
 }

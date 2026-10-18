@@ -34,6 +34,8 @@ export type StudioImageJob = {
   kind: "background" | "element";
   prompt: string;
   aspectRatio: string;
+  /** Referências só desta imagem (vão antes das gerais do carrossel). */
+  referenceUrls?: string[];
 };
 
 type Palette = { dark: string; light: string; primary: string; accent: string };

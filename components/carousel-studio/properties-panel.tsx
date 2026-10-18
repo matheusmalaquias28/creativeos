@@ -46,7 +46,10 @@ import type {
   StudioPage,
   StudioShapeLayer,
   StudioTextLayer,
+  StudioSlot,
+  StudioTemplateRole,
 } from "@/types/carousel-studio";
+import { STUDIO_SLOT_LABEL, STUDIO_TEMPLATE_ROLE_LABEL, isStudioSlot } from "@/types/carousel-studio";
 import type { StudioHistory } from "./use-studio-history";
 import { layerBox } from "./studio-canvas";
 import {
@@ -83,6 +86,16 @@ type Props = {
   onDelete: () => void;
   onDuplicatePage: () => void;
   onDeletePage: () => void;
+  /** Editando as páginas-modelo de um estilo: mostra campos e papel da página. */
+  isTemplate?: boolean;
+};
+
+/** Campos que cada tipo de camada pode assumir num modelo. */
+const SLOTS_BY_TYPE: Record<StudioLayer["type"], StudioSlot[]> = {
+  text: ["kicker", "title", "body", "note", "cta", "number"],
+  button: ["cta"],
+  image: ["image", "logo"],
+  shape: [],
 };
 
 const WEIGHTS = [300, 400, 500, 600, 700, 800, 900].map((w) => ({ value: String(w), label: String(w) }));
@@ -156,11 +169,24 @@ function GradientEditor({
   );
 }
 
-function PagePanel({ history, page, palette, caption, onCaptionChange, onDuplicatePage, onDeletePage, doc }: Props & { page: StudioPage; doc: StudioDocument }) {
+function PagePanel({ history, page, palette, caption, onCaptionChange, onDuplicatePage, onDeletePage, doc, isTemplate }: Props & { page: StudioPage; doc: StudioDocument }) {
   const setPage = (patch: Partial<StudioPage>, key?: string) =>
     history.commit((d) => mapPage(d, page.id, (p) => ({ ...p, ...patch })), key);
   return (
     <div>
+      {isTemplate ? (
+        <PanelSection title="Modelo">
+          <div className="text-[11px] text-white/45">Papel desta página no carrossel</div>
+          <SelectField
+            value={page.templateRole ?? "inner"}
+            options={(Object.keys(STUDIO_TEMPLATE_ROLE_LABEL) as StudioTemplateRole[]).map((r) => ({ value: r, label: STUDIO_TEMPLATE_ROLE_LABEL[r] }))}
+            onChange={(templateRole) => setPage({ templateRole })}
+          />
+          <p className="text-[11px] leading-relaxed text-white/35">
+            Selecione uma camada para marcar o campo que a IA preenche (título, corpo, imagem…). Camadas sem campo ficam fixas em todo carrossel.
+          </p>
+        </PanelSection>
+      ) : null}
       <PanelSection title="Página">
         <TextField value={page.name} onChange={(name) => setPage({ name }, `page-name-${page.id}`)} />
         <ColorField label="Fundo" value={page.background} palette={palette} onChange={(c) => setPage({ background: c ?? page.background }, `page-bg-${page.id}`)} />
@@ -329,6 +355,19 @@ function LayerPanel(props: Props & { page: StudioPage; doc: StudioDocument; laye
         }
       >
         <TextField value={layer.name} onChange={(name) => set({ name }, "name")} />
+        {props.isTemplate && SLOTS_BY_TYPE[layer.type].length > 0 ? (
+          <>
+            <div className="text-[11px] text-white/45">Campo do modelo</div>
+            <SelectField
+              value={layer.slot ?? ""}
+              options={[
+                { value: "", label: "Fixo (decoração do estilo)" },
+                ...SLOTS_BY_TYPE[layer.type].map((s) => ({ value: s, label: STUDIO_SLOT_LABEL[s] })),
+              ]}
+              onChange={(v) => set({ slot: isStudioSlot(v) ? v : null })}
+            />
+          </>
+        ) : null}
       </PanelSection>
 
       <PanelSection title="Posição e tamanho">
@@ -411,6 +450,16 @@ function TextSection({ layer, set, palette }: SectionProps<StudioTextLayer>) {
       <ColorField label="Cor" value={layer.color} palette={palette} onChange={(c) => set({ color: c ?? layer.color } as Partial<StudioTextLayer>, "color")} />
       <ColorField label="Destaque (*palavras*)" value={layer.accentColor} palette={palette} onChange={(c) => set({ accentColor: c ?? layer.accentColor } as Partial<StudioTextLayer>, "accent")} />
       <ColorField label="Marca-texto do destaque" value={layer.highlight ?? null} allowNone palette={palette} onChange={(c) => set({ highlight: c } as Partial<StudioTextLayer>, "hl")} />
+      <div className="text-[11px] text-white/45">Fonte do destaque</div>
+      <Row>
+        <SelectField
+          value={layer.accentFontFamily ?? ""}
+          style={layer.accentFontFamily ? { fontFamily: layer.accentFontFamily } : undefined}
+          options={[{ value: "", label: "A mesma do texto" }, ...fontOptions]}
+          onChange={(v) => set({ accentFontFamily: v || null } as Partial<StudioTextLayer>)}
+        />
+        <IconToggle title="Destaque em itálico" active={Boolean(layer.accentItalic)} onClick={() => set({ accentItalic: !layer.accentItalic } as Partial<StudioTextLayer>)}><Italic className="size-3.5" /></IconToggle>
+      </Row>
       <label className="flex items-center gap-2 text-xs text-white/70">
         <input type="checkbox" className="accent-indigo-400" checked={layer.autoHeight} onChange={(e) => set({ autoHeight: e.target.checked } as Partial<StudioTextLayer>)} />
         Altura automática

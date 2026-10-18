@@ -30,7 +30,7 @@ export function gradientCss(gradient: StudioGradient | null | undefined): string
   return `linear-gradient(${gradient.angle}deg, ${stops})`;
 }
 
-/** Texto com trechos *em destaque* na cor de acento. */
+/** Texto com trechos *em destaque* na cor (e, se houver, na fonte) de acento. */
 export function AccentText({ layer }: { layer: StudioTextLayer }) {
   const parts = layer.text.split(/(\*[^*\n]+\*)/g);
   return (
@@ -38,6 +38,8 @@ export function AccentText({ layer }: { layer: StudioTextLayer }) {
       {parts.map((part, i) => {
         if (part.length > 2 && part.startsWith("*") && part.endsWith("*")) {
           const style: CSSProperties = { color: layer.accentColor };
+          if (layer.accentFontFamily) style.fontFamily = layer.accentFontFamily;
+          if (layer.accentItalic) style.fontStyle = "italic";
           if (layer.highlight) {
             style.background = layer.highlight;
             style.padding = "0 0.12em";

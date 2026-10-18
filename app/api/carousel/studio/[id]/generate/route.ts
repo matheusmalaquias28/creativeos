@@ -11,7 +11,8 @@ type Params = { params: Promise<{ id: string }> };
 /**
  * (Re)gera o carrossel inteiro. Volta na hora; o progresso chega por Realtime.
  * `brief` é a instrução do operador para esta versão (ex.: "mais clean,
- * fundo claro, use fotos de escritório").
+ * fundo claro, use fotos de escritório"). `style_id` escolhe o estilo do
+ * acervo de estilos (null = sem estilo; ausente = mantém o atual).
  */
 export async function POST(req: NextRequest, { params }: Params) {
   const { id } = await params;
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
 
-  let body: { brief?: string | null; force?: boolean } = {};
+  let body: { brief?: string | null; style_id?: string | null; force?: boolean } = {};
   try {
     body = await req.json();
   } catch {
@@ -28,6 +29,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const claim = await claimStudioGeneration(id, {
     brief: typeof body.brief === "string" ? body.brief.trim().slice(0, 2000) || null : undefined,
+    styleId: body.style_id === undefined ? undefined : typeof body.style_id === "string" && body.style_id ? body.style_id : null,
     force: body.force === true,
   });
   if (!claim.ok) return NextResponse.json({ error: claim.reason }, { status: 409 });

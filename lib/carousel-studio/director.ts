@@ -16,12 +16,24 @@ import { getAnthropicClient } from "@/lib/ai/client";
 import { stripTravessao } from "@/lib/text/strip-dash";
 import type { StudioBrandKit, StudioFormat } from "@/types/carousel-studio";
 import type { DemandArte } from "@/types/demand";
+import { styleDnaText, type StyleDna } from "@/lib/carousel-styles/dna";
 import { deriveRoles } from "./color";
 import { STUDIO_FONTS, studioFontByFamily } from "./fonts";
 import { designPlanSchema, type DesignPlan, type SlidePlan } from "./plan";
 
 const DIRECTOR_MODEL = process.env.CAROUSEL_STUDIO_MODEL?.trim() || "claude-opus-5-5";
 const MAX_VISION_REFERENCES = 6;
+/** Com estilo, as artes de exemplo ocupam a maior parte da visão do diretor. */
+const MAX_STYLE_IMAGES = 6;
+const MAX_REFERENCES_WITH_STYLE = 3;
+
+/** Estilo do acervo de estilos aplicado nesta geração. */
+export type DirectorStyle = {
+  name: string;
+  dna: StyleDna;
+  /** Artes de exemplo, na ordem do carrossel. */
+  imageUrls: string[];
+};
 
 export type DirectorInput = {
   title: string;
@@ -32,6 +44,8 @@ export type DirectorInput = {
   brief?: string | null;
   /** Referências desta demanda (WAR + subidas no studio). */
   demandReferenceUrls: string[];
+  /** Estilo do acervo (DNA + artes de exemplo); null = sem estilo. */
+  style?: DirectorStyle | null;
 };
 
 function artesText(artes: DemandArte[]): string {
@@ -47,7 +61,22 @@ function artesText(artes: DemandArte[]): string {
     .join("\n\n");
 }
 
-function systemPrompt(): string {
+function styleSection(style: DirectorStyle): string {
+  return `
+
+ESTILO DO CARROSSEL (prioridade sobre as regras de DESIGN acima)
+O operador escolheu o estilo "${style.name}" do acervo de estilos. As primeiras imagens que você recebe são as artes de exemplo desse estilo. O carrossel novo precisa parecer claramente da mesma família: mesmo grid, mesma tipografia, mesmos elementos recorrentes, mesmo tratamento de imagem e o mesmo jeito de montar capa, miolo e CTA. Copie o SISTEMA, nunca o conteúdo nem os textos das artes de exemplo.
+- Cada card é diferente do outro (siga as regras de variação do estilo), mas a identidade não muda.
+- Fontes: use as do estilo (${style.dna.typography.headingFont} nos títulos, ${style.dna.typography.bodyFont} no texto).
+- Cores: aplique o USO de cor do estilo sobre a paleta do cliente.
+- Layouts: para cada card, escolha entre os disponíveis o que mais se aproxima do card equivalente do estilo.
+- imageStyle: parta da direção de imagem do estilo.
+
+DNA DO ESTILO
+${styleDnaText(style.dna)}`;
+}
+
+function systemPrompt(style?: DirectorStyle | null): string {
   const fonts = STUDIO_FONTS.map((f) => `${f.id} (${f.vibe})`).join("; ");
   return `Você é diretor de arte sênior de uma agência brasileira e monta carrosséis de Instagram de alto padrão, consistentes com a identidade de cada cliente.
 
@@ -69,19 +98,34 @@ DESIGN
 - Use SÓ cores da paleta do cliente nas cores-papel. dark e light precisam contrastar muito entre si; accent precisa aparecer bem sobre dark.
 - Fontes disponíveis: ${fonts}. Escolha um par coerente com o DNA visual (títulos com personalidade, texto legível).
 - imageStyle descreve a direção visual comum a todas as imagens (luz, lente, estilo, textura, paleta), derivada das referências do cliente.
-- Para nichos sensíveis (jurídico, saúde), prefira imagens sóbrias, reais e respeitosas, com pessoas brasileiras.`;
+- Para nichos sensíveis (jurídico, saúde), prefira imagens sóbrias, reais e respeitosas, com pessoas brasileiras.${style ? styleSection(style) : ""}`;
 }
 
-function userContent(input: DirectorInput, imageUrls: string[]): Anthropic.ContentBlockParam[] {
+type VisionImages = { style: string[]; references: string[] };
+
+function userContent(input: DirectorInput, images: VisionImages): Anthropic.ContentBlockParam[] {
   const b = input.brand;
   const blocks: Anthropic.ContentBlockParam[] = [];
-  imageUrls.forEach((url) => {
+  if (images.style.length) {
+    blocks.push({ type: "text", text: `ARTES DE EXEMPLO DO ESTILO "${input.style?.name ?? ""}" (na ordem do carrossel):` });
+    images.style.forEach((url) => {
+      blocks.push({ type: "image", source: { type: "url", url } });
+    });
+    if (images.references.length) {
+      blocks.push({ type: "text", text: "REFERÊNCIAS DO CLIENTE E DESTA DEMANDA (assunto, clima e identidade do cliente):" });
+    }
+  }
+  images.references.forEach((url) => {
     blocks.push({ type: "image", source: { type: "url", url } });
   });
   const headingHint = studioFontByFamily(b.fontHeading)?.id;
+  const referenceNote =
+    images.references.length && !images.style.length
+      ? `As ${images.references.length} imagens acima são referências visuais do cliente e desta demanda — use-as para definir imageStyle, composição e clima.\n\n`
+      : "";
   blocks.push({
     type: "text",
-    text: `${imageUrls.length ? `As ${imageUrls.length} imagens acima são referências visuais do cliente e desta demanda — use-as para definir imageStyle, composição e clima.\n\n` : ""}CLIENTE: ${b.clientName || "(sem nome)"}${b.handle ? ` (${b.handle})` : ""}
+    text: `${referenceNote}CLIENTE: ${b.clientName || "(sem nome)"}${b.handle ? ` (${b.handle})` : ""}
 PALETA DA FICHA: ${b.palette.length ? b.palette.join(", ") : "(sem paleta — proponha uma sóbria e elegante)"}
 ${headingHint ? `FONTE DE TÍTULO DO CLIENTE: ${headingHint} (use-a)\n` : ""}DNA VISUAL:
 ${b.styleNotes || "(não extraído — deduza das referências)"}
@@ -113,14 +157,14 @@ function cleanPlan(plan: DesignPlan, input: DirectorInput): DesignPlan {
   };
 }
 
-async function callDirector(input: DirectorInput, imageUrls: string[]): Promise<DesignPlan> {
+async function callDirector(input: DirectorInput, images: VisionImages): Promise<DesignPlan> {
   const client = getAnthropicClient();
   const response = await client.messages.parse(
     {
       model: DIRECTOR_MODEL,
       max_tokens: 16000,
-      system: systemPrompt(),
-      messages: [{ role: "user", content: userContent(input, imageUrls) }],
+      system: systemPrompt(input.style),
+      messages: [{ role: "user", content: userContent(input, images) }],
       output_config: { effort: "medium", format: zodOutputFormat(designPlanSchema) },
     },
     { timeout: 150_000 }
@@ -134,18 +178,24 @@ export async function directCarousel(input: DirectorInput): Promise<{ plan: Desi
   if (input.artes.length === 0) {
     return { plan: fallbackPlan(input), usedAi: false, error: "Demanda sem artes no briefing" };
   }
-  const imageUrls = Array.from(new Set([...input.demandReferenceUrls, ...input.brand.referenceUrls]))
-    .filter((u) => /^https:\/\//.test(u))
-    .slice(0, MAX_VISION_REFERENCES);
+  const isHttps = (u: string) => /^https:\/\//.test(u);
+  const styleUrls = (input.style?.imageUrls ?? []).filter(isHttps).slice(0, MAX_STYLE_IMAGES);
+  const images: VisionImages = {
+    style: styleUrls,
+    references: Array.from(new Set([...input.demandReferenceUrls, ...input.brand.referenceUrls]))
+      .filter((u) => isHttps(u) && !styleUrls.includes(u))
+      .slice(0, styleUrls.length ? MAX_REFERENCES_WITH_STYLE : MAX_VISION_REFERENCES),
+  };
 
   try {
-    return { plan: cleanPlan(await callDirector(input, imageUrls), input), usedAi: true };
+    return { plan: cleanPlan(await callDirector(input, images), input), usedAi: true };
   } catch (error) {
     // Uma URL de referência inacessível derruba a requisição inteira (400):
-    // tenta de novo só com texto antes de cair no plano determinístico.
-    if (imageUrls.length > 0 && error instanceof Anthropic.BadRequestError) {
+    // tenta de novo só com as artes do estilo (do nosso bucket) — sem estilo,
+    // só com texto — antes de cair no plano determinístico.
+    if (images.references.length + images.style.length > 0 && error instanceof Anthropic.BadRequestError) {
       try {
-        return { plan: cleanPlan(await callDirector(input, []), input), usedAi: true };
+        return { plan: cleanPlan(await callDirector(input, { style: images.style, references: [] }), input), usedAi: true };
       } catch (retryError) {
         error = retryError;
       }
@@ -189,12 +239,15 @@ export function fallbackPlan(input: DirectorInput): DesignPlan {
     };
   });
 
-  const headingId = studioFontByFamily(input.brand.fontHeading)?.id ?? "montserrat";
+  const dna = input.style?.dna;
+  const headingId = dna?.typography.headingFont ?? studioFontByFamily(input.brand.fontHeading)?.id ?? "montserrat";
   return {
     fontHeading: headingId,
-    fontBody: studioFontByFamily(input.brand.fontBody)?.id ?? "inter",
+    fontBody: dna?.typography.bodyFont ?? studioFontByFamily(input.brand.fontBody)?.id ?? "inter",
     colors: roles,
-    imageStyle: "Fotografia realista, luz natural suave, profundidade de campo rasa, tons alinhados à paleta da marca.",
+    imageStyle:
+      dna?.imageStylePrompt ||
+      "Fotografia realista, luz natural suave, profundidade de campo rasa, tons alinhados à paleta da marca.",
     slides,
     caption: "",
   };

@@ -19,7 +19,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
   return NextResponse.json({ carousel: toStudioCarousel(data) });
 }
 
-/** Autosave do editor: documento, nome, legenda e instrução da próxima geração. */
+/** Autosave do editor: documento, nome, legenda, estilo e instrução da próxima geração. */
 export async function PATCH(req: NextRequest, { params }: Params) {
   const { id } = await params;
   const supabase = await createClient();
@@ -36,6 +36,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     caption?: string | null;
     brief?: string | null;
     reference_urls?: string[];
+    style_id?: string | null;
   };
   try {
     body = JSON.parse(raw);
@@ -59,6 +60,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (typeof body.name === "string") update.name = body.name.trim().slice(0, 160) || "Carrossel";
   if (body.caption !== undefined) update.caption = body.caption;
   if (body.brief !== undefined) update.brief = body.brief;
+  if (body.style_id !== undefined) {
+    update.style_id = typeof body.style_id === "string" && body.style_id ? body.style_id : null;
+  }
   if (Array.isArray(body.reference_urls)) {
     update.reference_urls = body.reference_urls.filter((u) => typeof u === "string" && u.startsWith("http")).slice(0, 12);
   }

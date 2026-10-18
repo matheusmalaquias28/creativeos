@@ -39,6 +39,28 @@ export type StudioGradient = {
 
 // ─── Camadas ─────────────────────────────────────────────────────────────────
 
+/**
+ * Campo de uma página-modelo (estilo do acervo). Na geração com estilo, a IA
+ * preenche só as camadas com campo; as demais são decoração fixa do estilo.
+ */
+export const STUDIO_SLOTS = ["kicker", "title", "body", "note", "cta", "number", "image", "logo"] as const;
+export type StudioSlot = (typeof STUDIO_SLOTS)[number];
+
+export const STUDIO_SLOT_LABEL: Record<StudioSlot, string> = {
+  kicker: "Rótulo (acima do título)",
+  title: "Título",
+  body: "Corpo",
+  note: "Nota / anotação",
+  cta: "CTA",
+  number: "Número da página",
+  image: "Imagem (gerada por card)",
+  logo: "Logo do cliente",
+};
+
+export function isStudioSlot(value: unknown): value is StudioSlot {
+  return typeof value === "string" && (STUDIO_SLOTS as readonly string[]).includes(value);
+}
+
 type LayerBase = {
   id: string;
   name: string;
@@ -52,6 +74,8 @@ type LayerBase = {
   opacity: number;
   locked?: boolean;
   hidden?: boolean;
+  /** Campo da página-modelo (só em modelos de estilo). */
+  slot?: StudioSlot | null;
 };
 
 export type StudioImageRole = "background" | "element" | "photo" | "logo";
@@ -103,6 +127,9 @@ export type StudioTextLayer = LayerBase & {
   shadow?: boolean;
   /** Marca-texto atrás dos trechos em destaque (null = sem). */
   highlight?: string | null;
+  /** Fonte dos trechos em destaque (null = a mesma do texto). */
+  accentFontFamily?: string | null;
+  accentItalic?: boolean;
 };
 
 export type StudioShapeLayer = LayerBase & {
@@ -145,6 +172,16 @@ export type StudioPage = {
   background: string;
   gradient?: StudioGradient | null;
   layers: StudioLayer[];
+  /** Papel da página num modelo de estilo. */
+  templateRole?: StudioTemplateRole | null;
+};
+
+export type StudioTemplateRole = "cover" | "inner" | "cta";
+
+export const STUDIO_TEMPLATE_ROLE_LABEL: Record<StudioTemplateRole, string> = {
+  cover: "Capa",
+  inner: "Miolo",
+  cta: "CTA final",
 };
 
 export type StudioDocument = {
@@ -218,6 +255,10 @@ export type StudioCarousel = {
   caption: string | null;
   generation: StudioGeneration;
   thumbnail_url: string | null;
+  /** Estilo do acervo de estilos usado na geração (null = sem estilo). */
+  style_id: string | null;
+  /** Preenchido quando este documento é o conjunto de páginas-modelo de um estilo. */
+  style_template_for: string | null;
   created_at: string;
   updated_at: string;
 };

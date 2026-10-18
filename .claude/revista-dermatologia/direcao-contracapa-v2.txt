@@ -1,0 +1,27 @@
+Ferramenta integrada de geração de imagens.
+
+Redesign the attached final page into a substantially more professional luxury dermatology magazine BACK COVER. Deliver a SINGLE flat portrait page 3:4, highest resolution available, no mockup. Preserve warm ivory, dark espresso and muted champagne gold palette and recognizable B monogram, but rework the entire composition with exceptional editorial art direction. Expensive understated beauty magazine aesthetic, meticulous grid, generous negative space, elegant Didot-like serif and small refined sans-serif. Avoid the previous stacked centered flyer appearance and excessive decorative separators. Design a sophisticated asymmetric composition: tiny spaced DERMATOLOGIA masthead at top left, compact B monogram at top right; powerful but airy upper-left headline at upper third, italic emphasis on 'seu tempo'; subtle abstract warm photographic shadow across empty upper-right background, no objects needed. Lower third beautifully aligned two-column clinic contacts in small but readable type. Bottom editorial colophon and small discreet black linear BARCODE in bottom-right on matching ivory rectangular field, professional real magazine visual convention. Barcode is illustrative only, do not invent ISBN/ISSN, retail price or registration numbers. Under barcode simply 'EDIÇÃO INSTITUCIONAL'. No QR code. No huge logo at center. No page number on back cover.
+Use only this exact Portuguese content, preserve all numbers accurately:
+Headline 'Cuidar da pele é entender o seu tempo.'
+Subline 'E respeitar a história de cada pessoa.'
+Brand signature 'Dra. Bianca de Franco' / 'DERMATOLOGIA'
+Contact column 1:
+'CLÍNICA IPANEMA'
+'Rua Visconde de Pirajá, nº 608'
+'Salas 604/605 • Ipanema'
+'Rio de Janeiro – RJ'
+'(21) 97765-9559'
+Contact column 2:
+'CLÍNICA NITERÓI'
+'Rua Miguel de Frias, nº 150'
+'Sala 1212 • Icaraí'
+'Niterói – RJ • CEP 24220-003'
+'(21) 99571-8080'
+Below contacts 'Agendamentos pelo WhatsApp'
+'Segunda a sexta, 9h às 19h'
+'@biancadefranco'
+Small left-aligned colophon at bottom, separate from barcode:
+'Dra. Bianca De Franco • CRM 52102361-6'
+'Responsável técnico: Dr. Carlos Arthur Athayde'
+'CRM RJ: 52.101.999-6'
+Keep type sharp and readable with impeccable accents. The result must look like a professionally art-directed print back cover, restrained and polished.

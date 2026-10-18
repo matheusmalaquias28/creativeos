@@ -34,6 +34,7 @@ import {
 import { getGoogleDriveAuth } from "@/lib/google/drive";
 import { isCarouselDemand } from "@/lib/carousel-studio/demand";
 import { ensureStudioForDemand } from "@/services/carousel-studio";
+import { listCarouselStyleOptions } from "@/services/carousel-styles";
 import { DemandStudioSection } from "@/components/carousel-studio/demand-studio-section";
 
 export const maxDuration = 300;
@@ -108,7 +109,7 @@ export default async function DemandDetailPage({ params }: PageProps) {
 
   // Demandas de carrossel vão para o Carrossel Studio (criado sob demanda, sem custo).
   const carouselDemand = isCarouselDemand({ tipo: demand.tipo, briefing: demand.briefing });
-  const [clientAssets, demandRefs, exportFiles, driveAuth, studio] = await Promise.all([
+  const [clientAssets, demandRefs, exportFiles, driveAuth, studio, carouselStyles] = await Promise.all([
     demand.client_id && user
       ? getClientVisualAssets(demand.client_id, user.id)
       : Promise.resolve(null),
@@ -116,6 +117,7 @@ export default async function DemandDetailPage({ params }: PageProps) {
     getDemandExportFiles(id),
     getGoogleDriveAuth(),
     carouselDemand ? ensureStudioForDemand(id) : Promise.resolve(null),
+    carouselDemand ? listCarouselStyleOptions().catch(() => []) : Promise.resolve([]),
   ]);
 
   const title =
@@ -248,7 +250,7 @@ export default async function DemandDetailPage({ params }: PageProps) {
         </Surface>
 
         {studio ? (
-          <DemandStudioSection initial={studio} hasClient={Boolean(demand.client_id)} />
+          <DemandStudioSection initial={studio} hasClient={Boolean(demand.client_id)} styles={carouselStyles} />
         ) : (
           !demand.client_not_found && <DemandSpaceSection demand={demand} />
         )}

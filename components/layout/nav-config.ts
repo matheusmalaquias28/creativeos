@@ -104,6 +104,7 @@ export const NAV_SECTIONS: NavSection[] = [
         keywords: "carrossel instagram slides",
         children: [
           { href: "/carousel", label: "Todos os carrosséis" },
+          { href: "/carousel/estilos", label: "Estilos" },
           { href: "/carousel/perfis", label: "Perfis" },
         ],
       },
@@ -161,7 +162,9 @@ export function isNavChildActive(pathname: string, href: string) {
   if (href === "/carousel") {
     return (
       pathname === "/carousel" ||
-      (pathname.startsWith("/carousel/") && !pathname.startsWith("/carousel/perfis"))
+      (pathname.startsWith("/carousel/") &&
+        !pathname.startsWith("/carousel/perfis") &&
+        !pathname.startsWith("/carousel/estilos"))
     );
   }
   return isNavItemActive(pathname, href);

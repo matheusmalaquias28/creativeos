@@ -21,6 +21,8 @@ import {
   Playfair_Display,
   Merriweather,
   Lora,
+  Instrument_Serif,
+  Caveat,
 } from "next/font/google";
 import localFont from "next/font/local";
 
@@ -36,6 +38,8 @@ const bebasNeue = Bebas_Neue({ variable: "--font-bebas-neue", subsets: ["latin"]
 const playfair = Playfair_Display({ variable: "--font-playfair", subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], display: "swap" });
 const merriweather = Merriweather({ variable: "--font-merriweather", subsets: ["latin"], weight: ["400", "700", "900"], display: "swap" });
 const lora = Lora({ variable: "--font-lora", subsets: ["latin"], weight: ["400", "500", "600", "700"], display: "swap" });
+const instrumentSerif = Instrument_Serif({ variable: "--font-instrument-serif", subsets: ["latin"], weight: ["400"], style: ["normal", "italic"], display: "swap" });
+const caveat = Caveat({ variable: "--font-caveat", subsets: ["latin"], weight: ["400", "500", "600", "700"], display: "swap" });
 
 // Recoleta — fonte serif proprietária, self-hosted (não é Google Font).
 const recoleta = localFont({
@@ -61,6 +65,8 @@ export const fontVariables = [
   playfair.variable,
   merriweather.variable,
   lora.variable,
+  instrumentSerif.variable,
+  caveat.variable,
   recoleta.variable,
 ].join(" ");
 
@@ -87,6 +93,8 @@ export const FONT_OPTIONS: FontOption[] = [
   { id: "playfair", label: "Playfair Display", family: "var(--font-playfair), serif", category: "serif" },
   { id: "merriweather", label: "Merriweather", family: "var(--font-merriweather), serif", category: "serif" },
   { id: "lora", label: "Lora", family: "var(--font-lora), serif", category: "serif" },
+  { id: "instrument-serif", label: "Instrument Serif", family: "var(--font-instrument-serif), serif", category: "serif" },
+  { id: "caveat", label: "Caveat (manuscrita)", family: "var(--font-caveat), cursive", category: "display" },
   { id: "recoleta", label: "Recoleta", family: "var(--font-recoleta), serif", category: "serif" },
 ];
 

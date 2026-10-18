@@ -636,6 +636,66 @@ export type Database = {
         }>;
         Relationships: [];
       };
+      carousel_styles: {
+        Row: {
+          id: string;
+          name: string;
+          description: string | null;
+          client_id: string | null;
+          dna: Json;
+          analysis_status: "idle" | "analyzing" | "ready" | "failed";
+          analysis_error: string | null;
+          analyzed_at: string | null;
+          active: boolean;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          description?: string | null;
+          client_id?: string | null;
+          dna?: Json;
+          analysis_status?: "idle" | "analyzing" | "ready" | "failed";
+          analysis_error?: string | null;
+          analyzed_at?: string | null;
+          active?: boolean;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["carousel_styles"]["Insert"]>;
+        Relationships: [];
+      };
+      carousel_style_images: {
+        Row: {
+          id: string;
+          style_id: string;
+          storage_url: string;
+          storage_path: string;
+          file_name: string | null;
+          width: number | null;
+          height: number | null;
+          role: "cover" | "inner" | "cta" | null;
+          position: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          style_id: string;
+          storage_url: string;
+          storage_path: string;
+          file_name?: string | null;
+          width?: number | null;
+          height?: number | null;
+          role?: "cover" | "inner" | "cta" | null;
+          position?: number;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["carousel_style_images"]["Insert"]>;
+        Relationships: [];
+      };
       image_library: {
         Row: {
           id: string;
@@ -966,6 +1026,8 @@ export type Database = {
           caption: string | null;
           generation: Json;
           thumbnail_url: string | null;
+          style_id: string | null;
+          style_template_for: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -984,6 +1046,8 @@ export type Database = {
           caption?: string | null;
           generation?: Json;
           thumbnail_url?: string | null;
+          style_id?: string | null;
+          style_template_for?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -1000,6 +1064,8 @@ export type Database = {
           caption: string | null;
           generation: Json;
           thumbnail_url: string | null;
+          style_id: string | null;
+          style_template_for: string | null;
           updated_at: string;
         }>;
         Relationships: [];

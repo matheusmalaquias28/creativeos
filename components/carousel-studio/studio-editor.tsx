@@ -76,12 +76,14 @@ import { PropertiesPanel, type ImageActions } from "./properties-panel";
 import { FrameRenderer } from "./frame-renderer";
 import { AiImageDialog, ReferencesDialog, RegenerateDialog } from "./studio-dialogs";
 import { downloadBlob, renderFrameToBlob, uploadPageToDemand } from "./export";
+import type { CarouselStyleOption } from "@/services/carousel-styles";
 
 type SaveState = "saved" | "dirty" | "saving" | "error";
 
 export type StudioEditorProps = {
   initial: StudioCarousel;
   demandReferenceUrls: string[];
+  styles: CarouselStyleOption[];
   backHref: string;
   backLabel: string;
 };
@@ -134,7 +136,7 @@ function ToolButton({
   );
 }
 
-export function StudioEditor({ initial, demandReferenceUrls, backHref, backLabel }: StudioEditorProps) {
+export function StudioEditor({ initial, demandReferenceUrls, styles, backHref, backLabel }: StudioEditorProps) {
   const carouselId = initial.id;
   const history = useStudioHistory(initial.document);
   const doc = history.doc;
@@ -144,6 +146,8 @@ export function StudioEditor({ initial, demandReferenceUrls, backHref, backLabel
   const [name, setName] = useState(initial.name);
   const [caption, setCaption] = useState(initial.caption ?? "");
   const [brief, setBrief] = useState(initial.brief ?? "");
+  const [styleId, setStyleId] = useState<string | null>(initial.style_id);
+  const isTemplate = Boolean(initial.style_template_for);
   const [brand, setBrand] = useState(initial.brand);
   const [extraRefs, setExtraRefs] = useState<string[]>(initial.reference_urls);
   const [selection, setSelection] = useState<Selection>({ pageId: initial.document.pages[0]?.id ?? null, ids: [] });
@@ -735,11 +739,11 @@ export function StudioEditor({ initial, demandReferenceUrls, backHref, backLabel
   });
 
   // ── Geração ───────────────────────────────────────────────────────────────
-  const regenerate = async (nextBrief: string) => {
+  const regenerate = async (nextBrief: string, nextStyleId: string | null) => {
     const res = await fetch(`/api/carousel/studio/${carouselId}/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ brief: nextBrief }),
+      body: JSON.stringify({ brief: nextBrief, style_id: nextStyleId }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -747,6 +751,7 @@ export function StudioEditor({ initial, demandReferenceUrls, backHref, backLabel
       return;
     }
     setBrief(nextBrief);
+    setStyleId(nextStyleId);
     setStatus("queued");
     setGeneration({ stage: "queued", message: "Na fila…" });
     setSelection((s) => ({ pageId: s.pageId, ids: [] }));
@@ -884,12 +889,20 @@ export function StudioEditor({ initial, demandReferenceUrls, backHref, backLabel
             <Maximize2 className="size-3.5" />
           </ToolButton>
           <span className="mx-1 h-5 w-px bg-white/10" />
-          <ToolButton title="Referências visuais" onClick={() => setDialogs((d) => ({ ...d, references: true }))}>
-            <Images className="size-4" /> <span className="hidden lg:inline">Referências</span>
-          </ToolButton>
-          <ToolButton title="Gerar o carrossel de novo com IA" onClick={() => setDialogs((d) => ({ ...d, regenerate: true }))} disabled={busy}>
-            <Sparkles className="size-4" /> <span className="hidden lg:inline">Gerar de novo</span>
-          </ToolButton>
+          {isTemplate ? (
+            <span className="mr-1 hidden rounded-md bg-lime-400/15 px-2 py-1 text-[11px] font-semibold text-lime-300 lg:inline">
+              Páginas-modelo do estilo
+            </span>
+          ) : (
+            <>
+              <ToolButton title="Referências visuais" onClick={() => setDialogs((d) => ({ ...d, references: true }))}>
+                <Images className="size-4" /> <span className="hidden lg:inline">Referências</span>
+              </ToolButton>
+              <ToolButton title="Gerar o carrossel de novo com IA" onClick={() => setDialogs((d) => ({ ...d, regenerate: true }))} disabled={busy}>
+                <Sparkles className="size-4" /> <span className="hidden lg:inline">Gerar de novo</span>
+              </ToolButton>
+            </>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger
               disabled={readOnly || doc.pages.length === 0}
@@ -967,7 +980,7 @@ export function StudioEditor({ initial, demandReferenceUrls, backHref, backLabel
                     ? `A geração falhou: ${generation.error ?? "erro desconhecido"}`
                     : "Este carrossel ainda não foi gerado."}
               </p>
-              {!busy ? (
+              {!busy && !isTemplate ? (
                 <button
                   type="button"
                   onClick={() => setDialogs((d) => ({ ...d, regenerate: true }))}
@@ -1015,6 +1028,7 @@ export function StudioEditor({ initial, demandReferenceUrls, backHref, backLabel
             onDelete={deleteSelection}
             onDuplicatePage={() => activePage && onDuplicatePage(activePage.id)}
             onDeletePage={() => activePage && onDeletePage(activePage.id)}
+            isTemplate={isTemplate}
           />
         </aside>
       </div>
@@ -1077,6 +1091,8 @@ export function StudioEditor({ initial, demandReferenceUrls, backHref, backLabel
         open={dialogs.regenerate}
         onOpenChange={(open) => setDialogs((d) => ({ ...d, regenerate: open }))}
         initialBrief={brief}
+        initialStyleId={styleId}
+        styles={styles}
         onConfirm={regenerate}
       />
       <ReferencesDialog

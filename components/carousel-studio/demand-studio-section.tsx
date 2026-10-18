@@ -10,6 +10,8 @@ import { Surface } from "@/components/ui/surface";
 import { SectionHeader } from "@/components/layout/section-header";
 import { Textarea } from "@/components/ui/textarea";
 import { isStudioBusy, isStudioDocument, type StudioCarousel } from "@/types/carousel-studio";
+import { StylePicker } from "@/components/carousel-styles/style-picker";
+import type { CarouselStyleOption } from "@/services/carousel-styles";
 import { FrameThumbnail } from "./frame-renderer";
 
 const STATUS_LABEL: Record<StudioCarousel["status"], string> = {
@@ -25,9 +27,18 @@ const STATUS_LABEL: Record<StudioCarousel["status"], string> = {
  * Substitui o Space: mostra o progresso ao vivo, as páginas geradas e leva
  * ao editor.
  */
-export function DemandStudioSection({ initial, hasClient }: { initial: StudioCarousel; hasClient: boolean }) {
+export function DemandStudioSection({
+  initial,
+  hasClient,
+  styles,
+}: {
+  initial: StudioCarousel;
+  hasClient: boolean;
+  styles: CarouselStyleOption[];
+}) {
   const [studio, setStudio] = useState(initial);
   const [brief, setBrief] = useState(initial.brief ?? "");
+  const [styleId, setStyleId] = useState<string | null>(initial.style_id);
   const [showBrief, setShowBrief] = useState(false);
   const [starting, setStarting] = useState(false);
   const busy = isStudioBusy(studio.status);
@@ -71,11 +82,11 @@ export function DemandStudioSection({ initial, hasClient }: { initial: StudioCar
       const res = await fetch(`/api/carousel/studio/${initial.id}/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brief }),
+        body: JSON.stringify({ brief, style_id: styleId }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Não foi possível gerar");
-      setStudio((s) => ({ ...s, status: "queued", generation: { stage: "queued", message: "Na fila…" } }));
+      setStudio((s) => ({ ...s, status: "queued", style_id: styleId, generation: { stage: "queued", message: "Na fila…" } }));
       setShowBrief(false);
       toast.success("Gerando o carrossel — leva de 1 a 3 minutos.");
     } catch (e) {
@@ -118,6 +129,11 @@ export function DemandStudioSection({ initial, hasClient }: { initial: StudioCar
             {STATUS_LABEL[studio.status]}
           </span>
           {busy && gen.message ? <span className="text-muted-foreground">{gen.message}</span> : null}
+          {!busy && studio.style_id ? (
+            <span className="text-xs text-muted-foreground">
+              Estilo: {styles.find((s) => s.id === studio.style_id)?.name ?? "removido"}
+            </span>
+          ) : null}
           {studio.status === "failed" && gen.error ? (
             <span className="inline-flex items-center gap-1.5 text-tone-red">
               <AlertTriangle className="size-4" />
@@ -165,8 +181,9 @@ export function DemandStudioSection({ initial, hasClient }: { initial: StudioCar
         ) : null}
 
         {showBrief ? (
-          <div className="space-y-2 rounded-xl border border-border bg-surface/60 p-4">
-            <label className="text-sm font-medium">Instrução para a IA (opcional)</label>
+          <div className="space-y-3 rounded-xl border border-border bg-surface/60 p-4">
+            <StylePicker styles={styles} value={styleId} onChange={setStyleId} disabled={starting} />
+            <label className="block text-sm font-medium">Instrução para a IA (opcional)</label>
             <Textarea
               rows={3}
               value={brief}

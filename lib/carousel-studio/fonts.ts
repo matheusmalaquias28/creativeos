@@ -30,6 +30,8 @@ export const STUDIO_FONTS: StudioFontDef[] = [
   { id: "playfair", label: "Playfair Display", family: "var(--font-playfair), serif", heavy: 800, regular: 400, vibe: "serifada elegante, luxo, editorial" },
   { id: "merriweather", label: "Merriweather", family: "var(--font-merriweather), serif", heavy: 900, regular: 400, vibe: "serifada sóbria, jurídico, tradicional" },
   { id: "lora", label: "Lora", family: "var(--font-lora), serif", heavy: 700, regular: 400, vibe: "serifada suave, saúde, bem-estar" },
+  { id: "instrument-serif", label: "Instrument Serif", family: "var(--font-instrument-serif), serif", heavy: 400, regular: 400, vibe: "serifada condensada editorial, ótima em itálico como destaque" },
+  { id: "caveat", label: "Caveat", family: "var(--font-caveat), cursive", heavy: 700, regular: 500, vibe: "manuscrita de marcador, para anotações e notas à mão (não para títulos)" },
   { id: "recoleta", label: "Recoleta", family: "var(--font-recoleta), serif", heavy: 700, regular: 500, vibe: "serifada retrô, calorosa, gastronomia" },
 ];
 

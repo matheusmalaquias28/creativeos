@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Brain, ClipboardList, Wand2 } from "lucide-react";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
-import { BrandMark, BrandWordmark } from "@/components/layout/brand-mark";
+import { BrandWordmark, StormLogo } from "@/components/layout/brand-mark";
 import { tones } from "@/lib/design/tokens";
 import { cn } from "@/lib/utils";
 
@@ -38,7 +38,6 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
         <div aria-hidden className="bg-dot-grid pointer-events-none absolute inset-0 opacity-60 [mask-image:linear-gradient(to_bottom,black,transparent_75%)]" />
 
         <Link href="/" className="relative flex items-center gap-3">
-          <BrandMark size="md" />
           <BrandWordmark />
         </Link>
 
@@ -82,9 +81,8 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
       {/* Formulário */}
       <div className="relative flex min-h-screen flex-col">
         <header className="flex items-center justify-between px-6 py-5 lg:justify-end lg:px-10">
-          <Link href="/" className="flex items-center gap-2.5 lg:hidden">
-            <BrandMark size="sm" />
-            <span className="text-sm font-bold tracking-tight">Creative OS</span>
+          <Link href="/" className="flex items-center text-foreground lg:hidden">
+            <StormLogo />
           </Link>
           <ThemeToggle compact />
         </header>
