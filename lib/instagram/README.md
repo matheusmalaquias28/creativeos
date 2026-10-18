@@ -23,8 +23,10 @@ depois `POST /{ig-user-id}/media_publish` com `creation_id`. Detalhes e o que mu
   escopos `instagram_business_basic` + `instagram_business_content_publish`, não precisa
   de Página do Facebook) e *Facebook Login* (host `graph.facebook.com`, token `EAA…`,
   permissões `instagram_basic` + `instagram_content_publish` + `pages_read_engagement`,
-  e também `ads_management`/`ads_read` se o usuário tiver papel no Business Manager da Página).
-  O código detecta o host pelo prefixo do token. **Recomendação: Instagram Login.**
+  mais `pages_show_list` para listar as Páginas e achar a conta, e também
+  `ads_management`/`ads_read` se o usuário tiver papel no Business Manager da Página).
+  O código detecta o host pelo prefixo do token. **O spike usa o Facebook Login**, porque
+  o token do app começa com `EAA`. Para o multiusuário, veja as decisões no fim deste arquivo.
 - **Itens:** 2 a **10** por carrossel na API. O app do Instagram aceita 20, a API não.
 - **Formato:** só **JPEG** (MPO/JPS não). Máx. **8MB**, largura 320–1440px, sRGB.
 - **Proporção:** de **4:5 a 1.91:1**. Todos os itens são cortados pela proporção da
@@ -52,31 +54,69 @@ depois `POST /{ig-user-id}/media_publish` com `creation_id`. Detalhes e o que mu
   adicionadas ao app. Atender contas de terceiros (os clientes) exige *Advanced Access*,
   que passa por App Review.
 
-## Passo a passo: conta de teste
+## Passo a passo: conta de teste com Facebook Login (token `EAA…`, o caminho em uso)
 
-1. **Conta do Instagram:** use uma conta **profissional** (Empresa ou Criador) só para testes.
-2. **Criar o app:** em [developers.facebook.com/apps](https://developers.facebook.com/apps),
-   clique em *Criar app* e escolha o tipo **Business**. O app nasce em **modo desenvolvimento**
-   e deve continuar assim no spike. Nesse modo, ele só funciona com contas que têm papel no app.
-3. **Produto Instagram:** no painel do app, adicione o produto *Instagram* e abra
-   *Instagram → API setup with Instagram business login*.
-4. **Adicionar a conta como testadora:** em *Funções do app → Funções*, adicione a conta
-   como **Instagram Tester**. Depois, aceite o convite logado nessa conta: no Instagram
-   web, *Configurações → Apps e sites → Convites de testador*. O nome exato do menu muda
-   com frequência, então confira no painel.
-5. **Gerar o token:** de volta em *API setup with Instagram business login*, clique em
-   *Add account* / **Generate token** ao lado da conta, faça login no Instagram e copie o
-   token (`IGAA…`, válido por 60 dias).
-6. **Descobrir o ID da conta:**
+O token do app que estamos usando começa com `EAA`, ou seja, vem do **Facebook Login**.
+O código manda esse token para `graph.facebook.com` sozinho, sem nenhuma configuração extra.
+
+> **O token não passa por chat e não vai para arquivo versionado.** Coloque
+> `INSTAGRAM_TEST_ACCESS_TOKEN` e `INSTAGRAM_TEST_IG_USER_ID` direto no `.env.local`,
+> que está no `.gitignore`. Nos comandos abaixo, `$TOKEN`, `$APP_ID` e `$APP_SECRET` são
+> variáveis do seu terminal e não devem ser colados em nenhum outro lugar.
+
+1. **Contas:** use uma conta **profissional** do Instagram (Empresa ou Criador) só para
+   testes, **vinculada a uma Página do Facebook**. A pessoa que gera o token precisa ter
+   uma tarefa na Página (gerenciar ou criar conteúdo).
+2. **App em modo desenvolvimento:** em [developers.facebook.com/apps](https://developers.facebook.com/apps),
+   o app (tipo **Business**, com *Facebook Login for Business* adicionado) deve continuar
+   em **modo desenvolvimento**. Nesse modo, as permissões funcionam sem App Review, mas só
+   para quem tem uma função no app. Se for outra pessoa, adicione-a em *Funções do app → Funções*
+   como administradora, desenvolvedora ou testadora, e ela precisa aceitar o convite.
+3. **Permissões do token:** `instagram_basic`, `instagram_content_publish` e
+   `pages_show_list`. A página de Content Publishing da Meta também lista
+   `pages_read_engagement` para o Facebook Login, e vale incluí-la. Para o teste, o jeito
+   mais fácil de gerar o token é o [Graph API Explorer](https://developers.facebook.com/tools/explorer/):
+   escolha o app, marque as permissões, clique em *Generate Access Token* e aprove a Página
+   e a conta do Instagram. O token que sai dali é **curto (cerca de 1 hora)**.
+4. **Trocar o token curto por um de longa duração (cerca de 60 dias).** Faça isso no seu
+   terminal, porque o comando usa o app secret:
    ```bash
-   curl "https://graph.instagram.com/v25.0/me?fields=user_id,username&access_token=SEU_TOKEN"
+   curl -G "https://graph.facebook.com/v25.0/oauth/access_token" \
+     --data-urlencode "grant_type=fb_exchange_token" \
+     --data-urlencode "client_id=$APP_ID" \
+     --data-urlencode "client_secret=$APP_SECRET" \
+     --data-urlencode "fb_exchange_token=$TOKEN"
    ```
-   O `user_id` da resposta é o `INSTAGRAM_TEST_IG_USER_ID`.
-7. **Configurar o `.env.local`** (veja `.env.example`):
+   O `access_token` da resposta (`expires_in` ≈ 5.184.000s, cerca de 60 dias) é o valor de
+   `INSTAGRAM_TEST_ACCESS_TOKEN`. Esse token não é renovado por chamada de API: quando
+   vencer, gere outro no Explorer e troque de novo. Com esse token de usuário longo,
+   `GET /me/accounts` também devolve um `access_token` **de Página**, que não expira.
+   Se a publicação com o token de usuário der erro de permissão (código 10 ou 200), use
+   o token de Página.
+5. **Achar o IG user id:**
+   ```bash
+   curl -G "https://graph.facebook.com/v25.0/me/accounts" \
+     --data-urlencode "fields=name,instagram_business_account" \
+     --data-urlencode "access_token=$TOKEN"
+   ```
+   Na Página certa, o `instagram_business_account.id` (algo como `1784…`) é o
+   `INSTAGRAM_TEST_IG_USER_ID`. Se o campo não aparecer, a conta do Instagram não está
+   vinculada a essa Página ou não é uma conta profissional.
+6. **Configurar o `.env.local`** (veja `.env.example`) e reiniciar o `npm run dev`:
    ```
    INSTAGRAM_TEST_IG_USER_ID=1784...
-   INSTAGRAM_TEST_ACCESS_TOKEN=IGAA...
+   INSTAGRAM_TEST_ACCESS_TOKEN=EAA...
    ```
+
+### Alternativa: Instagram Login (token `IGAA…`)
+
+Se um dia o app usar *Instagram → API setup with Instagram business login*:
+
+- Adicione a conta como **Instagram Tester** em *Funções do app* e aceite o convite no Instagram.
+- Clique em **Generate token** ao lado da conta. Esse token já sai com 60 dias de validade.
+- Descubra o ID com `GET https://graph.instagram.com/v25.0/me?fields=user_id,username`.
+
+O código detecta esse tipo de token e usa `graph.instagram.com`.
 
 ## Como rodar o teste
 
@@ -105,8 +145,10 @@ Os testes (`npm test`) usam a API mockada e não fazem nenhuma chamada real.
 
 ## Decisões para a próxima etapa (multiusuário). Ainda não implementado
 
-- **Login:** Instagram Login (Business Login for Instagram), uma conexão por **cliente**.
-  Assim não dependemos de o cliente ter uma Página do Facebook vinculada.
+- **Login:** uma conexão por **cliente**. Ainda falta decidir entre os dois tipos de login.
+  O Instagram Login dispensa a Página do Facebook e tem renovação de token por API
+  (`ig_refresh_token`). O Facebook Login é o que o spike usa e devolve um token de Página
+  que não expira, mas exige que o cliente tenha uma Página vinculada e que demos acesso a ela.
 - **Tokens:** tabela `instagram_accounts` (client_id, ig_user_id, username, token
   criptografado, expires_at, scopes, status). Um cron renova o token quando faltarem
   cerca de 10 dias para vencer (`ig_refresh_token`) e marca a conta como "reconectar"
