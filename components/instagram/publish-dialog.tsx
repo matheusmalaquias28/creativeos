@@ -106,7 +106,6 @@ export function InstagramPublishDialog({
       <InstagramPublishShell
         open={open}
         onOpenChange={onOpenChange}
-        accountQuery={`carouselId=${carouselId}`}
         cards={cards}
         minCards={2}
         initialCaption={initialCaption}

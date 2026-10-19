@@ -87,7 +87,6 @@ export function DemandInstagramButton({
       <InstagramPublishShell
         open={open}
         onOpenChange={setOpen}
-        accountQuery={`demandId=${demandId}`}
         cards={cards}
         minCards={1}
         initialCaption={initialCaption}

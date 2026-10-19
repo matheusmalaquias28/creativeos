@@ -9,7 +9,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { resolveAccountForClient } from "@/lib/instagram/account";
+import { resolveAccount } from "@/lib/instagram/account";
 import { feedFormatError } from "@/lib/instagram/jpeg";
 import { createPost, publishPostNow, toInstagramPost, verifyUploadedItems } from "@/lib/instagram/posts";
 import { CAPTION_MAX_CHARS } from "@/lib/instagram/publish";
@@ -46,7 +46,7 @@ const bodySchema = z.object({
   items: z.array(z.object({ path: z.string().min(1), page_id: z.string().nullish() })),
   caption: z.string().max(CAPTION_MAX_CHARS, `Legenda passa de ${CAPTION_MAX_CHARS} caracteres`),
   scheduledAt: z.string().datetime({ offset: true }).nullable(),
-  /** Conta que o usuário viu na confirmação — se mudou, não publica. */
+  /** Conta escolhida no diálogo (e mostrada na confirmação). */
   igUserId: z.string().min(1),
 });
 
@@ -76,13 +76,7 @@ export async function POST(request: Request) {
     const formatError = feedFormatError(carousel.format);
     if (formatError) return NextResponse.json({ error: formatError }, { status: 422 });
 
-    const account = await resolveAccountForClient(carousel.client_id);
-    if (account.igUserId !== body.igUserId) {
-      return NextResponse.json(
-        { error: `A conta de destino mudou para @${account.username ?? account.igUserId}. Abra o diálogo de novo e confira.` },
-        { status: 409 }
-      );
-    }
+    const account = await resolveAccount(body.igUserId);
 
     const items = await verifyUploadedItems(admin, { carouselId: body.carouselId, postId: body.postId, items: body.items });
     let post = await createPost(admin, {

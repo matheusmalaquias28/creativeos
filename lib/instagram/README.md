@@ -13,7 +13,8 @@ Há dois pontos de entrada, com o mesmo diálogo:
 No editor do Carrossel Studio, o comando **Exportar → Publicar no Instagram** Esse comando abre um
 diálogo onde você escolhe e ordena os cards (de 2 a 10), edita a legenda (máx. 2.200
 caracteres) e decide entre **Agora** ou **Agendar** (data e hora no horário de Brasília).
-O diálogo mostra a conta de destino (@username) e pede uma confirmação final: "Vai publicar
+O diálogo mostra a conta de destino (@username), com um seletor quando há mais de uma
+conta conectada (veja [Várias contas](#várias-contas)), e pede uma confirmação final: "Vai publicar
 N cards em @conta". **Nada publica sozinho.** Só sai post depois de alguém clicar e
 confirmar. O cron só publica o que alguém agendou.
 
@@ -44,13 +45,13 @@ como `failed`, com o aviso para conferir no Instagram, e não tenta de novo sozi
 | --- | --- |
 | `publish.ts` | `publishCarousel()`: com 1 imagem, faz um post simples; com 2 ou mais, segue containers → `FINISHED` → `CAROUSEL` → `media_publish` → permalink. Também tem `getPublishingQuota()` e `getInstagramAccount()` (`/me`). |
 | `posts.ts` | Tabela `instagram_posts`: criar, conferir os cards, preparar as artes da demanda (Storage ou Drive → JPEG), reivindicar atomicamente, publicar, cancelar e rodar o cron. |
-| `account.ts` | Conta de destino. Hoje é a do env; depois, a conta conectada de cada cliente. |
+| `account.ts` | Contas conectadas (env): lista para o seletor e devolve o token da conta escolhida ou gravada no post. |
 | `schedule.ts` | Horário de Brasília ↔ UTC e validação do agendamento (de 5 min a 75 dias). |
 | `jpeg.ts` / `format.ts` | Regras de imagem do feed; o 9:16 é recusado. |
 | `errors.ts` | Erros da Graph API em português. |
 | `http.ts` | Só admin publica; formato das respostas de erro. |
 
-Rotas: `GET /api/instagram/account` (`?carouselId=` ou `?demandId=`), `GET|POST /api/instagram/posts`,
+Rotas: `GET /api/instagram/account` (lista as contas), `GET|POST /api/instagram/posts`,
 `POST /api/instagram/demand-posts` (artes da entrega da demanda),
 `POST /api/instagram/posts/upload`, `POST /api/instagram/posts/[id]/publish` (agora ou tentar
 de novo), `POST /api/instagram/posts/[id]/cancel` e `GET|POST /api/cron/instagram-publish`.
@@ -151,6 +152,23 @@ da documentação, e pode ser trocada com `INSTAGRAM_API_VERSION` (por exemplo, 
    ```
    `INSTAGRAM_TEST_ACCESS_TOKEN` continua aceito como nome alternativo do token.
 
+### Várias contas
+
+Cada conta precisa do **próprio token** (o token do Instagram Login é de uma conta só). A
+conta 1 continua em `INSTAGRAM_ACCESS_TOKEN` + `INSTAGRAM_TEST_IG_USER_ID`. As outras usam
+um par numerado:
+
+```
+INSTAGRAM_ACCESS_TOKEN_2=IGAA...        # token da segunda conta (passo 4 acima, logado nela)
+INSTAGRAM_IG_USER_ID_2=1784...          # opcional com IGAA, obrigatório com EAA
+INSTAGRAM_ACCESS_TOKEN_3=...
+```
+
+Com mais de uma conta, o diálogo mostra um seletor de **Conta de destino**. O post grava o
+`ig_user_id` escolhido, e o cron publica com o token dessa conta. Se o token de uma conta
+vencer ou o id não bater com o `/me`, ela some do seletor (o erro vai para o log do servidor)
+e os agendados dela falham com aviso, sem afetar as outras.
+
 ### Alternativa: Facebook Login (token `EAA…`)
 
 Com esse tipo de token, o código usa `graph.facebook.com`.
@@ -227,8 +245,8 @@ O botão "Publicar agora" funciona sem cron.
 - **Imagens:** feito. Os cards são gerados no navegador na hora de publicar ou agendar e
   ficam no bucket `instagram-posts`. O que se edita no Studio depois de agendar **não entra**
   no post: é uma foto daquele momento.
-- **Conta por cliente:** trocar `resolveAccountForClient()` em `account.ts` para ler a conta
-  conectada do cliente. A tabela já grava `client_id`, `ig_user_id` e `ig_username` por post.
+- **Conta por cliente:** trocar `listAccounts()` em `account.ts` para ler as contas conectadas
+  (tabela) em vez do env. A tabela já grava `client_id`, `ig_user_id` e `ig_username` por post.
 - **Meta:** para publicar em contas de clientes é preciso Advanced Access para
   `instagram_business_basic` e `instagram_business_content_publish`. Isso pede App Review
   (screencast do fluxo, política de privacidade, callback de exclusão de dados) e

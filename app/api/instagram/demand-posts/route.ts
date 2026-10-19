@@ -11,7 +11,7 @@ import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { resolveAccountForClient } from "@/lib/instagram/account";
+import { resolveAccount } from "@/lib/instagram/account";
 import { createPost, prepareDemandItems, publishPostNow } from "@/lib/instagram/posts";
 import { CAPTION_MAX_CHARS, CAROUSEL_MAX_ITEMS } from "@/lib/instagram/publish";
 import { validateScheduledAt } from "@/lib/instagram/schedule";
@@ -24,7 +24,7 @@ const bodySchema = z.object({
   fileIds: z.array(z.string().uuid()).min(1, "Escolha pelo menos uma arte").max(CAROUSEL_MAX_ITEMS),
   caption: z.string().max(CAPTION_MAX_CHARS, `Legenda passa de ${CAPTION_MAX_CHARS} caracteres`),
   scheduledAt: z.string().datetime({ offset: true }).nullable(),
-  /** Conta que o usuário viu na confirmação — se mudou, não publica. */
+  /** Conta escolhida no diálogo (e mostrada na confirmação). */
   igUserId: z.string().min(1),
 });
 
@@ -48,13 +48,7 @@ export async function POST(request: Request) {
     const { data: demand } = await admin.from("creative_demands").select("id, client_id").eq("id", body.demandId).maybeSingle();
     if (!demand) return NextResponse.json({ error: "Demanda não encontrada" }, { status: 404 });
 
-    const account = await resolveAccountForClient(demand.client_id);
-    if (account.igUserId !== body.igUserId) {
-      return NextResponse.json(
-        { error: `A conta de destino mudou para @${account.username ?? account.igUserId}. Abra o diálogo de novo e confira.` },
-        { status: 409 }
-      );
-    }
+    const account = await resolveAccount(body.igUserId);
 
     const postId = randomUUID();
     const items = await prepareDemandItems(admin, { demandId: body.demandId, postId, fileIds: body.fileIds });

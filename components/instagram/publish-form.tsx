@@ -62,7 +62,6 @@ function defaultScheduleLocal(): string {
 export function InstagramPublishShell({
   open,
   onOpenChange,
-  accountQuery,
   cards,
   minCards,
   initialCaption,
@@ -74,8 +73,6 @@ export function InstagramPublishShell({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Query de /api/instagram/account (ex.: "carouselId=…" ou "demandId=…"). */
-  accountQuery: string;
   cards: PublishCard[];
   minCards: number;
   initialCaption: string;
@@ -94,7 +91,8 @@ export function InstagramPublishShell({
   const [step, setStep] = useState<Step>("edit");
   const [progress, setProgress] = useState("");
   const [result, setResult] = useState<InstagramPost | null>(null);
-  const [account, setAccount] = useState<InstagramAccountInfo | null>(null);
+  const [accounts, setAccounts] = useState<InstagramAccountInfo[] | null>(null);
+  const [accountId, setAccountId] = useState<string | null>(null);
   const [accountError, setAccountError] = useState<string | null>(null);
 
   // Ao abrir: estado novo a partir do conteúdo atual.
@@ -106,14 +104,18 @@ export function InstagramPublishShell({
     setScheduleLocal(defaultScheduleLocal());
     setStep("edit");
     setResult(null);
-    setAccount(null);
+    setAccounts(null);
     setAccountError(null);
     let canceled = false;
-    fetch(`/api/instagram/account?${accountQuery}`)
+    fetch("/api/instagram/account")
       .then(async (res) => {
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error ?? "Não foi possível ler a conta do Instagram");
-        if (!canceled) setAccount(data as InstagramAccountInfo);
+        if (canceled) return;
+        const list = (data.accounts ?? []) as InstagramAccountInfo[];
+        setAccounts(list);
+        // Mantém a última conta escolhida, se ela ainda estiver conectada.
+        setAccountId((prev) => (prev && list.some((a) => a.igUserId === prev) ? prev : (list[0]?.igUserId ?? null)));
       })
       .catch((e) => !canceled && setAccountError(e instanceof Error ? e.message : "Conta indisponível"));
     return () => {
@@ -123,6 +125,7 @@ export function InstagramPublishShell({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  const account = accounts?.find((a) => a.igUserId === accountId) ?? null;
   const cardById = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
   const chosen = order.filter((c) => c.included && cardById.has(c.id));
   const scheduledIso = useMemo(() => {
@@ -144,7 +147,7 @@ export function InstagramPublishShell({
     const err = validateScheduledAt(scheduledIso);
     if (err) problems.push(err);
   }
-  if (!account) problems.push(accountError ?? "Carregando a conta do Instagram…");
+  if (!account) problems.push(accountError ?? (accounts ? "Escolha a conta de destino." : "Carregando as contas do Instagram…"));
 
   const move = (index: number, delta: number) =>
     setOrder((prev) => {
@@ -193,6 +196,21 @@ export function InstagramPublishShell({
           <DialogDescription>
             {accountError ? (
               <span className="text-tone-red">{accountError}</span>
+            ) : step === "edit" && accounts && accounts.length > 1 ? (
+              <span className="flex items-center gap-2">
+                Conta de destino:
+                <select
+                  value={accountId ?? ""}
+                  onChange={(e) => setAccountId(e.target.value)}
+                  className="h-8 rounded-lg border border-border bg-card px-2 text-sm font-semibold text-foreground"
+                >
+                  {accounts.map((a) => (
+                    <option key={a.igUserId} value={a.igUserId}>
+                      @{a.username ?? a.igUserId}
+                    </option>
+                  ))}
+                </select>
+              </span>
             ) : (
               <>
                 Conta de destino: <strong className="text-foreground">{target}</strong>
