@@ -580,23 +580,34 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
 
       const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
 
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const imageUrl = ev.target?.result as string;
-        setNodes((ns) => [
-          ...ns,
-          {
-            id: `img-${Date.now()}`,
-            type: "referenciaImagem",
-            position,
-            data: { imageUrl, label: file.name.replace(/\.[^.]+$/, "") },
-          } as Node,
-        ]);
-        scheduleAutoSave();
-      };
-      reader.readAsDataURL(file);
+      // Sobe pro Storage e o node guarda só a URL — base64 no grafo deixava a
+      // linha com vários MB e o salvamento estourava o statement_timeout.
+      void (async () => {
+        try {
+          const body = new FormData();
+          body.append("file", file);
+          const res = await fetch(`/api/demands/${demanda.id}/flow/upload`, { method: "POST", body });
+          const json = (await res.json()) as { url?: string; error?: string };
+          if (!res.ok || !json.url) throw new Error(json.error ?? "Falha no upload");
+          const imageUrl = json.url;
+          setNodes((ns) => [
+            ...ns,
+            {
+              id: `img-${Date.now()}`,
+              type: "referenciaImagem",
+              position,
+              data: { imageUrl, label: file.name.replace(/\.[^.]+$/, "") },
+            } as Node,
+          ]);
+          scheduleAutoSave();
+        } catch (err) {
+          toast.error("Erro ao enviar imagem", {
+            description: err instanceof Error ? err.message : String(err),
+          });
+        }
+      })();
     },
-    [screenToFlowPosition, setNodes, scheduleAutoSave]
+    [demanda.id, screenToFlowPosition, setNodes, scheduleAutoSave]
   );
 
   // ─── Node palette ─────────────────────────────────────────────────────
