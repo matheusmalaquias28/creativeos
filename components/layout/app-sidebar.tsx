@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { signOut } from "@/actions/auth";
 import { useNewDemandsCount } from "@/components/demands/new-demands-count-provider";
-import { BrandMark, BrandWordmark } from "@/components/layout/brand-mark";
+import { BrandMark, BrandWordmark, StormLogo } from "@/components/layout/brand-mark";
 import { useCommandMenu } from "@/components/layout/command-menu";
 import {
   isNavChildActive,
@@ -86,9 +86,8 @@ export function AppSidebar({ userName, userEmail }: AppSidebarProps) {
         >
           <Menu className="size-5" strokeWidth={1.75} />
         </button>
-        <Link href={homeHref} className="flex items-center gap-2.5">
-          <BrandMark size="sm" />
-          <span className="text-sm font-bold tracking-tight">Creative OS</span>
+        <Link href={homeHref} className="flex items-center text-foreground">
+          <StormLogo />
         </Link>
         <button
           type="button"
@@ -181,10 +180,9 @@ function SidebarBody({
           href={homeHref}
           onClick={onNavigate}
           className="flex min-w-0 items-center gap-3"
-          title={collapsed ? "Creative OS" : undefined}
+          title={collapsed ? "Storm" : undefined}
         >
-          <BrandMark />
-          {!collapsed && <BrandWordmark />}
+          {collapsed ? <BrandMark /> : <BrandWordmark />}
         </Link>
         {onToggle && !collapsed && (
           <button

@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { homePathFor, parseRole } from "@/lib/auth/permissions";
 import { buttonVariants } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
-import { BrandMark, BrandWordmark } from "@/components/layout/brand-mark";
+import { BrandWordmark } from "@/components/layout/brand-mark";
 import { tones, type Tone } from "@/lib/design/tokens";
 import { cn } from "@/lib/utils";
 
@@ -49,10 +49,7 @@ export default async function HomePage() {
   return (
     <div className="relative flex min-h-screen flex-col">
       <header className="flex items-center justify-between px-6 py-5 lg:px-12">
-        <div className="flex items-center gap-3">
-          <BrandMark />
-          <BrandWordmark />
-        </div>
+        <BrandWordmark />
         <div className="flex items-center gap-2">
           <ThemeToggle compact />
           <Link href="/login" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
