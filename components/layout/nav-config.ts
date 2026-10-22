@@ -8,6 +8,7 @@ import {
   Layers,
   ShieldCheck,
   Users,
+  Video,
   Wand2,
   type LucideIcon,
 } from "lucide-react";
@@ -68,6 +69,13 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: Globe,
         tone: "blue",
         keywords: "site landing page",
+      },
+      {
+        href: "/videos",
+        label: "Vídeos",
+        icon: Video,
+        tone: "pink",
+        keywords: "reels vsl edição vídeo filmagem",
       },
       {
         href: "/clients",

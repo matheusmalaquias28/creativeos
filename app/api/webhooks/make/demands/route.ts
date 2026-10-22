@@ -13,6 +13,8 @@ import {
 import { DEMAND_INITIAL_STATUS } from "@/types/demand";
 import { isCarouselDemand } from "@/lib/carousel-studio/demand";
 import { autoRouteCarouselDemand } from "@/lib/carousel-studio/auto-trigger";
+import { isVideoDemandPayload } from "@/lib/video-demands/parse-payload";
+import { ingestVideoDemand } from "@/lib/video-demands/ingest";
 import type { Database } from "@/types/database";
 
 type CreativeDemandInsert =
@@ -123,6 +125,25 @@ export async function POST(request: Request) {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  // Demandas de vídeo (tipo: "video") são separadas das de arte: vão para
+  // `video_demands` e não entram no pipeline de artes/Magnific. Rede de
+  // segurança caso o WAR continue apontando para este endpoint em vez de
+  // /api/webhooks/make/videos.
+  if (isVideoDemandPayload(body)) {
+    const result = await ingestVideoDemand(createAdminClient(), body);
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: result.status });
+    }
+    return NextResponse.json({
+      ok: true,
+      kind: "video",
+      demandId: result.demandId,
+      externalId: result.externalId,
+      clientNotFound: result.clientNotFound,
+      message: "Demanda de vídeo roteada para a aba Vídeos",
+    });
   }
 
   const parsed = parseMakeDemandPayload(body);

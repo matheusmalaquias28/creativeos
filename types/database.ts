@@ -403,6 +403,98 @@ export type Database = {
           },
         ];
       };
+      video_demands: {
+        Row: {
+          id: string;
+          external_id: string;
+          client_id: string | null;
+          client_name_external: string;
+          client_not_found: boolean;
+          tipo: string | null;
+          categoria: string | null;
+          prioridade: string | null;
+          squad: string | null;
+          gestor: string | null;
+          webdesigner: string | null;
+          solicitante: string | null;
+          briefing: Json;
+          status: string | null;
+          is_archived: boolean;
+          is_new: boolean;
+          started_at: string | null;
+          completed_at: string | null;
+          elapsed_seconds: number | null;
+          due_date: string | null;
+          external_created_at: string | null;
+          raw_payload: Json;
+          drive_folder_url: string | null;
+          drive_folder_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          external_id: string;
+          client_id?: string | null;
+          client_name_external: string;
+          client_not_found?: boolean;
+          tipo?: string | null;
+          categoria?: string | null;
+          prioridade?: string | null;
+          squad?: string | null;
+          gestor?: string | null;
+          webdesigner?: string | null;
+          solicitante?: string | null;
+          briefing?: Json;
+          status?: string | null;
+          is_archived?: boolean;
+          is_new?: boolean;
+          started_at?: string | null;
+          completed_at?: string | null;
+          elapsed_seconds?: number | null;
+          due_date?: string | null;
+          external_created_at?: string | null;
+          raw_payload?: Json;
+          drive_folder_url?: string | null;
+          drive_folder_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<{
+          client_id: string | null;
+          client_name_external: string;
+          client_not_found: boolean;
+          tipo: string | null;
+          categoria: string | null;
+          prioridade: string | null;
+          squad: string | null;
+          gestor: string | null;
+          webdesigner: string | null;
+          solicitante: string | null;
+          briefing: Json;
+          status: string | null;
+          is_archived: boolean;
+          is_new: boolean;
+          started_at: string | null;
+          completed_at: string | null;
+          elapsed_seconds: number | null;
+          due_date: string | null;
+          external_created_at: string | null;
+          raw_payload: Json;
+          drive_folder_url: string | null;
+          drive_folder_id: string | null;
+          updated_at: string;
+        }>;
+        Relationships: [
+          {
+            foreignKeyName: "video_demands_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       demand_export_files: {
         Row: {
           id: string;
