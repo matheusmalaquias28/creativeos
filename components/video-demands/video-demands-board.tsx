@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import {
   AlertTriangle,
+  ArrowUpRight,
   Calendar,
   FolderOpen,
   Grip,
@@ -191,6 +193,14 @@ function VideoCard({
                 <FolderOpen className="size-3.5" />
               </a>
             )}
+            <Link
+              href={`/videos/${demand.id}`}
+              onClick={(e) => e.stopPropagation()}
+              className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-premium hover:bg-primary hover:text-primary-foreground"
+              title="Ver demanda"
+            >
+              <ArrowUpRight className="size-3.5" />
+            </Link>
           </div>
         </div>
       </div>

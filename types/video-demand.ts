@@ -66,3 +66,8 @@ export type VideoDemandListItem = VideoDemand & {
   /** Status aceitos pelo WAR para esta demanda (extraídos do raw_payload). */
   status_permitidos?: string[];
 };
+
+/** Item + payload cru do WAR, usado na página de detalhe para exibir tudo. */
+export type VideoDemandDetail = VideoDemandListItem & {
+  raw_payload: unknown;
+};

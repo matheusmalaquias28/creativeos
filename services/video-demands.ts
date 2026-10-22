@@ -2,7 +2,11 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { isSchemaMissingError, schemaNotReadyError } from "@/lib/errors/database";
 import { extractStatusPermitidos } from "@/lib/demands/war-status-callback";
-import type { VideoBriefing, VideoDemandListItem } from "@/types/video-demand";
+import type {
+  VideoBriefing,
+  VideoDemandDetail,
+  VideoDemandListItem,
+} from "@/types/video-demand";
 
 function throwIfDbError(error: { message: string }) {
   if (isSchemaMissingError(error.message)) {
@@ -88,7 +92,7 @@ export const getVideoDemandsForUser = cache(
 );
 
 export const getVideoDemandById = cache(
-  async (demandId: string): Promise<VideoDemandListItem | null> => {
+  async (demandId: string): Promise<VideoDemandDetail | null> => {
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("video_demands")
@@ -104,7 +108,10 @@ export const getVideoDemandById = cache(
       | { name?: string; slug?: string }[]
       | null;
     const client = Array.isArray(clients) ? clients[0] : clients;
-    return mapRow(data as Record<string, unknown>, client?.name, client?.slug ?? null);
+    return {
+      ...mapRow(data as Record<string, unknown>, client?.name, client?.slug ?? null),
+      raw_payload: (data as Record<string, unknown>).raw_payload ?? null,
+    };
   }
 );
 
