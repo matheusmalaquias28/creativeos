@@ -1,5 +1,3 @@
-import type Anthropic from "@anthropic-ai/sdk";
-
 export type TweetContentMode = "ai" | "manual";
 
 export type TweetSpec = {
@@ -7,9 +5,9 @@ export type TweetSpec = {
   cards: { texto: string }[];
 };
 
-export const BUILD_TWEET_TOOL: Anthropic.Messages.Tool = {
+/** Formato de saída: carrossel estilo tweet, já dividido em cards (JSON Schema estrito). */
+export const BUILD_TWEET_TOOL = {
   name: "build_tweet_carousel",
-  description: "Entrega o carrossel estilo tweet, já dividido em cards.",
   input_schema: {
     type: "object",
     properties: {
@@ -31,10 +29,12 @@ export const BUILD_TWEET_TOOL: Anthropic.Messages.Tool = {
             },
           },
           required: ["texto"],
+          additionalProperties: false,
         },
       },
     },
     required: ["titulo", "cards"],
+    additionalProperties: false,
   },
 };
 

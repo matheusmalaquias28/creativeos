@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
-import { getAnthropicClient } from "@/lib/ai/client";
+import { openaiJsonStream, responseText } from "@/lib/ai/openai-text";
 import {
   BUILD_CAROUSEL_TOOL,
   buildSystemPrompt,
@@ -12,7 +11,6 @@ import type { CarouselProfile } from "@/types/carousel-profile";
 
 export const maxDuration = 120;
 
-const TURBO_MODEL = "claude-sonnet-4-6";
 
 type ContentBody = { profileId: string; theme: string; cardCount?: number };
 
@@ -47,7 +45,6 @@ export async function POST(req: NextRequest) {
   if (!profile) return new Response(JSON.stringify({ error: "Perfil não encontrado" }), { status: 404 });
 
   const encoder = new TextEncoder();
-  const anthropic = getAnthropicClient();
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -57,47 +54,45 @@ export async function POST(req: NextRequest) {
       try {
         send({ type: "status", message: "Pesquisando o tema e pensando na narrativa…" });
 
-        const tools = [
-          { type: "web_search_20250305", name: "web_search", max_uses: 4 },
-          BUILD_CAROUSEL_TOOL,
-        ] as Anthropic.Messages.ToolUnion[];
-
-        const aStream = anthropic.messages.stream({
-          model: TURBO_MODEL,
-          max_tokens: 6000,
-          system: buildSystemPrompt(profile, theme, cardCount),
-          messages: [
-            {
-              role: "user",
-              content:
-                "Pesquise o tema com dados atuais e gere o conteúdo do carrossel. Ao final, chame a ferramenta build_carousel com o resultado completo.",
-            },
-          ],
-          tools,
-        });
-
-        aStream.on("text", (t) => send({ type: "text", delta: t }));
-
-        const final = await aStream.finalMessage();
-
-        let spec: TurboSpec | null = null;
-        const toolBlock = final.content.find(
-          (b) => b.type === "tool_use" && b.name === "build_carousel"
-        );
-        if (toolBlock && toolBlock.type === "tool_use") {
-          spec = toolBlock.input as TurboSpec;
-        } else {
-          const textBlock = final.content.find((b) => b.type === "text");
-          if (textBlock && textBlock.type === "text") {
-            const m = textBlock.text.match(/\{[\s\S]*\}/);
-            if (m) {
-              try {
-                spec = JSON.parse(m[0]) as TurboSpec;
-              } catch {
-                /* ignore */
-              }
+        // Pesquisa na web (ferramenta nativa da OpenAI) e devolve o carrossel no
+        // schema do build_carousel. O resumo do raciocínio vai para o painel
+        // "pensando" da UI; buscas viram status.
+        let searches = 0;
+        let writing = false;
+        const final = await openaiJsonStream(
+          {
+            system: buildSystemPrompt(profile, theme, cardCount),
+            input:
+              "Pesquise o tema com dados atuais e gere o conteúdo do carrossel completo no formato pedido.",
+            tools: [{ type: "web_search" }],
+            schemaName: BUILD_CAROUSEL_TOOL.name,
+            // Schema com campos opcionais (cta, gridPrompts, textGlass): modo não-estrito.
+            jsonSchema: BUILD_CAROUSEL_TOOL.input_schema,
+            strict: false,
+            maxOutputTokens: 24000,
+            reasoningEffort: "medium",
+            timeoutMs: 115_000,
+          },
+          (evt) => {
+            if (evt.type === "response.reasoning_summary_text.delta" && evt.delta) {
+              send({ type: "text", delta: evt.delta });
+            } else if (evt.type === "response.reasoning_summary_part.done") {
+              send({ type: "text", delta: "\n\n" });
+            } else if (evt.type === "response.web_search_call.searching") {
+              searches += 1;
+              send({ type: "status", message: `Pesquisando na web (${searches})…` });
+            } else if (evt.type === "response.output_text.delta" && !writing) {
+              writing = true;
+              send({ type: "status", message: "Montando o carrossel…" });
             }
           }
+        );
+
+        let spec: TurboSpec | null = null;
+        try {
+          spec = JSON.parse(responseText(final)) as TurboSpec;
+        } catch {
+          spec = null;
         }
 
         if (!spec || !Array.isArray(spec.slides) || spec.slides.length === 0) {

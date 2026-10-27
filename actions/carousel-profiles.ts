@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getAnthropicClient } from "@/lib/ai/client";
+import { openaiText } from "@/lib/ai/openai-text";
 import { stripTravessao } from "@/lib/text/strip-dash";
 import type { CarouselProfileDraft } from "@/types/carousel-profile";
 
@@ -32,14 +32,11 @@ export async function generateProfileContextAction(
   if (!user) return { error: "Não autenticado" };
 
   try {
-    const anthropic = getAnthropicClient();
-    const msg = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 1200,
-      messages: [
-        {
-          role: "user",
-          content: `Você é um estrategista de marca. A partir das anotações abaixo sobre o cliente "${name}", escreva um documento de contexto em Markdown, conciso e objetivo, que sirva de briefing para gerar carrosséis de Instagram.
+    const text = await openaiText({
+      system: "Você é um estrategista de marca de uma agência brasileira.",
+      maxOutputTokens: 6000,
+      reasoningEffort: "low",
+      input: `Você é um estrategista de marca. A partir das anotações abaixo sobre o cliente "${name}", escreva um documento de contexto em Markdown, conciso e objetivo, que sirva de briefing para gerar carrosséis de Instagram.
 
 Anotações:
 """
@@ -54,13 +51,9 @@ Estruture com estas seções (use títulos ##):
 
 IMPORTANTE: nunca use travessão (— ou –) no texto; use vírgula ou ponto.
 Responda APENAS com o Markdown, sem comentários extras.`,
-        },
-      ],
     });
 
-    const text = msg.content.find((b) => b.type === "text");
-    if (!text || text.type !== "text") return { error: "Sem resposta da IA" };
-    return { md: stripTravessao(text.text.trim()) };
+    return { md: stripTravessao(text.trim()) };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Erro ao gerar contexto" };
   }

@@ -10,9 +10,13 @@
  * copy — a demanda nunca fica sem carrossel por causa do diretor.
  */
 
-import Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { getAnthropicClient } from "@/lib/ai/client";
+import {
+  OpenAITextError,
+  inputImage,
+  inputText,
+  openaiStructured,
+  type OpenAIInputPart,
+} from "@/lib/ai/openai-text";
 import { stripTravessao } from "@/lib/text/strip-dash";
 import type { StudioBrandKit, StudioFormat } from "@/types/carousel-studio";
 import type { DemandArte } from "@/types/demand";
@@ -21,7 +25,6 @@ import { deriveRoles } from "./color";
 import { STUDIO_FONTS, studioFontByFamily } from "./fonts";
 import { designPlanSchema, type DesignPlan, type SlidePlan } from "./plan";
 
-const DIRECTOR_MODEL = process.env.CAROUSEL_STUDIO_MODEL?.trim() || "claude-opus-5-5";
 const MAX_VISION_REFERENCES = 6;
 /** Com estilo, as artes de exemplo ocupam a maior parte da visão do diretor. */
 const MAX_STYLE_IMAGES = 6;
@@ -103,28 +106,24 @@ DESIGN
 
 type VisionImages = { style: string[]; references: string[] };
 
-function userContent(input: DirectorInput, images: VisionImages): Anthropic.ContentBlockParam[] {
+function userContent(input: DirectorInput, images: VisionImages): OpenAIInputPart[] {
   const b = input.brand;
-  const blocks: Anthropic.ContentBlockParam[] = [];
+  const blocks: OpenAIInputPart[] = [];
   if (images.style.length) {
-    blocks.push({ type: "text", text: `ARTES DE EXEMPLO DO ESTILO "${input.style?.name ?? ""}" (na ordem do carrossel):` });
-    images.style.forEach((url) => {
-      blocks.push({ type: "image", source: { type: "url", url } });
-    });
+    blocks.push(inputText(`ARTES DE EXEMPLO DO ESTILO "${input.style?.name ?? ""}" (na ordem do carrossel):`));
+    images.style.forEach((url) => blocks.push(inputImage(url)));
     if (images.references.length) {
-      blocks.push({ type: "text", text: "REFERÊNCIAS DO CLIENTE E DESTA DEMANDA (assunto, clima e identidade do cliente):" });
+      blocks.push(inputText("REFERÊNCIAS DO CLIENTE E DESTA DEMANDA (assunto, clima e identidade do cliente):"));
     }
   }
-  images.references.forEach((url) => {
-    blocks.push({ type: "image", source: { type: "url", url } });
-  });
+  images.references.forEach((url) => blocks.push(inputImage(url)));
   const headingHint = studioFontByFamily(b.fontHeading)?.id;
   const referenceNote =
     images.references.length && !images.style.length
       ? `As ${images.references.length} imagens acima são referências visuais do cliente e desta demanda — use-as para definir imageStyle, composição e clima.\n\n`
       : "";
   blocks.push({
-    type: "text",
+    type: "input_text",
     text: `${referenceNote}CLIENTE: ${b.clientName || "(sem nome)"}${b.handle ? ` (${b.handle})` : ""}
 PALETA DA FICHA: ${b.palette.length ? b.palette.join(", ") : "(sem paleta — proponha uma sóbria e elegante)"}
 ${headingHint ? `FONTE DE TÍTULO DO CLIENTE: ${headingHint} (use-a)\n` : ""}DNA VISUAL:
@@ -158,20 +157,15 @@ function cleanPlan(plan: DesignPlan, input: DirectorInput): DesignPlan {
 }
 
 async function callDirector(input: DirectorInput, images: VisionImages): Promise<DesignPlan> {
-  const client = getAnthropicClient();
-  const response = await client.messages.parse(
-    {
-      model: DIRECTOR_MODEL,
-      max_tokens: 16000,
-      system: systemPrompt(input.style),
-      messages: [{ role: "user", content: userContent(input, images) }],
-      output_config: { effort: "medium", format: zodOutputFormat(designPlanSchema) },
-    },
-    { timeout: 150_000 }
-  );
-  if (response.stop_reason === "refusal") throw new Error("O diretor de arte recusou o briefing");
-  if (!response.parsed_output) throw new Error("O diretor de arte não devolveu um plano válido");
-  return response.parsed_output;
+  return openaiStructured({
+    system: systemPrompt(input.style),
+    input: userContent(input, images),
+    schemaName: "design_plan",
+    schema: designPlanSchema,
+    maxOutputTokens: 32000,
+    reasoningEffort: "medium",
+    timeoutMs: 150_000,
+  });
 }
 
 export async function directCarousel(input: DirectorInput): Promise<{ plan: DesignPlan; usedAi: boolean; error?: string }> {
@@ -193,7 +187,7 @@ export async function directCarousel(input: DirectorInput): Promise<{ plan: Desi
     // Uma URL de referência inacessível derruba a requisição inteira (400):
     // tenta de novo só com as artes do estilo (do nosso bucket) — sem estilo,
     // só com texto — antes de cair no plano determinístico.
-    if (images.references.length + images.style.length > 0 && error instanceof Anthropic.BadRequestError) {
+    if (images.references.length + images.style.length > 0 && error instanceof OpenAITextError && error.status === 400) {
       try {
         return { plan: cleanPlan(await callDirector(input, { style: images.style, references: [] }), input), usedAi: true };
       } catch (retryError) {

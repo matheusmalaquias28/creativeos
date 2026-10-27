@@ -1,7 +1,7 @@
 /**
  * Rascunho das páginas-modelo de um estilo de carrossel.
  *
- * O Claude olha cada arte de exemplo e devolve as camadas que a compõem (caixa
+ * A IA (OpenAI) olha cada arte de exemplo e devolve as camadas que a compõem (caixa
  * em milésimos do card, fonte, cor, campo). O código transforma isso em uma
  * página do Studio:
  *   - texto, forma e botão viram camadas de código, editáveis;
@@ -13,11 +13,10 @@
  * É um rascunho: o operador ajusta no editor uma vez e o estilo fica pronto.
  */
 
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import pLimit from "p-limit";
 import sharp from "sharp";
 import { z } from "zod";
-import { getAnthropicClient } from "@/lib/ai/client";
+import { inputImage, inputText, openaiStructured } from "@/lib/ai/openai-text";
 import { removeFlatBackground } from "@/lib/carousel-studio/cutout";
 import { STUDIO_FONT_IDS, STUDIO_FONTS, studioFontById } from "@/lib/carousel-studio/fonts";
 import { uploadStudioImage } from "@/lib/carousel-studio/images";
@@ -31,7 +30,6 @@ import {
 import { styleDnaText, type StyleDna } from "./dna";
 import type { StudioLayer, StudioPage, StudioTemplateRole } from "@/types/carousel-studio";
 
-const DRAFT_MODEL = process.env.CAROUSEL_STUDIO_MODEL?.trim() || "claude-opus-5-5";
 const DRAFT_CONCURRENCY = 3;
 
 const hex = z.string().describe("Cor hex #RRGGBB");
@@ -115,29 +113,20 @@ async function draftCard(params: {
   roleHint: StudioTemplateRole | null;
   dna: StyleDna | null;
 }): Promise<CardDraft> {
-  const response = await getAnthropicClient().messages.parse(
-    {
-      model: DRAFT_MODEL,
-      max_tokens: 12000,
-      system: systemPrompt(params.dna),
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "image", source: { type: "url", url: params.imageUrl } },
-            {
-              type: "text",
-              text: `Card ${params.index + 1} de ${params.total}${params.roleHint ? ` (papel: ${params.roleHint})` : ""}. Desmonte em camadas.`,
-            },
-          ],
-        },
-      ],
-      output_config: { effort: "medium", format: zodOutputFormat(cardDraftSchema) },
-    },
-    { timeout: 150_000 }
-  );
-  if (!response.parsed_output) throw new Error(`A IA não desmontou o card ${params.index + 1}`);
-  return response.parsed_output;
+  return openaiStructured({
+    system: systemPrompt(params.dna),
+    input: [
+      inputImage(params.imageUrl),
+      inputText(
+        `Card ${params.index + 1} de ${params.total}${params.roleHint ? ` (papel: ${params.roleHint})` : ""}. Desmonte em camadas.`
+      ),
+    ],
+    schemaName: "card_draft",
+    schema: cardDraftSchema,
+    maxOutputTokens: 24000,
+    reasoningEffort: "medium",
+    timeoutMs: 150_000,
+  });
 }
 
 // ─── Rascunho → página do Studio ─────────────────────────────────────────────

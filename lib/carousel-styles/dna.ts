@@ -8,7 +8,7 @@ import { STUDIO_LAYOUTS } from "@/lib/carousel-studio/plan";
  * continua em `layouts.ts` (e, na próxima etapa, nas páginas-modelo do estilo).
  *
  * Fica separado do analisador para o diretor e o front importarem sem puxar o
- * SDK da Anthropic.
+ * cliente da OpenAI.
  */
 
 const hex = z.string().describe("Cor hex #RRGGBB vista nas artes");

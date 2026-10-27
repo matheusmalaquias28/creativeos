@@ -11,10 +11,14 @@
  * recortados, rótulos fixos) sai idêntico ao modelo.
  */
 
-import Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
-import { getAnthropicClient } from "@/lib/ai/client";
+import {
+  OpenAITextError,
+  inputImage,
+  inputText,
+  openaiStructured,
+  type OpenAIInputPart,
+} from "@/lib/ai/openai-text";
 import { stripTravessao } from "@/lib/text/strip-dash";
 import type { StyleDna } from "@/lib/carousel-styles/dna";
 import {
@@ -32,7 +36,6 @@ import { nearestAspect, type StudioImageJob } from "./layouts";
 import { wrapOperatorPrompt } from "./images";
 import { estimateTextHeight, fitFontSize } from "./text-fit";
 
-const DIRECTOR_MODEL = process.env.CAROUSEL_STUDIO_MODEL?.trim() || "claude-opus-5-5";
 const MAX_STYLE_IMAGES = 8;
 const MAX_REFERENCES = 3;
 
@@ -168,29 +171,29 @@ MODELOS DISPONÍVEIS
 ${catalogText(input.catalog)}`;
 }
 
-function userContent(input: TemplateDirectorInput, withImages: boolean): Anthropic.ContentBlockParam[] {
-  const blocks: Anthropic.ContentBlockParam[] = [];
+function userContent(input: TemplateDirectorInput, withImages: boolean): OpenAIInputPart[] {
+  const blocks: OpenAIInputPart[] = [];
   const isHttps = (u: string) => /^https:\/\//.test(u);
   if (withImages) {
     const styleUrls = input.style.imageUrls.filter(isHttps).slice(0, MAX_STYLE_IMAGES);
     if (styleUrls.length) {
-      blocks.push({ type: "text", text: `Artes de exemplo do estilo "${input.style.name}" (os modelos nasceram delas; o número no nome do modelo é o card de origem):` });
+      blocks.push(inputText(`Artes de exemplo do estilo "${input.style.name}" (os modelos nasceram delas; o número no nome do modelo é o card de origem):`));
       styleUrls.forEach((url, i) => {
-        blocks.push({ type: "text", text: `Card ${i + 1}:` });
-        blocks.push({ type: "image", source: { type: "url", url } });
+        blocks.push(inputText(`Card ${i + 1}:`));
+        blocks.push(inputImage(url));
       });
     }
     const refs = Array.from(new Set([...input.demandReferenceUrls, ...input.brand.referenceUrls]))
       .filter(isHttps)
       .slice(0, MAX_REFERENCES);
     if (refs.length) {
-      blocks.push({ type: "text", text: "Referências do cliente e desta demanda (assunto e clima, não layout):" });
-      refs.forEach((url) => blocks.push({ type: "image", source: { type: "url", url } }));
+      blocks.push(inputText("Referências do cliente e desta demanda (assunto e clima, não layout):"));
+      refs.forEach((url) => blocks.push(inputImage(url)));
     }
   }
   const b = input.brand;
   blocks.push({
-    type: "text",
+    type: "input_text",
     text: `CLIENTE: ${b.clientName || "(sem nome)"}${b.handle ? ` (${b.handle})` : ""}
 CONTEXTO DO NEGÓCIO:
 ${b.businessContext || "(sem contexto)"}
@@ -204,19 +207,15 @@ ${artesText(input.artes)}`,
 }
 
 async function callTemplateDirector(input: TemplateDirectorInput, withImages: boolean): Promise<TemplatePlan> {
-  const response = await getAnthropicClient().messages.parse(
-    {
-      model: DIRECTOR_MODEL,
-      max_tokens: 12000,
-      system: systemPrompt(input),
-      messages: [{ role: "user", content: userContent(input, withImages) }],
-      output_config: { effort: "medium", format: zodOutputFormat(templatePlanSchema) },
-    },
-    { timeout: 150_000 }
-  );
-  if (response.stop_reason === "refusal") throw new Error("O diretor de arte recusou o briefing");
-  if (!response.parsed_output) throw new Error("O diretor de arte não devolveu um plano válido");
-  return response.parsed_output;
+  return openaiStructured({
+    system: systemPrompt(input),
+    input: userContent(input, withImages),
+    schemaName: "template_plan",
+    schema: templatePlanSchema,
+    maxOutputTokens: 24000,
+    reasoningEffort: "medium",
+    timeoutMs: 150_000,
+  });
 }
 
 export async function directFromTemplates(
@@ -229,7 +228,7 @@ export async function directFromTemplates(
     return { plan: await callTemplateDirector(input, true), usedAi: true };
   } catch (error) {
     // Uma URL de referência inacessível derruba a requisição (400): tenta sem imagens.
-    if (error instanceof Anthropic.BadRequestError) {
+    if (error instanceof OpenAITextError && error.status === 400) {
       try {
         return { plan: await callTemplateDirector(input, false), usedAi: true };
       } catch (retryError) {

@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import {
-  getAnthropicClient,
-  DEFAULT_CLAUDE_MODEL,
-} from "@/lib/ai/client";
+import { openaiText } from "@/lib/ai/openai-text";
 import { stripTravessao } from "@/lib/text/strip-dash";
 import type { CarouselSlide } from "@/types/carousel";
 
@@ -24,6 +21,27 @@ type GenerateRequest =
     }
   | { type: "caption"; slides: Pick<CarouselSlide, "titulo" | "subtitulo">[] };
 
+/** Modelo leve para as edições rápidas do editor. Override: `OPENAI_CAROUSEL_FAST_MODEL`. */
+const FAST_MODEL = process.env.OPENAI_CAROUSEL_FAST_MODEL?.trim() || "gpt-5.4-mini";
+
+const SYSTEM = "Você é redator de carrosséis de Instagram para uma agência brasileira. Escreva em português do Brasil.";
+
+/** Uma pergunta, uma resposta em texto; null se a OpenAI não devolver nada. */
+async function ask(prompt: string, maxOutputTokens: number): Promise<string | null> {
+  try {
+    return await openaiText({
+      model: FAST_MODEL,
+      system: SYSTEM,
+      input: prompt,
+      maxOutputTokens,
+      reasoningEffort: "low",
+    });
+  } catch (error) {
+    console.error("[carousel/generate]", error instanceof Error ? error.message : error);
+    return null;
+  }
+}
+
 function extractJson<T>(text: string, isArray: boolean): T {
   const trimmed = text.trim();
   const pattern = isArray ? /\[[\s\S]*\]/ : /\{[\s\S]*\}/;
@@ -41,17 +59,11 @@ export async function POST(req: NextRequest) {
   }
 
   const body: GenerateRequest = await req.json();
-  const anthropic = getAnthropicClient();
 
   if (body.type === "slides") {
     const count = Math.min(Math.max(body.slideCount ?? 5, 1), 20);
-    const msg = await anthropic.messages.create({
-      model: DEFAULT_CLAUDE_MODEL,
-      max_tokens: 2000,
-      messages: [
-        {
-          role: "user",
-          content: `Crie ${count} slides para um carrossel do Instagram sobre: "${body.prompt}".
+    const text = await ask(
+      `Crie ${count} slides para um carrossel do Instagram sobre: "${body.prompt}".
 
 Responda APENAS com um JSON array, sem markdown:
 [
@@ -63,18 +75,15 @@ Regras:
 - Subtítulos complementam o título (máx 20 palavras)
 - ${NO_DASH_RULE}
 - Nenhum texto além do JSON`,
-        },
-      ],
-    });
-
-    const text = msg.content.find((b) => b.type === "text");
-    if (!text || text.type !== "text") {
+      6000
+    );
+    if (!text) {
       return NextResponse.json({ error: "Sem resposta" }, { status: 500 });
     }
 
     try {
       const slides = extractJson<{ titulo: string; subtitulo: string }[]>(
-        text.text,
+        text,
         true
       ).map((s) => ({
         titulo: stripTravessao(s.titulo),
@@ -87,13 +96,8 @@ Regras:
   }
 
   if (body.type === "refine") {
-    const msg = await anthropic.messages.create({
-      model: DEFAULT_CLAUDE_MODEL,
-      max_tokens: 400,
-      messages: [
-        {
-          role: "user",
-          content: `Refine este slide conforme a instrução.
+    const text = await ask(
+      `Refine este slide conforme a instrução.
 
 Slide:
 - Título: "${body.slide.titulo}"
@@ -104,18 +108,15 @@ Instrução: "${body.instruction}"
 ${NO_DASH_RULE}
 Responda APENAS com JSON, sem markdown:
 { "titulo": "...", "subtitulo": "..." }`,
-        },
-      ],
-    });
-
-    const text = msg.content.find((b) => b.type === "text");
-    if (!text || text.type !== "text") {
+      1200
+    );
+    if (!text) {
       return NextResponse.json({ error: "Sem resposta" }, { status: 500 });
     }
 
     try {
       const refined = extractJson<{ titulo: string; subtitulo: string }>(
-        text.text,
+        text,
         false
       );
       return NextResponse.json({
@@ -132,13 +133,8 @@ Responda APENAS com JSON, sem markdown:
       .map((s, i) => `Slide ${i + 1}: "${s.titulo}" — "${s.subtitulo}"`)
       .join("\n");
 
-    const msg = await anthropic.messages.create({
-      model: DEFAULT_CLAUDE_MODEL,
-      max_tokens: 2000,
-      messages: [
-        {
-          role: "user",
-          content: `Melhore todos os slides conforme a instrução.
+    const text = await ask(
+      `Melhore todos os slides conforme a instrução.
 
 Slides:
 ${slidesText}
@@ -148,18 +144,15 @@ Instrução: "${body.instruction}"
 ${NO_DASH_RULE}
 Responda APENAS com JSON array com TODOS os slides melhorados, sem markdown:
 [{ "titulo": "...", "subtitulo": "..." }]`,
-        },
-      ],
-    });
-
-    const text = msg.content.find((b) => b.type === "text");
-    if (!text || text.type !== "text") {
+      6000
+    );
+    if (!text) {
       return NextResponse.json({ error: "Sem resposta" }, { status: 500 });
     }
 
     try {
       const slides = extractJson<{ titulo: string; subtitulo: string }[]>(
-        text.text,
+        text,
         true
       ).map((s) => ({
         titulo: stripTravessao(s.titulo),
@@ -176,29 +169,21 @@ Responda APENAS com JSON array com TODOS os slides melhorados, sem markdown:
       .map((s, i) => `Slide ${i + 1}: "${s.titulo}" — "${s.subtitulo}"`)
       .join("\n");
 
-    const msg = await anthropic.messages.create({
-      model: DEFAULT_CLAUDE_MODEL,
-      max_tokens: 800,
-      messages: [
-        {
-          role: "user",
-          content: `Crie uma legenda completa para o Instagram com base nesses slides:
+    const text = await ask(
+      `Crie uma legenda completa para o Instagram com base nesses slides:
 
 ${slidesText}
 
 Inclua: gancho inicial, desenvolvimento do tema, chamada para ação e hashtags relevantes.
 ${NO_DASH_RULE}
 Responda apenas com o texto da legenda, sem JSON.`,
-        },
-      ],
-    });
-
-    const text = msg.content.find((b) => b.type === "text");
-    if (!text || text.type !== "text") {
+      2400
+    );
+    if (!text) {
       return NextResponse.json({ error: "Sem resposta" }, { status: 500 });
     }
 
-    return NextResponse.json({ caption: stripTravessao(text.text.trim()) });
+    return NextResponse.json({ caption: stripTravessao(text.trim()) });
   }
 
   return NextResponse.json({ error: "Tipo inválido" }, { status: 400 });

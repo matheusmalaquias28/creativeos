@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getAnthropicClient } from "@/lib/ai/client";
+import { openaiJson } from "@/lib/ai/openai-text";
 import { stripTravessao } from "@/lib/text/strip-dash";
 import { textToCardHtml } from "@/lib/carousel/tweet/format";
 import {
@@ -17,7 +17,6 @@ import {
 
 export const maxDuration = 90;
 
-const TWEET_MODEL = process.env.TWEET_CAROUSEL_MODEL ?? "claude-sonnet-5";
 const MAX_INPUT = 20_000;
 
 type GenerateBody = {
@@ -65,32 +64,23 @@ export async function POST(req: NextRequest) {
 
   let spec: TweetSpec;
   try {
-    const anthropic = getAnthropicClient();
-    const msg = await anthropic.messages.create({
-      model: TWEET_MODEL,
-      max_tokens: 4000,
+    spec = await openaiJson<TweetSpec>({
       system: buildTweetSystemPrompt({
         mode,
         profileName: profile.name,
         handle: profile.handle,
         cardCount,
       }),
-      messages: [
-        {
-          role: "user",
-          content:
-            mode === "ai"
-              ? `Ideia do carrossel:\n"""\n${input}\n"""`
-              : `Conteúdo a organizar em cards:\n"""\n${input}\n"""`,
-        },
-      ],
-      tools: [BUILD_TWEET_TOOL],
-      tool_choice: { type: "tool", name: BUILD_TWEET_TOOL.name },
+      input:
+        mode === "ai"
+          ? `Ideia do carrossel:\n"""\n${input}\n"""`
+          : `Conteúdo a organizar em cards:\n"""\n${input}\n"""`,
+      schemaName: BUILD_TWEET_TOOL.name,
+      jsonSchema: BUILD_TWEET_TOOL.input_schema,
+      maxOutputTokens: 12000,
+      reasoningEffort: "low",
+      timeoutMs: 85_000,
     });
-
-    const block = msg.content.find((b) => b.type === "tool_use");
-    if (!block || block.type !== "tool_use") throw new Error("A IA não retornou os cards");
-    spec = block.input as TweetSpec;
     if (!Array.isArray(spec.cards) || spec.cards.length === 0) {
       throw new Error("A IA não retornou os cards");
     }
