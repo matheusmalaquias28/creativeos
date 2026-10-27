@@ -21,8 +21,6 @@ import {
   Playfair_Display,
   Merriweather,
   Lora,
-  Instrument_Serif,
-  Caveat,
 } from "next/font/google";
 import localFont from "next/font/local";
 
@@ -38,8 +36,22 @@ const bebasNeue = Bebas_Neue({ variable: "--font-bebas-neue", subsets: ["latin"]
 const playfair = Playfair_Display({ variable: "--font-playfair", subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], display: "swap" });
 const merriweather = Merriweather({ variable: "--font-merriweather", subsets: ["latin"], weight: ["400", "700", "900"], display: "swap" });
 const lora = Lora({ variable: "--font-lora", subsets: ["latin"], weight: ["400", "500", "600", "700"], display: "swap" });
-const instrumentSerif = Instrument_Serif({ variable: "--font-instrument-serif", subsets: ["latin"], weight: ["400"], style: ["normal", "italic"], display: "swap" });
-const caveat = Caveat({ variable: "--font-caveat", subsets: ["latin"], weight: ["400", "500", "600", "700"], display: "swap" });
+// Instrument Serif e Caveat: self-hosted (subset latin, OFL). Buscá-las no
+// Google Fonts durante o build quebrou o deploy na Vercel (next/font recebeu
+// URL de arquivo sem extensão).
+const instrumentSerif = localFont({
+  variable: "--font-instrument-serif",
+  display: "swap",
+  src: [
+    { path: "./fonts/instrument-serif/InstrumentSerif-Regular.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/instrument-serif/InstrumentSerif-Italic.woff2", weight: "400", style: "italic" },
+  ],
+});
+const caveat = localFont({
+  variable: "--font-caveat",
+  display: "swap",
+  src: [{ path: "./fonts/caveat/Caveat-Variable.woff2", weight: "400 700", style: "normal" }],
+});
 
 // Recoleta — fonte serif proprietária, self-hosted (não é Google Font).
 const recoleta = localFont({
