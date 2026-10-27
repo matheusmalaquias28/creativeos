@@ -445,7 +445,7 @@ function extractArteJob(
     aspect_ratio: data.aspectRatio ?? IMAGE_GEN_DEFAULTS.aspectRatio,
     image_size: data.imageSize ?? IMAGE_GEN_DEFAULTS.imageSize,
     model: data.model ?? IMAGE_GEN_DEFAULTS.model,
-    quality: data.format === "story" ? STORY_QUALITY : data.quality ?? IMAGE_GEN_DEFAULTS.quality,
+    quality: data.quality ?? (data.format === "story" ? STORY_QUALITY : IMAGE_GEN_DEFAULTS.quality),
     count: Math.max(1, data.count ?? 1),
     fanout_reference_urls: fanoutUrls,
     skip_logo: data.format === "story",

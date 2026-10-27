@@ -96,6 +96,45 @@ function PromptPreview({ text, linked }: { text: string; linked: Set<string> }) 
   );
 }
 
+/**
+ * Camada atrás do textarea (texto transparente) durante a edição: mesmo texto,
+ * mesma quebra de linha, com as menções vinculadas pintadas de verde — sem
+ * padding/peso extra no destaque, senão o texto desalinha do cursor.
+ */
+function PromptHighlightMirror({
+  text,
+  linked,
+  mirrorRef,
+}: {
+  text: string;
+  linked: Set<string>;
+  mirrorRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  return (
+    <div
+      ref={mirrorRef}
+      aria-hidden
+      className={cn(PROMPT_EDIT_TEXT, "pointer-events-none absolute inset-0 text-white [scrollbar-color:transparent_transparent]")}
+    >
+      {text.split(/(@\([^)]+\))/g).map((part, i) =>
+        linked.has(part.toLowerCase()) ? (
+          <span key={i} className="rounded-[4px] bg-emerald-500/85 shadow-[0_0_0_2px_rgb(16_185_129/0.85)]">
+            {part}
+          </span>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+      {/* Linha final vazia ocupa altura igual ao textarea. */}
+      {"​"}
+    </div>
+  );
+}
+
+/** Métricas de texto compartilhadas por textarea e espelho — têm que ser idênticas. */
+const PROMPT_EDIT_TEXT =
+  "min-h-0 w-full overflow-y-scroll whitespace-pre-wrap break-words pr-1 text-[0.875rem] leading-relaxed [scrollbar-width:thin]";
+
 const glassIconBtn =
   "nodrag flex size-6 items-center justify-center rounded-full text-white/80 transition-colors hover:bg-white/15 hover:text-white disabled:opacity-35";
 
@@ -125,6 +164,7 @@ export function ArteNode({ id, data, selected }: Props) {
   const draftRef = useRef(draft);
   draftRef.current = draft;
   const taRef = useRef<HTMLTextAreaElement>(null);
+  const mirrorRef = useRef<HTMLDivElement>(null);
   const commitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [mention, setMention] = useState<{ start: number; query: string } | null>(null);
   const [mentionIdx, setMentionIdx] = useState(0);
@@ -594,6 +634,8 @@ export function ArteNode({ id, data, selected }: Props) {
 
             <div className={cn("relative flex min-h-0 flex-col", promptOpen && "flex-1")}>
               {promptOpen ? (
+                <div className="relative flex min-h-0 flex-1">
+                <PromptHighlightMirror text={draft} linked={linkedTokens} mirrorRef={mirrorRef} />
                 <textarea
                   ref={taRef}
                   autoFocus
@@ -605,6 +647,9 @@ export function ArteNode({ id, data, selected }: Props) {
                     setMention(detectMention(v, e.target.selectionStart ?? v.length));
                     setMentionIdx(0);
                     scheduleCommit(v);
+                  }}
+                  onScroll={(e) => {
+                    if (mirrorRef.current) mirrorRef.current.scrollTop = e.currentTarget.scrollTop;
                   }}
                   onBlur={() => {
                     if (commitTimer.current) clearTimeout(commitTimer.current);
@@ -626,8 +671,9 @@ export function ArteNode({ id, data, selected }: Props) {
                     }
                     if (e.key === "Escape") { e.stopPropagation(); e.currentTarget.blur(); }
                   }}
-                  className="nodrag nowheel min-h-0 w-full flex-1 resize-none bg-transparent pr-1 text-[0.875rem] leading-relaxed text-white placeholder:text-white/40 focus:outline-none [scrollbar-color:rgba(255,255,255,0.3)_transparent] [scrollbar-width:thin]"
+                  className={cn(PROMPT_EDIT_TEXT, "nodrag nowheel relative flex-1 resize-none bg-transparent text-transparent caret-white placeholder:text-white/40 selection:bg-white/25 selection:text-transparent focus:outline-none [scrollbar-color:rgba(255,255,255,0.3)_transparent]")}
                 />
+                </div>
               ) : (
                 <button
                   type="button"
@@ -682,10 +728,10 @@ export function ArteNode({ id, data, selected }: Props) {
                 onChange={(v) => update({ imageSize: v })} />
             </div>
             <div className="flex items-center gap-1.5">
-              <NodeSelect variant="glass" title={isStory ? "Esforço (stories: sempre Low)" : "Esforço"}
-                value={isStory ? STORY_QUALITY : data.quality ?? "medium"}
+              <NodeSelect variant="glass" title="Esforço"
+                value={data.quality ?? (isStory ? STORY_QUALITY : "medium")}
                 leading={<Gauge className="size-3.5 text-white/70" />}
-                options={(isStory ? [STORY_QUALITY] : QUALITY_OPTIONS).map((v) => ({ value: v, label: v[0].toUpperCase() + v.slice(1) }))}
+                options={QUALITY_OPTIONS.map((v) => ({ value: v, label: v[0].toUpperCase() + v.slice(1) }))}
                 onChange={(v) => update({ quality: v as ArteData["quality"] })} />
               <div className="ml-auto">
                 {isGenerating ? (

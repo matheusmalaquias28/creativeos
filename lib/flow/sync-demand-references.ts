@@ -38,6 +38,45 @@ function connectedRefLabels(graph: FlowGraph, arteNodeId: string): Set<string> {
   return labels;
 }
 
+const DBREF_PREFIX = "referenciaImagem-dbref-";
+
+/**
+ * Stories é só reenquadramento das artes feed: referência da demanda nunca
+ * entra nele. Desfaz o que syncs anteriores ligaram ao node de stories (aresta
+ * da ref + linha `@(menção) — ...` no prompt). Referência que o operador
+ * conectar à mão no node de stories não é tocada.
+ */
+function detachDemandRefsFromStories(graph: FlowGraph, demandId: string): FlowGraph {
+  const storyIds = new Set(
+    graph.nodes
+      .filter((n) => n.type === "arte" && n.data.demandId === demandId && n.data.format === "story")
+      .map((n) => n.id)
+  );
+  if (storyIds.size === 0) return graph;
+
+  const tokensByStory = new Map<string, string[]>();
+  const edges = graph.edges.filter((edge) => {
+    if (!storyIds.has(edge.target) || !edge.source.startsWith(DBREF_PREFIX)) return true;
+    const src = graph.nodes.find((n) => n.id === edge.source);
+    const label = src?.type === "referenciaImagem" ? (src.data as ReferenciaImagemData).label : null;
+    if (label) tokensByStory.set(edge.target, [...(tokensByStory.get(edge.target) ?? []), normalizeKey(label)]);
+    return false;
+  });
+  if (edges.length === graph.edges.length) return graph;
+
+  const nodes = graph.nodes.map((n) => {
+    const tokens = tokensByStory.get(n.id);
+    if (!tokens || n.type !== "arte") return n;
+    const prefixes = tokens.map((t) => `@(${t})`.toLowerCase());
+    const promptText = getPromptArteEditorText(n.data)
+      .split("\n")
+      .filter((l) => !prefixes.some((p) => l.trim().toLowerCase().startsWith(p)))
+      .join("\n");
+    return { ...n, data: { ...n.data, promptText } };
+  });
+  return { nodes, edges };
+}
+
 /**
  * Materializa toda referência cadastrada na PÁGINA da demanda (fora do Space,
  * tabela `demand_reference_image`) como um node `referenciaImagem` visível e
@@ -51,16 +90,18 @@ function connectedRefLabels(graph: FlowGraph, arteNodeId: string): Set<string> {
  * <row.id>`) — rodar de novo sobre um grafo já sincronizado não duplica nada.
  */
 export function syncDemandReferencesIntoGraph(
-  graph: FlowGraph,
+  rawGraph: FlowGraph,
   demandId: string,
   rows: DemandReferenceRow[]
 ): FlowGraph {
+  const graph = detachDemandRefsFromStories(rawGraph, demandId);
   if (rows.length === 0) return graph;
 
   const existingIds = new Set(graph.nodes.map((n) => n.id));
+  // Só artes feed: o node de stories não recebe referência da demanda.
   const arteNodes = graph.nodes.filter(
     (n): n is FlowNode & { type: "arte"; data: ArteData } =>
-      n.type === "arte" && n.data.demandId === demandId
+      n.type === "arte" && n.data.demandId === demandId && n.data.format !== "story"
   );
   if (arteNodes.length === 0) return graph;
 
@@ -80,7 +121,7 @@ export function syncDemandReferencesIntoGraph(
   };
 
   for (const row of rows) {
-    const nodeId = `referenciaImagem-dbref-${row.id}`;
+    const nodeId = `${DBREF_PREFIX}${row.id}`;
     if (existingIds.has(nodeId)) continue;
     if (!row.storage_url?.trim()) continue;
 

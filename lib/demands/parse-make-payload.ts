@@ -169,7 +169,7 @@ function parseBriefing(payload: UnknownRecord): DemandBriefing {
   );
 
   return {
-    titulo: asString(briefing.titulo ?? payload["briefing.titulo"] ?? payload.titulo),
+    titulo: firstNonEmpty(briefing.titulo, payload["briefing.titulo"], payload.titulo),
     instagramCliente: asString(
       briefing.instagramCliente ??
         payload["briefing.instagramCliente"] ??

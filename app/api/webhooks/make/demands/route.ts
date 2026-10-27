@@ -10,11 +10,12 @@ import {
   isMateriaisEditadosMissing,
   resolveDemandDriveFolder,
 } from "@/lib/export/drive-folder";
-import { DEMAND_INITIAL_STATUS } from "@/types/demand";
+import { DEMAND_INITIAL_STATUS, isDoneStatus } from "@/types/demand";
 import { isCarouselDemand } from "@/lib/carousel-studio/demand";
 import { autoRouteCarouselDemand } from "@/lib/carousel-studio/auto-trigger";
 import { isVideoDemandPayload } from "@/lib/video-demands/parse-payload";
 import { ingestVideoDemand } from "@/lib/video-demands/ingest";
+import { applyWarStatusEvent, parseWarStatusEvent } from "@/lib/demands/war-status-event";
 import type { Database } from "@/types/database";
 
 type CreativeDemandInsert =
@@ -127,6 +128,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
+  // Evento de status do WAR (`demanda.status`) chega neste mesmo endpoint, só
+  // com id/status: atualiza o status e para aqui — nunca vira upsert de
+  // demanda (apagaria título, artes e callback). Vale para arte e vídeo.
+  const statusEvent = parseWarStatusEvent(body);
+  if (statusEvent) {
+    try {
+      const applied = await applyWarStatusEvent(createAdminClient(), statusEvent);
+      if (!applied) {
+        return NextResponse.json(
+          { ok: false, kind: "status", error: "Demanda não encontrada", externalId: statusEvent.externalId },
+          { status: 404 }
+        );
+      }
+      return NextResponse.json({ ok: true, kind: "status", demandId: applied.id, status: statusEvent.status });
+    } catch (err) {
+      console.error("[webhook/make/demands] status", err);
+      return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
+    }
+  }
+
   // Demandas de vídeo (tipo: "video") são separadas das de arte: vão para
   // `video_demands` e não entram no pipeline de artes/Magnific. Rede de
   // segurança caso o WAR continue apontando para este endpoint em vez de
@@ -181,6 +202,7 @@ export async function POST(request: Request) {
     );
   }
 
+  const status = normalizeStatus(parsed.status);
   const row: CreativeDemandInsert = {
     external_id: parsed.externalId,
     client_id: matchedClient?.id ?? null,
@@ -193,7 +215,9 @@ export async function POST(request: Request) {
     solicitante: parsed.solicitante || null,
     briefing: parsed.briefing,
     artes: parsed.artes,
-    status: normalizeStatus(parsed.status),
+    status,
+    // Já chega concluída: sai do kanban (mesmo efeito de concluir por aqui).
+    ...(isDoneStatus(status) ? { is_archived: true } : {}),
     due_date: parseDueDate(parsed.dueDate),
     external_created_at: parseDueDate(parsed.externalCreatedAt),
     raw_payload: body as CreativeDemandInsert["raw_payload"],

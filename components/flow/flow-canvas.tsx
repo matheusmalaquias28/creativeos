@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState, useEffect } from "react";
+import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   ReactFlow,
@@ -36,6 +36,8 @@ import {
   Check,
   Copy,
   Trash2,
+  Scissors,
+  LayoutGrid,
 } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
@@ -48,14 +50,23 @@ import { ReferenciaImagemNode } from "@/components/flow/nodes/referencia-imagem-
 import { ListaImagensNode } from "@/components/flow/nodes/lista-imagens-node";
 import { ArteNode } from "@/components/flow/nodes/arte-node";
 import { DeletableEdge } from "@/components/flow/edges/deletable-edge";
+import { polylinesIntersect, samplePath, type Point } from "@/components/flow/edges/path-geometry";
 import { FlowCanvasContext } from "@/components/flow/flow-canvas-context";
+import { DemandFrames } from "@/components/flow/demand-frames";
+import {
+  demandFrames,
+  demandOwnership,
+  estimatedSize,
+  organizeFlowGraph,
+  type SizeOf,
+} from "@/lib/flow/organize";
 import { FLOW_NODE_TONE } from "@/components/flow/nodes/node-shell";
 import { Button } from "@/components/ui/button";
 import { tones } from "@/lib/design/tokens";
 import { cn } from "@/lib/utils";
 import { ARTE_ROW_Y, gerarFluxoDaDemanda, gerarSubfluxoDaDemanda, ROW_H } from "@/lib/flow/generator";
 import { IMAGE_GEN_DEFAULTS } from "@/lib/ai/imagegen/defaults";
-import type { FlowGraph, ListaImagensData, SaidaArteData } from "@/lib/flow/types";
+import type { FlowGraph, FlowNode, ListaImagensData, SaidaArteData } from "@/lib/flow/types";
 import type { CreativeDemand } from "@/types/demand";
 
 // ─── Stable maps (outside component) ─────────────────────────────────────
@@ -141,6 +152,12 @@ function rfToGraph(nodes: Node[], edges: Edge[]): FlowGraph {
   };
 }
 
+/** Tamanho real do node no canvas (medido pelo React Flow) ou estimado. */
+const rfSizeOf: SizeOf = (n) => {
+  const m = (n as unknown as Node).measured;
+  return m?.width && m?.height ? { w: m.width, h: m.height } : estimatedSize(n);
+};
+
 // ─── Node palette ─────────────────────────────────────────────────────────
 
 const PALETTE_ITEMS = [
@@ -182,7 +199,7 @@ type JobRow = {
 
 function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: InnerProps) {
   const router = useRouter();
-  const { screenToFlowPosition, getViewport, getNodes, getEdges } = useReactFlow();
+  const { screenToFlowPosition, getViewport, getNodes, getEdges, deleteElements, fitView } = useReactFlow();
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   const defaultGraph = initialGraph ?? gerarFluxoDaDemanda(demanda, numArtes);
@@ -190,6 +207,11 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initEdges);
+  // Abre enquadrado no fluxo DESTA demanda (o Space é compartilhado do cliente).
+  const [initialFitNodes] = useState(() => {
+    const owner = demandOwnership(defaultGraph);
+    return defaultGraph.nodes.filter((n) => owner.get(n.id) === demanda.id).map((n) => ({ id: n.id }));
+  });
   const [saving, setSaving] = useState(false);
   const [running, setRunning] = useState(false);
   // "✓" indicator that briefly flashes after a silent auto-save
@@ -545,6 +567,61 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
 
   const onConnect = handleConnect;
 
+  // ─── Demandas no Space: molduras + Organizar ────────────────────────────
+
+  const frames = useMemo(() => {
+    const graph = { nodes: nodes as unknown as FlowNode[], edges: edges as unknown as FlowGraph["edges"] };
+    return demandFrames(graph, rfSizeOf).map((f) =>
+      f.demandId === demanda.id ? { ...f, title: demanda.briefing?.titulo || f.title } : f
+    );
+  }, [nodes, edges, demanda.id, demanda.briefing?.titulo]);
+
+  const organize = useCallback(() => {
+    const graph = rfToGraph(getNodes(), getEdges());
+    const positions = new Map(organizeFlowGraph(graph, rfSizeOf).nodes.map((n) => [n.id, n.position]));
+    setNodes((ns) => ns.map((n) => (positions.has(n.id) ? { ...n, position: positions.get(n.id)! } : n)));
+    scheduleAutoSave();
+    requestAnimationFrame(() => void fitView({ padding: 0.15, duration: 300 }));
+  }, [getNodes, getEdges, setNodes, scheduleAutoSave, fitView]);
+
+  // ─── Tesoura (tecla C): traça uma linha que corta várias conexões ────────
+
+  const [cutMode, setCutMode] = useState(false);
+  // Traço da tesoura em coordenadas de TELA (clientX/clientY).
+  const [cutStroke, setCutStroke] = useState<Point[] | null>(null);
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const t = e.target as HTMLElement | null;
+      if (t?.closest("input, textarea, select, [contenteditable='true']")) return;
+      if (e.key === "Escape") {
+        setCutMode(false);
+        setCutStroke(null);
+        return;
+      }
+      if (e.key.toLowerCase() !== "c" || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+      e.preventDefault();
+      setCutMode((on) => !on);
+      setCutStroke(null);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  const finishCut = useCallback(
+    (stroke: Point[]) => {
+      if (stroke.length < 2 || !wrapperRef.current) return;
+      const cut = stroke.map((p) => screenToFlowPosition(p));
+      const hit = getEdges().filter((edge) => {
+        const g = wrapperRef.current?.querySelector(`.react-flow__edge[data-id="${CSS.escape(edge.id)}"]`);
+        const path = g?.querySelector<SVGPathElement>(".react-flow__edge-interaction, .react-flow__edge-path");
+        return path ? polylinesIntersect(samplePath(path), cut) : false;
+      });
+      if (hit.length > 0) void deleteElements({ edges: hit.map((e) => ({ id: e.id })) });
+    },
+    [getEdges, screenToFlowPosition, deleteElements]
+  );
+
   // ─── Drag-and-drop images ─────────────────────────────────────────────
 
   const onDragOver = useCallback((e: React.DragEvent) => {
@@ -760,7 +837,7 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
       {/* Toolbar */}
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-border bg-card px-4 py-2.5 sm:px-6">
         <span className="hidden text-xs text-muted-foreground md:inline">
-          Arraste imagens para o canvas · clique numa conexão para removê-la
+          Arraste imagens para o canvas · passe o mouse numa conexão para removê-la · C: tesoura
         </span>
         <div className="ml-auto flex items-center gap-2">
           {/* Auto-save indicator */}
@@ -783,6 +860,22 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
             )}
           </span>
 
+          <Button
+            variant={cutMode ? "default" : "outline"}
+            size="sm"
+            onClick={() => setCutMode((on) => !on)}
+            title="Tesoura (C): arraste uma linha para cortar várias conexões"
+          >
+            <Scissors /> Tesoura
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={organize}
+            title="Reorganiza o Space: uma faixa por demanda, material do cliente à esquerda"
+          >
+            <LayoutGrid /> Organizar
+          </Button>
           <Button variant="outline" size="sm" onClick={reset} disabled={busy}>
             <RotateCcw /> Resetar
           </Button>
@@ -823,13 +916,14 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             fitView
-            fitViewOptions={{ padding: 0.2 }}
+            fitViewOptions={{ padding: 0.2, nodes: initialFitNodes.length > 0 ? initialFitNodes : undefined }}
             minZoom={0.25}
             maxZoom={2}
             deleteKeyCode="Backspace"
             defaultEdgeOptions={EDGE_DEFAULTS}
             style={FLOW_THEME_VARS}
           >
+            <DemandFrames frames={frames} currentDemandId={demanda.id} />
             <Background
               variant={BackgroundVariant.Dots}
               gap={20}
@@ -845,6 +939,47 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
             />
           </ReactFlow>
         </FlowCanvasContext.Provider>
+
+        {/* Tesoura: camada por cima do canvas que captura o traço */}
+        {cutMode && (
+          <div
+            className="absolute inset-0 z-[5] cursor-crosshair touch-none"
+            onPointerDown={(e) => {
+              e.currentTarget.setPointerCapture(e.pointerId);
+              setCutStroke([{ x: e.clientX, y: e.clientY }]);
+            }}
+            onPointerMove={(e) => {
+              if (!cutStroke) return;
+              setCutStroke((s) => (s ? [...s, { x: e.clientX, y: e.clientY }] : s));
+            }}
+            onPointerUp={() => {
+              if (cutStroke) finishCut(cutStroke);
+              setCutStroke(null);
+            }}
+          >
+            <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center">
+              <span className="flex items-center gap-1.5 rounded-full border border-border bg-popover px-3 py-1 text-xs font-medium text-foreground shadow-[var(--surface-shadow-elevated)]">
+                <Scissors className="size-3.5 text-tone-red" />
+                Arraste para cortar conexões · C ou Esc para sair
+              </span>
+            </div>
+            {cutStroke && cutStroke.length > 1 && wrapperRef.current && (
+              <svg className="pointer-events-none absolute inset-0 size-full">
+                <polyline
+                  points={(() => {
+                    const r = wrapperRef.current.getBoundingClientRect();
+                    return cutStroke.map((p) => `${p.x - r.left},${p.y - r.top}`).join(" ");
+                  })()}
+                  fill="none"
+                  stroke="var(--tone-red)"
+                  strokeWidth={2}
+                  strokeDasharray="6 4"
+                  strokeLinecap="round"
+                />
+              </svg>
+            )}
+          </div>
+        )}
 
         {/* Context menu (botão direito num node) */}
         {nodeMenu && (

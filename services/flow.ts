@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { gerarFluxoDaDemanda, mergeDemandIntoClientGraph } from "@/lib/flow/generator";
 import { syncDemandReferencesIntoGraph, type DemandReferenceRow } from "@/lib/flow/sync-demand-references";
+import { organizeFlowGraph } from "@/lib/flow/organize";
 import type { FlowGraph, FlowNode } from "@/lib/flow/types";
 import type { CreativeDemand } from "@/types/demand";
 
@@ -107,17 +108,19 @@ export async function getOrCreateClientFlowGraph(
 
   const existingGraph = await getClientFlowGraph(demand.client_id);
 
-  const base =
-    existingGraph && hasDemandNodes(existingGraph, demand.id)
-      ? existingGraph
-      : mergeDemandIntoClientGraph(existingGraph, demand, numArtes);
-
-  if (base !== existingGraph) {
-    await upsertClientFlowGraph(demand.client_id, base);
+  if (existingGraph && hasDemandNodes(existingGraph, demand.id)) {
+    const synced = await syncAndPersistDemandReferences(demand, existingGraph);
+    return { graph: synced, clientId: demand.client_id };
   }
 
-  const synced = await syncAndPersistDemandReferences(demand, base);
-  return { graph: synced, clientId: demand.client_id };
+  // Demanda nova no Space do cliente: funde, materializa as referências dela e
+  // reorganiza em faixas (uma por demanda) — senão cada demanda nova cai por
+  // cima/no meio das anteriores. Uma escrita só.
+  const merged = mergeDemandIntoClientGraph(existingGraph, demand, numArtes);
+  const synced = syncDemandReferencesIntoGraph(merged, demand.id, await loadDemandReferenceRows(demand.id));
+  const organized = organizeFlowGraph(synced);
+  await upsertClientFlowGraph(demand.client_id, organized);
+  return { graph: organized, clientId: demand.client_id };
 }
 
 /**

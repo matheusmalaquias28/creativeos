@@ -12,5 +12,5 @@ export const LEGACY_STORY_PROMPTS = [
   "Adapte essas artes para o formato stories 9:16, sem adicionar textos e distorcer imagens",
 ];
 
-/** Stories é só reenquadramento: esforço SEMPRE low. */
+/** Stories é só reenquadramento: esforço padrão low (o operador pode subir no node). */
 export const STORY_QUALITY = "low" as const;

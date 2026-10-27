@@ -23,7 +23,6 @@ import {
   DEMAND_STATUSES,
   DEMAND_INITIAL_STATUS,
   DEMAND_QUEUE_STATUS,
-  DEMAND_DONE_STATUS,
   isClosedStatus,
   type CreativeDemandListItem,
   type DemandStatus,
@@ -34,15 +33,22 @@ import {
 const KNOWN_STATUSES = new Set<string>(DEMAND_STATUSES);
 
 /**
- * Coluna à parte para status nulos/"custom" que o WAR pode mandar e que não
- * têm coluna própria no vocabulário fixo. Nunca cai no card inicial — só aqui.
+ * Colunas do kanban, na ordem do fluxo (Ajuste logo depois de Fazendo). Fora
+ * daqui não aparece: "Concluído" sai sozinho do quadro, "Aprovação de Copy"
+ * não tem coluna e status nulo/"custom" do WAR (ex.: Cancelada, Revisão) não
+ * entra no kanban.
  */
-const UNKNOWN_STATUS_COLUMN = "__status_desconhecido__" as const;
-type KanbanColumnId = DemandStatus | typeof UNKNOWN_STATUS_COLUMN;
-
-function isUnknownStatus(d: CreativeDemandListItem): boolean {
-  return !d.status || !KNOWN_STATUSES.has(d.status);
-}
+const KANBAN_STATUSES: DemandStatus[] = [
+  "Aguardando Definição de Data",
+  "Em Fila",
+  "Fazendo",
+  "Ajuste",
+  "Aprovação do Gestor",
+  "Aprovação do Cliente",
+  "Aprovado",
+  "Atrasado",
+];
+type KanbanColumnId = DemandStatus;
 
 // ─── Column config ───────────────────────────────────────────────────────────
 
@@ -57,18 +63,11 @@ const COLUMN_LABELS: Partial<Record<DemandStatus, string>> = {
   "Aguardando Definição de Data": "Aguardando Data",
 };
 
-const COLUMNS: KanbanColumn[] = [
-  ...DEMAND_STATUSES.map((status) => ({
-    status,
-    label: COLUMN_LABELS[status] ?? status,
-    color: getStatusColorState(status),
-  })),
-  {
-    status: UNKNOWN_STATUS_COLUMN,
-    label: "Status Desconhecido",
-    color: "gray",
-  },
-];
+const COLUMNS: KanbanColumn[] = KANBAN_STATUSES.map((status) => ({
+  status,
+  label: COLUMN_LABELS[status] ?? status,
+  color: getStatusColorState(status),
+}));
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -356,12 +355,6 @@ export function DemandsKanbanBoard({ initialDemands }: Props) {
 
   const getDemandsByStatus = useCallback(
     (status: KanbanColumnId) => {
-      // Status nulo/"custom" do WAR: sempre vai para a coluna à parte, nunca
-      // para o card inicial — mesmo sem data de entrega.
-      if (status === UNKNOWN_STATUS_COLUMN) {
-        return demands.filter(isUnknownStatus);
-      }
-
       if (status === DEMAND_INITIAL_STATUS) {
         // Só fica no 1º card quem tem o status inicial E ainda não tem data de
         // entrega — assim que o WAR define a data, a demanda passa para "Em
@@ -399,9 +392,6 @@ export function DemandsKanbanBoard({ initialDemands }: Props) {
 
   const handleColumnDragOver = useCallback(
     (status: KanbanColumnId) => (e: React.DragEvent) => {
-      // A coluna de status desconhecido não é um destino válido — não dá para
-      // "escolher" um status custom do WAR pelo Kanban.
-      if (status === UNKNOWN_STATUS_COLUMN) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
       setOverColumn(status);
@@ -415,7 +405,6 @@ export function DemandsKanbanBoard({ initialDemands }: Props) {
 
   const handleColumnDrop = useCallback(
     (targetStatus: KanbanColumnId) => async (e: React.DragEvent) => {
-      if (targetStatus === UNKNOWN_STATUS_COLUMN) return;
       e.preventDefault();
       setOverColumn(null);
 
@@ -441,17 +430,6 @@ export function DemandsKanbanBoard({ initialDemands }: Props) {
           )
         );
         toast.error("Erro ao mover demanda", { description: result.error });
-        return;
-      }
-
-      // Remove from kanban if archived (Concluído)
-      if (targetStatus === DEMAND_DONE_STATUS) {
-        setTimeout(() => {
-          setDemands((prev) => prev.filter((d) => d.id !== demand.id));
-        }, 800);
-        toast.success("Demanda concluída", {
-          description: "Movida para arquivadas automaticamente.",
-        });
       }
     },
     []
