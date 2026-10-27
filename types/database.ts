@@ -1494,6 +1494,59 @@ export type Database = {
           },
         ];
       };
+      instagram_posts: {
+        Row: {
+          id: string;
+          studio_carousel_id: string | null;
+          demand_id: string | null;
+          client_id: string | null;
+          ig_user_id: string;
+          ig_username: string | null;
+          items: Json;
+          caption: string;
+          scheduled_at: string | null;
+          status: string;
+          media_id: string | null;
+          permalink: string | null;
+          error: string | null;
+          publishing_started_at: string | null;
+          published_at: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          studio_carousel_id?: string | null;
+          demand_id?: string | null;
+          client_id?: string | null;
+          ig_user_id: string;
+          ig_username?: string | null;
+          items?: Json;
+          caption?: string;
+          scheduled_at?: string | null;
+          status?: string;
+          media_id?: string | null;
+          permalink?: string | null;
+          error?: string | null;
+          publishing_started_at?: string | null;
+          published_at?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<{
+          scheduled_at: string | null;
+          status: string;
+          media_id: string | null;
+          permalink: string | null;
+          error: string | null;
+          publishing_started_at: string | null;
+          published_at: string | null;
+          updated_at: string;
+        }>;
+        Relationships: [];
+      };
     };
     Views: {
       client_art_readiness: {

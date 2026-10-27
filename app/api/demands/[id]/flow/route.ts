@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getClientFlowGraph, upsertClientFlowGraph } from "@/services/flow";
+import { uploadInlineImages } from "@/lib/flow/inline-images";
 import type { FlowGraph } from "@/lib/flow/types";
 
 type Params = { params: Promise<{ id: string }> };
@@ -45,8 +46,18 @@ export async function PUT(req: Request, { params }: Params) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const graph = (body as { graph?: FlowGraph }).graph;
-  if (!graph) return NextResponse.json({ error: "graph is required" }, { status: 400 });
+  const rawGraph = (body as { graph?: FlowGraph }).graph;
+  if (!rawGraph) return NextResponse.json({ error: "graph is required" }, { status: 400 });
+
+  // Imagem em base64 no grafo vira URL no Storage — senão a linha fica com
+  // vários MB e o upsert estoura o statement_timeout (ver inline-images.ts).
+  let graph: FlowGraph;
+  try {
+    ({ value: graph } = await uploadInlineImages(rawGraph));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Erro desconhecido";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 
   const clientId = await getDemandClientId(id);
 

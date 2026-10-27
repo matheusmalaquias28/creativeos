@@ -77,6 +77,8 @@ import { FrameRenderer } from "./frame-renderer";
 import { AiImageDialog, ReferencesDialog, RegenerateDialog } from "./studio-dialogs";
 import { downloadBlob, renderFrameToBlob, uploadPageToDemand } from "./export";
 import type { CarouselStyleOption } from "@/services/carousel-styles";
+import { Megaphone } from "lucide-react";
+import { InstagramPublishDialog } from "@/components/instagram/publish-dialog";
 
 type SaveState = "saved" | "dirty" | "saving" | "error";
 
@@ -160,6 +162,7 @@ export function StudioEditor({ initial, demandReferenceUrls, styles, backHref, b
   const [saveState, setSaveState] = useState<SaveState>("saved");
   const [exporting, setExporting] = useState<null | "download-one" | "download-all" | "demand">(null);
   const [dialogs, setDialogs] = useState({ regenerate: false, references: false, ai: false });
+  const [instagramOpen, setInstagramOpen] = useState(false);
 
   const busy = isStudioBusy(status);
   const readOnly = busy || exporting !== null;
@@ -927,6 +930,10 @@ export function StudioEditor({ initial, demandReferenceUrls, styles, backHref, b
                   </DropdownMenuItem>
                 </>
               ) : null}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setInstagramOpen(true)}>
+                <Megaphone /> Publicar no Instagram
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -1108,6 +1115,13 @@ export function StudioEditor({ initial, demandReferenceUrls, styles, backHref, b
         open={dialogs.ai}
         onOpenChange={(open) => setDialogs((d) => ({ ...d, ai: open }))}
         onGenerate={generateNewImage}
+      />
+      <InstagramPublishDialog
+        open={instagramOpen}
+        onOpenChange={setInstagramOpen}
+        carouselId={carouselId}
+        doc={instagramOpen ? withMeasuredHeights(doc, measured) : doc}
+        initialCaption={caption}
       />
     </div>
   );

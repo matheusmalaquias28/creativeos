@@ -1,0 +1,98 @@
+/**
+ * GET  /api/instagram/posts?carouselId=… | ?demandId=…   histórico
+ * POST /api/instagram/posts                 cria o post (cards já no Storage)
+ *   { postId, carouselId, items: [{ path, page_id }], caption, scheduledAt: ISO | null, igUserId }
+ *   scheduledAt null = publica agora, nesta mesma requisição.
+ */
+
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { resolveAccount } from "@/lib/instagram/account";
+import { feedFormatError } from "@/lib/instagram/jpeg";
+import { createPost, publishPostNow, toInstagramPost, verifyUploadedItems } from "@/lib/instagram/posts";
+import { CAPTION_MAX_CHARS } from "@/lib/instagram/publish";
+import { validateScheduledAt } from "@/lib/instagram/schedule";
+import { instagramErrorResponse, requireInstagramAdmin } from "@/lib/instagram/http";
+
+// "Publicar agora" espera o Instagram processar os containers.
+export const maxDuration = 300;
+
+export async function GET(request: Request) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+
+  const search = new URL(request.url).searchParams;
+  const carouselId = search.get("carouselId");
+  const demandId = search.get("demandId");
+  if (!carouselId && !demandId) return NextResponse.json({ error: "carouselId ou demandId obrigatório" }, { status: 400 });
+  const { data, error } = await supabase
+    .from("instagram_posts")
+    .select("*")
+    .eq(carouselId ? "studio_carousel_id" : "demand_id", (carouselId ?? demandId)!)
+    .order("created_at", { ascending: false })
+    .limit(30);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ posts: (data ?? []).map(toInstagramPost) });
+}
+
+const bodySchema = z.object({
+  postId: z.string().uuid(),
+  carouselId: z.string().uuid(),
+  items: z.array(z.object({ path: z.string().min(1), page_id: z.string().nullish() })),
+  caption: z.string().max(CAPTION_MAX_CHARS, `Legenda passa de ${CAPTION_MAX_CHARS} caracteres`),
+  scheduledAt: z.string().datetime({ offset: true }).nullable(),
+  /** Conta escolhida no diálogo (e mostrada na confirmação). */
+  igUserId: z.string().min(1),
+});
+
+export async function POST(request: Request) {
+  const auth = await requireInstagramAdmin();
+  if ("response" in auth) return auth.response;
+
+  const parsed = bodySchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Dados inválidos" }, { status: 400 });
+  }
+  const body = parsed.data;
+
+  if (body.scheduledAt) {
+    const scheduleError = validateScheduledAt(body.scheduledAt);
+    if (scheduleError) return NextResponse.json({ error: scheduleError }, { status: 422 });
+  }
+
+  try {
+    const admin = createAdminClient();
+    const { data: carousel } = await admin
+      .from("studio_carousels")
+      .select("id, format, client_id, demand_id")
+      .eq("id", body.carouselId)
+      .maybeSingle();
+    if (!carousel) return NextResponse.json({ error: "Carrossel não encontrado" }, { status: 404 });
+    const formatError = feedFormatError(carousel.format);
+    if (formatError) return NextResponse.json({ error: formatError }, { status: 422 });
+
+    const account = await resolveAccount(body.igUserId);
+
+    const items = await verifyUploadedItems(admin, { carouselId: body.carouselId, postId: body.postId, items: body.items });
+    let post = await createPost(admin, {
+      id: body.postId,
+      carouselId: body.carouselId,
+      demandId: carousel.demand_id,
+      clientId: carousel.client_id,
+      account,
+      items,
+      caption: body.caption,
+      scheduledAt: body.scheduledAt,
+      createdBy: auth.user.id,
+    });
+    if (!body.scheduledAt) post = await publishPostNow(admin, post.id);
+    return NextResponse.json({ post });
+  } catch (error) {
+    return instagramErrorResponse(error, "criar post");
+  }
+}

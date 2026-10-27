@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { resolveDimensions } from "../openai";
+import sharp from "sharp";
+import { normalizeReference, REFERENCE_EDGE_MAX, resolveDimensions } from "../openai";
 
 // Limites do gpt-image-2.5 (ver doc OpenAI / lib/ai/imagegen/openai.ts).
 const EDGE_MAX = 3840;
@@ -58,5 +59,52 @@ describe("resolveDimensions", () => {
     const bogus = resolveDimensions("0:0", "9000K");
     expect(bogus.width % 16).toBe(0);
     expect(bogus.height % 16).toBe(0);
+  });
+});
+
+describe("normalizeReference", () => {
+  it("reduz referência gigante com transparência para PNG dentro do limite", async () => {
+    const huge = await sharp({
+      create: { width: 6000, height: 2000, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+    }).png().toBuffer();
+
+    const { bytes, mime } = await normalizeReference(huge);
+    const meta = await sharp(bytes).metadata();
+
+    expect(mime).toBe("image/png");
+    expect(meta.format).toBe("png");
+    expect(meta.hasAlpha).toBe(true);
+    expect(Math.max(meta.width!, meta.height!)).toBe(REFERENCE_EDGE_MAX);
+    // proporção preservada
+    expect(meta.width! / meta.height!).toBeCloseTo(3, 1);
+  });
+
+  it("converte CMYK sem transparência para JPEG sRGB", async () => {
+    const cmyk = await sharp({
+      create: { width: 400, height: 500, channels: 3, background: { r: 200, g: 30, b: 30 } },
+    }).toColorspace("cmyk").jpeg().toBuffer();
+    expect((await sharp(cmyk).metadata()).space).toBe("cmyk");
+
+    const { bytes, mime } = await normalizeReference(cmyk);
+    const meta = await sharp(bytes).metadata();
+
+    expect(mime).toBe("image/jpeg");
+    expect(meta.space).toBe("srgb");
+  });
+
+  it("não amplia imagem pequena", async () => {
+    const small = await sharp({
+      create: { width: 300, height: 200, channels: 3, background: { r: 255, g: 255, b: 255 } },
+    }).webp().toBuffer();
+
+    const { bytes, mime } = await normalizeReference(small);
+    const meta = await sharp(bytes).metadata();
+
+    expect(mime).toBe("image/jpeg");
+    expect([meta.width, meta.height]).toEqual([300, 200]);
+  });
+
+  it("rejeita bytes que não são imagem", async () => {
+    await expect(normalizeReference(Buffer.from("not an image"))).rejects.toThrow();
   });
 });

@@ -12,8 +12,9 @@
  * (`resolveDimensions`). A qualidade (low/medium/high) vai direto no `quality`.
  *
  * Referências entram pelo endpoint de edição (`/images/edits`, multipart, campo
- * `image[]`): baixamos cada URL e mandamos como arquivo — a OpenAI não aceita
- * URL remota para gpt-image. Sem referências, usamos `/images/generations`
+ * `image[]`): baixamos cada URL, normalizamos com sharp (`normalizeReference`:
+ * tamanho, cor e formato) e mandamos como arquivo — a OpenAI não aceita URL
+ * remota para gpt-image. Sem referências, usamos `/images/generations`
  * (JSON). Em ambos o retorno é `b64_json` (URL não é suportada para gpt-image).
  */
 
@@ -141,17 +142,36 @@ export function resolveDimensions(
   return { size: `${width}x${height}`, width, height };
 }
 
-function mimeFromUrl(url: string): string {
-  const clean = url.split("?")[0].toLowerCase();
-  if (clean.endsWith(".png")) return "image/png";
-  if (clean.endsWith(".webp")) return "image/webp";
-  return "image/jpeg";
-}
+/**
+ * Maior borda de uma referência enviada à OpenAI. Mais que isso não melhora a
+ * fidelidade e arquivos gigantes são recusados com "Invalid image data" (ex.: a
+ * logo de 22560×7414 px de um cliente derrubava todas as artes da demanda).
+ */
+export const REFERENCE_EDGE_MAX = 2048;
 
-function extFromMime(mime: string): string {
-  if (mime === "image/png") return "png";
-  if (mime === "image/webp") return "webp";
-  return "jpg";
+/**
+ * Normaliza uma referência para o /images/edits: aplica a rotação do EXIF,
+ * reduz para caber em REFERENCE_EDGE_MAX, converte para sRGB 8 bits (CMYK,
+ * 16 bits, WebP/GIF/AVIF/HEIC viram formatos que a OpenAI aceita) e reencoda —
+ * PNG quando há transparência (logos), JPEG nos demais.
+ */
+export async function normalizeReference(
+  input: Buffer
+): Promise<{ bytes: Buffer; mime: "image/png" | "image/jpeg" }> {
+  const image = sharp(input, { failOn: "none" }).rotate();
+  const { hasAlpha } = await image.metadata();
+  const pipeline = image
+    .resize({
+      width: REFERENCE_EDGE_MAX,
+      height: REFERENCE_EDGE_MAX,
+      fit: "inside",
+      withoutEnlargement: true,
+    })
+    .toColorspace("srgb");
+  if (hasAlpha) {
+    return { bytes: await pipeline.png().toBuffer(), mime: "image/png" };
+  }
+  return { bytes: await pipeline.jpeg({ quality: 90 }).toBuffer(), mime: "image/jpeg" };
 }
 
 async function downloadReference(url: string): Promise<{ blob: Blob; filename: string }> {
@@ -159,11 +179,16 @@ async function downloadReference(url: string): Promise<{ blob: Blob; filename: s
   if (!res.ok) {
     throw new OpenAIImageError(`Falha ao baixar referência (${res.status}): ${url}`);
   }
-  // Tipo real do arquivo (data: URL e Storage sem extensão confiável).
-  const header = res.headers.get("content-type")?.split(";")[0].trim().toLowerCase();
-  const mime = header?.startsWith("image/") ? header : mimeFromUrl(url);
-  const bytes = Buffer.from(await res.arrayBuffer());
-  return { blob: new Blob([bytes], { type: mime }), filename: `ref.${extFromMime(mime)}` };
+  let normalized: Awaited<ReturnType<typeof normalizeReference>>;
+  try {
+    normalized = await normalizeReference(Buffer.from(await res.arrayBuffer()));
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    throw new OpenAIImageError(`Referência não é uma imagem válida (${reason}): ${url}`);
+  }
+  const { bytes, mime } = normalized;
+  const ext = mime === "image/png" ? "png" : "jpg";
+  return { blob: new Blob([new Uint8Array(bytes)], { type: mime }), filename: `ref.${ext}` };
 }
 
 /** Compõe o prompt final anexando o papel de cada referência, quando houver. */
