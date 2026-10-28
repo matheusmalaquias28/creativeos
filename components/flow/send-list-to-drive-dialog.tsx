@@ -12,6 +12,7 @@ import {
   sendListToDriveAction,
 } from "@/actions/demand-export";
 import type { ExportFormat } from "@/lib/export/filename";
+import { assignListDriveSlots } from "@/lib/export/list-drive-slots";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -29,7 +30,8 @@ const SKIP = "skip";
  * Envia as imagens de uma Lista do Space para o Drive da demanda: cada imagem
  * vai para o slot da sua arte (Arte N) no formato escolhido, e só esse formato
  * é entregue — stories caem na pasta "Stories". A arte de cada imagem vem da
- * origem registrada na geração; quando não dá para saber, o operador escolhe.
+ * origem registrada na geração; o que não dá para saber (ou passa do número de
+ * artes da demanda) já vem num slot livre, que o operador pode trocar.
  */
 export function SendListToDriveDialog({ demandId, urls, defaultFormat, onClose }: Props) {
   const [format, setFormat] = useState<ExportFormat>(defaultFormat);
@@ -49,8 +51,11 @@ export function SendListToDriveDialog({ demandId, urls, defaultFormat, onClose }
         return;
       }
       const demand = demands.demands?.find((d) => d.id === demandId);
-      setArtCount(demand?.artes.length ?? 0);
-      setSlots(Object.fromEntries((resolved.slots ?? []).map((s) => [s.url, s.artIndex])));
+      const count = demand?.artes.length ?? 0;
+      const origin = new Map((resolved.slots ?? []).map((s) => [s.url, s.artIndex]));
+      const initial = assignListDriveSlots(urls.map((url) => origin.get(url) ?? null), count);
+      setArtCount(count);
+      setSlots(Object.fromEntries(urls.map((url, i) => [url, initial[i]])));
     });
   }, [demandId, urls]);
 
@@ -68,11 +73,14 @@ export function SendListToDriveDialog({ demandId, urls, defaultFormat, onClose }
     return dup;
   }, [assigned]);
 
+  // Sempre há slot para toda a lista: além das artes da demanda, slots extras
+  // (Arte N+1…) para quando a lista tem mais imagens do que a demanda pede.
+  const slotCount = Math.max(artCount ?? 0, urls.length, ...assigned.map((i) => i.artIndex));
   const slotOptions = [
     { value: SKIP, label: "Não enviar" },
-    ...Array.from({ length: artCount ?? 0 }, (_, i) => ({
+    ...Array.from({ length: slotCount }, (_, i) => ({
       value: String(i + 1),
-      label: `Arte ${i + 1}`,
+      label: i + 1 > (artCount ?? 0) ? `Arte ${i + 1} (extra)` : `Arte ${i + 1}`,
     })),
   ];
 
