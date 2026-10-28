@@ -30,25 +30,29 @@ import {
 
 // ─── Known statuses ──────────────────────────────────────────────────────────
 
-const KNOWN_STATUSES = new Set<string>(DEMAND_STATUSES);
+/** Status "custom" do WAR para a etapa de adaptar as artes para stories. */
+const STORIES_STATUS = "Formato Stories";
 
 /**
- * Colunas do kanban, na ordem do fluxo (Ajuste logo depois de Fazendo). Fora
- * daqui não aparece: "Concluído" sai sozinho do quadro, "Aprovação de Copy"
- * não tem coluna e status nulo/"custom" do WAR (ex.: Cancelada, Revisão) não
- * entra no kanban.
+ * Colunas do kanban, na ordem do fluxo (Ajuste logo depois de Fazendo, e
+ * Formato Stories ao lado de Ajuste). Fora daqui não aparece: "Concluído" sai
+ * sozinho do quadro, "Aprovação de Copy" não tem coluna e os demais status
+ * nulos/"custom" do WAR (ex.: Cancelada, Revisão) não entram no kanban.
  */
-const KANBAN_STATUSES: DemandStatus[] = [
+const KANBAN_STATUSES = [
   "Aguardando Definição de Data",
   "Em Fila",
   "Fazendo",
   "Ajuste",
+  STORIES_STATUS,
   "Aprovação do Gestor",
   "Aprovação do Cliente",
   "Aprovado",
   "Atrasado",
-];
-type KanbanColumnId = DemandStatus;
+] as const satisfies readonly (DemandStatus | typeof STORIES_STATUS)[];
+type KanbanColumnId = (typeof KANBAN_STATUSES)[number];
+
+const KNOWN_STATUSES = new Set<string>([...DEMAND_STATUSES, STORIES_STATUS]);
 
 // ─── Column config ───────────────────────────────────────────────────────────
 
@@ -59,7 +63,7 @@ type KanbanColumn = {
 };
 
 /** Rótulos curtos para os cabeçalhos das colunas (o status completo é longo). */
-const COLUMN_LABELS: Partial<Record<DemandStatus, string>> = {
+const COLUMN_LABELS: Partial<Record<KanbanColumnId, string>> = {
   "Aguardando Definição de Data": "Aguardando Data",
 };
 

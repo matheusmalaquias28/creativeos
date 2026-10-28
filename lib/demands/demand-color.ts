@@ -21,6 +21,7 @@ const STATUS_COLOR: Record<string, DemandColorState> = {
   "Aprovação de Copy": "purple",
   "Aprovação do Gestor": "purple",
   Ajuste: "purple",
+  "Formato Stories": "blue", // status custom do WAR
   "Aprovação do Cliente": "purple",
   Aprovado: "green",
   Atrasado: "red",
