@@ -192,10 +192,25 @@ type InnerProps = {
 // Job row shape from Realtime
 type JobRow = {
   id: string;
+  demand_id: string;
   art_index: number;
   status: string;
   story_status?: string;
 };
+
+/**
+ * Demanda dona do node. O Space é do CLIENTE e junta várias demandas, cada uma
+ * com seus próprios art_index 0..n — casar job e node só pelo art_index fazia
+ * a arte de uma demanda aparecer na outra, e o node de outra demanda girava
+ * para sempre (o canvas só acompanhava os jobs da demanda da página).
+ */
+function nodeDemandId(n: Node, fallback: string): string {
+  return (n.data as SaidaArteData).demandId || fallback;
+}
+
+function jobKey(demandId: string, artIndex: number): string {
+  return `${demandId}:${artIndex}`;
+}
 
 function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: InnerProps) {
   const router = useRouter();
@@ -418,25 +433,37 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
   // A mesma leitura roda em polling enquanto houver arte gerando (ver abaixo):
   // se o Realtime perder o evento de "succeeded" (socket caiu, aba em segundo
   // plano), o node não pode ficar girando para sempre com a arte já pronta.
+  //
+  // Lê os jobs de TODAS as demandas presentes no Space, não só a da página.
+  // String ordenada para não refazer a leitura a cada arraste de node.
+  const spaceDemandIds = useMemo(() => {
+    const ids = new Set([demanda.id]);
+    for (const n of nodes) {
+      if (n.type === "arte" || n.type === "saidaArte") ids.add(nodeDemandId(n, demanda.id));
+    }
+    return Array.from(ids).sort().join(",");
+  }, [nodes, demanda.id]);
+
   const loadJobsSnapshot = useCallback(async () => {
     const supabase = createClient();
     const { data: jobs } = await supabase
       .from("art_generation_job")
-      .select("id, art_index, status, created_at, updated_at")
-      .eq("demand_id", demanda.id)
+      .select("id, demand_id, art_index, status, created_at, updated_at")
+      .in("demand_id", spaceDemandIds.split(","))
       .order("created_at", { ascending: false });
     if (!jobs?.length) return null;
 
-    // Job mais recente por art_index — pode haver duplicatas de antes da
-    // dedupe em run/run-node (ver app/api/demands/[id]/flow/run*/route.ts).
-    const jobByIndex = new Map<number, { id: string; status: string; updatedAt: string }>();
+    // Job mais recente por demanda + art_index — pode haver duplicatas de antes
+    // da dedupe em run/run-node (ver app/api/demands/[id]/flow/run*/route.ts).
+    const jobByKey = new Map<string, { id: string; status: string; updatedAt: string }>();
     for (const j of jobs) {
-      if (!jobByIndex.has(j.art_index)) {
-        jobByIndex.set(j.art_index, { id: j.id, status: j.status, updatedAt: j.updated_at });
+      const key = jobKey(j.demand_id, j.art_index);
+      if (!jobByKey.has(key)) {
+        jobByKey.set(key, { id: j.id, status: j.status, updatedAt: j.updated_at });
       }
     }
 
-    const jobIds = Array.from(jobByIndex.values(), (j) => j.id);
+    const jobIds = Array.from(jobByKey.values(), (j) => j.id);
     const { data: versions } = await supabase
       .from("art_version")
       .select("id, job_id, result_url, is_current, version_number, format")
@@ -449,8 +476,8 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
       list.push(v);
       versionsByJob.set(v.job_id, list);
     }
-    return { jobByIndex, versionsByJob };
-  }, [demanda.id]);
+    return { jobByKey, versionsByJob };
+  }, [spaceDemandIds]);
 
   type JobsSnapshot = NonNullable<Awaited<ReturnType<typeof loadJobsSnapshot>>>;
 
@@ -462,7 +489,7 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
         ns.map((n) => {
           if (n.type !== "arte" && n.type !== "saidaArte") return n;
           const d = n.data as SaidaArteData;
-          const job = snapshot.jobByIndex.get(d.artIndex);
+          const job = snapshot.jobByKey.get(jobKey(nodeDemandId(n, demanda.id), d.artIndex));
           if (!job || !shouldApply(job)) return n;
 
           const format = d.format === "story" ? "story" : "feed";
@@ -485,7 +512,7 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
       );
       return finished;
     },
-    [setNodes]
+    [setNodes, demanda.id]
   );
 
   useEffect(() => {
@@ -505,6 +532,8 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
   useEffect(() => {
     const supabase = createClient();
 
+    // O Space é do cliente: escuta os jobs de todas as demandas dele — clicar
+    // em Gerar num node de outra demanda cria o job sob a demanda DO NODE.
     const channel = supabase
       .channel(`flow-jobs-${demanda.id}`)
       .on(
@@ -513,21 +542,23 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
           event: "*",
           schema: "public",
           table: "art_generation_job",
-          filter: `demand_id=eq.${demanda.id}`,
+          filter: demanda.client_id
+            ? `client_id=eq.${demanda.client_id}`
+            : `demand_id=eq.${demanda.id}`,
         },
         async (payload) => {
           const job = (payload.new ?? payload.old) as JobRow | null;
-          if (!job || job.art_index === undefined) return;
+          if (!job || job.art_index === undefined || !job.demand_id) return;
 
           const status = job.status as SaidaArteData["generatingStatus"];
+          const isJobNode = (n: Node) =>
+            (n.type === "saidaArte" || n.type === "arte") &&
+            (n.data as SaidaArteData).artIndex === job.art_index &&
+            nodeDemandId(n, demanda.id) === job.demand_id;
 
           // Immediately reflect status change in the node
           setNodes((ns) =>
-            ns.map((n) => {
-              if (n.type !== "saidaArte" && n.type !== "arte") return n;
-              if ((n.data as SaidaArteData).artIndex !== job.art_index) return n;
-              return { ...n, data: { ...n.data, generatingStatus: status } };
-            })
+            ns.map((n) => (isJobNode(n) ? { ...n, data: { ...n.data, generatingStatus: status } } : n))
           );
 
           // Falha/pausa no meio de um lote pode ter deixado versões prontas.
@@ -551,8 +582,7 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
               let finishedNodeId: string | null = null;
               setNodes((ns) =>
                 ns.map((n) => {
-                  if (n.type !== "saidaArte" && n.type !== "arte") return n;
-                  if ((n.data as SaidaArteData).artIndex !== job.art_index) return n;
+                  if (!isJobNode(n)) return n;
                   finishedNodeId = n.id;
                   return {
                     ...n,
@@ -580,7 +610,7 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [demanda.id, setNodes, syncListsAfterGeneration]);
+  }, [demanda.id, demanda.client_id, setNodes, syncListsAfterGeneration]);
 
   // ─── Connections ──────────────────────────────────────────────────────
 
@@ -740,6 +770,9 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
           if (n.type !== "saidaArte" && n.type !== "arte") return n;
           // Stories não roda no "Executar" geral — disparo é no próprio node.
           if ((n.data as SaidaArteData).format === "story") return n;
+          // O "Executar" só roda as artes desta demanda — as das outras
+          // demandas do Space ficariam "na fila" para sempre.
+          if (nodeDemandId(n, demanda.id) !== demanda.id) return n;
           return { ...n, data: { ...n.data, generatingStatus: "queued" as const } };
         })
       );
@@ -784,7 +817,7 @@ function FlowCanvasInner({ demanda, numArtes, initialGraph, clientProfile }: Inn
       const snapshot = await loadJobsSnapshot();
       if (cancelled || !snapshot) return;
       if (!baseline) {
-        baseline = new Map(Array.from(snapshot.jobByIndex.values(), (j) => [j.id, j.updatedAt]));
+        baseline = new Map(Array.from(snapshot.jobByKey.values(), (j) => [j.id, j.updatedAt]));
         return;
       }
       const base = baseline;
