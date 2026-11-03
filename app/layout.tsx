@@ -1,14 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { Geist_Mono } from "next/font/google";
 import { AppProviders } from "@/components/providers/app-providers";
 import { AmbientBackground } from "@/components/layout/ambient-background";
-import { fontVariables } from "@/lib/design/fonts";
+import { fontVariables, geistMono } from "@/lib/design/fonts";
 import "./globals.css";
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 // maximumScale impede o zoom automático do iOS ao focar campos (o pinch-zoom
 // continua funcionando no iOS, que ignora esse limite para gestos).

@@ -1,44 +1,91 @@
 /**
- * Curated Google Fonts shared between the carousel editor and the design
- * profiles page. Each font is self-hosted by next/font and exposed as a CSS
- * variable so it can be referenced from inline styles (previews, rich text)
- * anywhere the variables are defined (they are attached to <html> in the root
- * layout).
+ * Curated fonts shared between the carousel editor and the design profiles
+ * page. Each font is self-hosted and exposed as a CSS variable so it can be
+ * referenced from inline styles (previews, rich text) anywhere the variables
+ * are defined (they are attached to <html> in the root layout).
  *
  * `family` is a ready-to-use `font-family` value — store it directly on a slide
  * or profile and drop it into a style object.
  */
-import {
-  Manrope,
-  Inter,
-  Poppins,
-  Montserrat,
-  Roboto,
-  Space_Grotesk,
-  Archivo,
-  Oswald,
-  Bebas_Neue,
-  Playfair_Display,
-  Merriweather,
-  Lora,
-} from "next/font/google";
 import localFont from "next/font/local";
 
-const manrope = Manrope({ variable: "--font-manrope", subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], display: "swap" });
-const inter = Inter({ variable: "--font-inter", subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], display: "swap" });
-const poppins = Poppins({ variable: "--font-poppins", subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], display: "swap" });
-const montserrat = Montserrat({ variable: "--font-montserrat", subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], display: "swap" });
-const roboto = Roboto({ variable: "--font-roboto", subsets: ["latin"], weight: ["400", "500", "700", "900"], display: "swap" });
-const spaceGrotesk = Space_Grotesk({ variable: "--font-space-grotesk", subsets: ["latin"], weight: ["400", "500", "600", "700"], display: "swap" });
-const archivo = Archivo({ variable: "--font-archivo", subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], display: "swap" });
-const oswald = Oswald({ variable: "--font-oswald", subsets: ["latin"], weight: ["400", "500", "600", "700"], display: "swap" });
-const bebasNeue = Bebas_Neue({ variable: "--font-bebas-neue", subsets: ["latin"], weight: ["400"], display: "swap" });
-const playfair = Playfair_Display({ variable: "--font-playfair", subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], display: "swap" });
-const merriweather = Merriweather({ variable: "--font-merriweather", subsets: ["latin"], weight: ["400", "700", "900"], display: "swap" });
-const lora = Lora({ variable: "--font-lora", subsets: ["latin"], weight: ["400", "500", "600", "700"], display: "swap" });
-// Instrument Serif e Caveat: self-hosted (subset latin, OFL). Buscá-las no
-// Google Fonts durante o build quebrou o deploy na Vercel (next/font recebeu
-// URL de arquivo sem extensão).
+// Todas as Google Fonts ficam no repositório (woff2 subset latin, licença OFL)
+// via next/font/local. Buscá-las no Google Fonts durante o build quebrava o
+// deploy na Vercel sempre que uma fonte saía do cache de build ("Cannot read
+// properties of null (reading '1')": next/font recebia URL de arquivo sem
+// extensão). Fontes variáveis são um arquivo só cobrindo a faixa de pesos.
+const manrope = localFont({
+  variable: "--font-manrope",
+  display: "swap",
+  src: [{ path: "./fonts/manrope/Manrope-Variable.woff2", weight: "400 800", style: "normal" }],
+});
+const inter = localFont({
+  variable: "--font-inter",
+  display: "swap",
+  src: [{ path: "./fonts/inter/Inter-Variable.woff2", weight: "400 800", style: "normal" }],
+});
+const poppins = localFont({
+  variable: "--font-poppins",
+  display: "swap",
+  src: [
+    { path: "./fonts/poppins/Poppins-400.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/poppins/Poppins-500.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/poppins/Poppins-600.woff2", weight: "600", style: "normal" },
+    { path: "./fonts/poppins/Poppins-700.woff2", weight: "700", style: "normal" },
+    { path: "./fonts/poppins/Poppins-800.woff2", weight: "800", style: "normal" },
+  ],
+});
+const montserrat = localFont({
+  variable: "--font-montserrat",
+  display: "swap",
+  src: [{ path: "./fonts/montserrat/Montserrat-Variable.woff2", weight: "400 800", style: "normal" }],
+});
+const roboto = localFont({
+  variable: "--font-roboto",
+  display: "swap",
+  src: [{ path: "./fonts/roboto/Roboto-Variable.woff2", weight: "400 900", style: "normal" }],
+});
+const spaceGrotesk = localFont({
+  variable: "--font-space-grotesk",
+  display: "swap",
+  src: [{ path: "./fonts/space-grotesk/SpaceGrotesk-Variable.woff2", weight: "400 700", style: "normal" }],
+});
+const archivo = localFont({
+  variable: "--font-archivo",
+  display: "swap",
+  src: [{ path: "./fonts/archivo/Archivo-Variable.woff2", weight: "400 800", style: "normal" }],
+});
+const oswald = localFont({
+  variable: "--font-oswald",
+  display: "swap",
+  src: [{ path: "./fonts/oswald/Oswald-Variable.woff2", weight: "400 700", style: "normal" }],
+});
+const bebasNeue = localFont({
+  variable: "--font-bebas-neue",
+  display: "swap",
+  src: [{ path: "./fonts/bebas-neue/BebasNeue-400.woff2", weight: "400", style: "normal" }],
+});
+const playfair = localFont({
+  variable: "--font-playfair",
+  display: "swap",
+  src: [{ path: "./fonts/playfair-display/PlayfairDisplay-Variable.woff2", weight: "400 800", style: "normal" }],
+});
+const merriweather = localFont({
+  variable: "--font-merriweather",
+  display: "swap",
+  src: [{ path: "./fonts/merriweather/Merriweather-Variable.woff2", weight: "400 900", style: "normal" }],
+});
+const lora = localFont({
+  variable: "--font-lora",
+  display: "swap",
+  src: [{ path: "./fonts/lora/Lora-Variable.woff2", weight: "400 700", style: "normal" }],
+});
+/** Fonte mono da UI (var `--font-mono` no globals.css). */
+export const geistMono = localFont({
+  variable: "--font-geist-mono",
+  display: "swap",
+  src: [{ path: "./fonts/geist-mono/GeistMono-Variable.woff2", weight: "100 900", style: "normal" }],
+});
 const instrumentSerif = localFont({
   variable: "--font-instrument-serif",
   display: "swap",
