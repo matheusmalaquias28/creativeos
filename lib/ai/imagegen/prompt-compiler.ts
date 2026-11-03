@@ -9,6 +9,8 @@
  *   3. Referências pontuais da demanda (demand_references, ordenadas por position)
  */
 
+import { buildCtaDirective, DEFAULT_CTA_POSITION } from "@/lib/flow/cta-directive";
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -32,6 +34,8 @@ export type ArtSpec = {
   informacoesExtras?: string | null;
   aspect_ratio?: string;
   image_size?: string;
+  /** Posição do botão de CTA no Space (ver cta-directive.ts). */
+  cta_position?: string | null;
 };
 
 export type BriefingCopy = {
@@ -167,11 +171,10 @@ export function compilePrompt(
 }
 
 /**
- * Regra fixa do CTA nas artes do Space: botão centralizado embaixo, com fundo
- * de cor sólida. Se o prompt do node já disser a cor, ela vence.
+ * Regra do CTA nas artes do Space na posição padrão (base, centralizado, cor
+ * sólida da identidade). Com posição escolhida no node, use `buildCtaDirective`.
  */
-export const SPACE_CTA_DIRECTIVE =
-  "O CTA é um BOTÃO: SEMPRE centralizado na parte inferior da arte, com fundo de cor sólida (sem gradiente, sem transparência) e o texto do CTA em cor de alto contraste. Se o prompt indicar a cor do CTA, use essa cor.";
+export const SPACE_CTA_DIRECTIVE = buildCtaDirective(DEFAULT_CTA_POSITION);
 
 /**
  * Compilador do "Space" (canvas node-based) — ao contrário do `compilePrompt`
@@ -221,7 +224,7 @@ export function compileSpacePrompt(
       "Textos a exibir na arte (use exatamente estes como copy, sem inventar outros):\n" +
         copy.map((l) => `- ${l}`).join("\n")
     );
-    if (artSpec.cta) parts.push(SPACE_CTA_DIRECTIVE);
+    if (artSpec.cta) parts.push(buildCtaDirective(artSpec.cta_position));
   }
 
   // 5. Paleta como referência de cor (NÃO forçada como fundo).

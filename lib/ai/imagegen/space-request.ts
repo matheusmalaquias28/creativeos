@@ -13,8 +13,9 @@
  * frente, depois a logo, e por último as referências de estilo/ambiente.
  */
 
+import { buildCtaDirective } from "@/lib/flow/cta-directive";
 import { buildLogoDirective } from "@/lib/flow/logo-directive";
-import { compileSpacePrompt, SPACE_CTA_DIRECTIVE, type CreativeProfile } from "./prompt-compiler";
+import { compileSpacePrompt, type CreativeProfile } from "./prompt-compiler";
 
 export type SpaceJobParams = {
   headline?: string | null;
@@ -30,6 +31,8 @@ export type SpaceJobParams = {
   logo_position?: string | null;
   logo_size?: string | null;
   logo_directive?: string | null;
+  /** Posição do botão de CTA na base da arte (ver cta-directive.ts). */
+  cta_position?: string | null;
   /** Texto inteiro do node `arte` — quando presente, é o corpo do prompt. */
   prompt_text?: string | null;
   briefing_titulo?: string | null;
@@ -151,7 +154,7 @@ export function buildSpaceRequest(
 
   const masterText = params.prompt_text?.trim();
   const body = masterText
-    ? masterBody(masterText, Boolean(params.cta?.trim()), aspectRatio, imageSize)
+    ? masterBody(masterText, Boolean(params.cta?.trim()), params.cta_position, aspectRatio, imageSize)
     : compileSpacePrompt(
     NO_PROFILE,
     { titulo: params.briefing_titulo ?? undefined, tipo: params.briefing_tipo ?? undefined },
@@ -162,6 +165,7 @@ export function buildSpaceRequest(
       informacoesExtras: params.informacoesExtras ?? undefined,
       aspect_ratio: aspectRatio,
       image_size: imageSize,
+      cta_position: params.cta_position,
     },
     []
   );
@@ -179,13 +183,20 @@ export function buildSpaceRequest(
 
 /**
  * Corpo do prompt quando o node tem texto: o texto do operador, literal e
- * inteiro, + a regra fixa do CTA (quando a arte tem CTA) + o formato escolhido
- * nos controles do node. Nada de campanha ou copy reescrita por fora.
+ * inteiro, + a regra do CTA na posição escolhida no node (quando a arte tem
+ * CTA) + o formato escolhido nos controles do node. Nada de campanha ou copy
+ * reescrita por fora.
  */
-function masterBody(text: string, hasCta: boolean, aspectRatio: string, imageSize: string): string {
+function masterBody(
+  text: string,
+  hasCta: boolean,
+  ctaPosition: string | null | undefined,
+  aspectRatio: string,
+  imageSize: string
+): string {
   // CTA com rótulo livre ("CTA CENTRALIZADA NA COR VERDE: ...") não vira
   // `params.cta` no parse — por isso também olha o texto.
-  const cta = hasCta || /\bCTA\b/i.test(text) ? `\n\n${SPACE_CTA_DIRECTIVE}` : "";
+  const cta = hasCta || /\bCTA\b/i.test(text) ? `\n\n${buildCtaDirective(ctaPosition)}` : "";
   return `${text}${cta}\n\nFormato: proporção ${aspectRatio}, resolução ${imageSize}.`;
 }
 

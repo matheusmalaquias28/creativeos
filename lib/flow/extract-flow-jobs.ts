@@ -62,6 +62,8 @@ export type FlowJobParams = {
    * continuam existindo para o seletor da UI refletir o valor atual.
    */
   logo_directive?: string | null;
+  /** Posição do botão de CTA na base da arte (ver cta-directive.ts). */
+  cta_position?: string | null;
   /**
    * Prompt MASTER do node `arte`: o texto inteiro do node, literal (só os
    * tokens `@(nome)` viram o nome). No Space ele é o corpo do prompt — nada
@@ -452,6 +454,7 @@ function extractArteJob(
     logo_position: data.logoPosition ?? null,
     logo_size: data.logoSize ?? null,
     logo_directive: logoDirective,
+    cta_position: data.ctaPosition ?? null,
     prompt_text: resolveNamedRefTokens(fullText, namedRefMap, refs, seen)?.trim() || null,
     briefing_titulo: briefing.titulo ?? null,
     briefing_tipo: briefing.tipo ?? null,
@@ -480,6 +483,7 @@ export function flowJobParamsToRow(p: FlowJobParams): Json {
     logo_position: p.logo_position ?? null,
     logo_size: p.logo_size ?? null,
     logo_directive: p.logo_directive ?? null,
+    cta_position: p.cta_position ?? null,
     prompt_text: p.prompt_text ?? null,
     briefing_titulo: p.briefing_titulo,
     briefing_tipo: p.briefing_tipo,

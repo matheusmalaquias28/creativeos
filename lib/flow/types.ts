@@ -105,6 +105,8 @@ export type ArteData = PromptFields & {
   /** Posição/tamanho da logo (quando enviada como referência). Ver logo-directive.ts */
   logoPosition?: string;
   logoSize?: 'small' | 'medium' | 'large';
+  /** Posição do botão de CTA na base da arte. Ver cta-directive.ts */
+  ctaPosition?: string;
   /**
    * A identidade de marca do cliente (base_prompt/paleta) já foi semeada como
    * linha visível no prompt deste node — ver enrich-graph.ts. Uma vez `true`,

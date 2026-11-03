@@ -104,6 +104,15 @@ describe("buildSpaceRequest", () => {
     expect(req.body).toContain(SPACE_CTA_DIRECTIVE);
   });
 
+  it("posição do CTA escolhida no node muda a regra do botão (sempre na base)", () => {
+    const esq = buildSpaceRequest({ prompt_text: "CTA: COMPRE", cta_position: "bottom-left" }, defaults);
+    expect(esq.body).toContain("parte inferior da arte, alinhado à esquerda");
+    expect(esq.body).not.toContain(SPACE_CTA_DIRECTIVE);
+    const semPosicao = buildSpaceRequest({ headline: "Oi", cta: "COMPRE" }, defaults);
+    expect(semPosicao.body).toContain("parte inferior da arte, centralizado");
+    expect(semPosicao.body).toContain("cor sólida tirada da identidade visual");
+  });
+
   it("sem CTA no node, nenhuma regra de CTA", () => {
     const req = buildSpaceRequest({ prompt_text: "cena sem texto" }, defaults);
     expect(req.body).not.toContain(SPACE_CTA_DIRECTIVE);

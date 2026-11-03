@@ -17,6 +17,7 @@ import {
   Library,
   FolderUp,
   ScanEye,
+  MousePointerClick,
 } from "lucide-react";
 import type { Node } from "@xyflow/react";
 import { toast } from "sonner";
@@ -36,6 +37,7 @@ import {
   buildLogoDirective,
   type LogoSize,
 } from "@/lib/flow/logo-directive";
+import { CTA_POSITIONS, DEFAULT_CTA_POSITION } from "@/lib/flow/cta-directive";
 import { upsertMentionLine } from "@/lib/flow/mention-text";
 import { STORY_QUALITY } from "@/lib/flow/story-defaults";
 import { downloadImageUrl } from "@/lib/flow/download-image";
@@ -413,6 +415,11 @@ export function ArteNode({ id, data, selected }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasLogo, isStory]);
 
+  // Prompt com CTA? Mesmo critério da montagem do prompt (space-request.ts):
+  // só então a regra do botão entra e o seletor de posição faz sentido.
+  const hasCta = /\bCTA\b/i.test(draft);
+  const ctaPosition = data.ctaPosition ?? DEFAULT_CTA_POSITION;
+
   // Nome do arquivo: SEMPRE o nome da demanda + um número (o índice da arte)
   // pra diferenciar — nunca o label do node (que pode ter sido renomeado).
   const downloadFilename = (() => {
@@ -615,6 +622,18 @@ export function ArteNode({ id, data, selected }: Props) {
                   {LOGO_SIZES[logoSizeLevel]?.label ?? "Pequena"}
                 </span>
               </button>
+            </div>
+          )}
+
+          {/* CTA: posição na base da arte (só quando o prompt tem CTA) */}
+          {!isStory && hasCta && (
+            <div className="mt-2 flex items-center gap-1.5">
+              <span className="flex h-8 items-center gap-1.5 rounded-full bg-black/40 px-2.5 text-[0.6875rem] font-semibold text-white/80 backdrop-blur-md">
+                <MousePointerClick className="size-3.5" /> CTA
+              </span>
+              <NodeSelect variant="glass" title="Posição do CTA (sempre na base, cor sólida da marca)" value={ctaPosition}
+                options={CTA_POSITIONS.map((p) => ({ value: p.value, label: p.label }))}
+                onChange={(v) => update({ ctaPosition: v })} />
             </div>
           )}
 
