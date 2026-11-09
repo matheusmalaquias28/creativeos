@@ -15,7 +15,7 @@ import { isCarouselDemand } from "@/lib/carousel-studio/demand";
 import { autoRouteCarouselDemand } from "@/lib/carousel-studio/auto-trigger";
 import { isVideoDemandPayload } from "@/lib/video-demands/parse-payload";
 import { ingestVideoDemand } from "@/lib/video-demands/ingest";
-import { applyWarStatusEvent, parseWarStatusEvent } from "@/lib/demands/war-status-event";
+import { applyWarStatusEvent, parseWarDemandEvent } from "@/lib/demands/war-status-event";
 import type { Database } from "@/types/database";
 
 type CreativeDemandInsert =
@@ -128,11 +128,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  // Evento de status do WAR (`demanda.status`) chega neste mesmo endpoint, só
-  // com id/status: atualiza o status e para aqui — nunca vira upsert de
-  // demanda (apagaria título, artes e callback). Vale para arte e vídeo.
-  const statusEvent = parseWarStatusEvent(body);
-  if (statusEvent) {
+  // Eventos do WAR que não são criação (comentário `demanda.nota`, status
+  // `demanda.status`, …) chegam neste mesmo endpoint só com id/cliente/nota:
+  // no máximo atualizam o status e param aqui — nunca viram upsert de demanda
+  // (apagaria título, artes/copy e callback). Vale para arte e vídeo.
+  const warEvent = parseWarDemandEvent(body);
+  if (warEvent) {
+    if (!warEvent.status) {
+      return NextResponse.json({
+        ok: true,
+        kind: "event",
+        event: warEvent.event,
+        externalId: warEvent.externalId,
+        message: "Evento sem status: conteúdo da demanda preservado",
+      });
+    }
+    const statusEvent = { ...warEvent, status: warEvent.status };
     try {
       const applied = await applyWarStatusEvent(createAdminClient(), statusEvent);
       if (!applied) {
@@ -141,7 +152,13 @@ export async function POST(request: Request) {
           { status: 404 }
         );
       }
-      return NextResponse.json({ ok: true, kind: "status", demandId: applied.id, status: statusEvent.status });
+      return NextResponse.json({
+        ok: true,
+        kind: "status",
+        event: statusEvent.event,
+        demandId: applied.id,
+        status: statusEvent.status,
+      });
     } catch (err) {
       console.error("[webhook/make/demands] status", err);
       return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });

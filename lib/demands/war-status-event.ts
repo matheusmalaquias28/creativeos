@@ -5,6 +5,29 @@ type UnknownRecord = Record<string, unknown>;
 
 export type WarStatusEvent = { externalId: string; status: string; event: string | null };
 
+/**
+ * Evento do WAR que NÃO é criação/edição de demanda (comentário, mudança de
+ * status, …). `status` só vem preenchido quando o evento carrega um status.
+ */
+export type WarDemandEvent = { externalId: string; status: string | null; event: string | null };
+
+/** Eventos que nunca podem reescrever o conteúdo da demanda. */
+const NON_CONTENT_EVENT = /nota|coment|status/i;
+
+/** Campos que só existem num payload de criação/edição (arte ou vídeo). */
+function hasDemandContent(record: UnknownRecord): boolean {
+  if (
+    "briefing" in record ||
+    "artes" in record ||
+    "artesArray" in record ||
+    "briefingDescricao" in record ||
+    "briefingTexto" in record
+  ) {
+    return true;
+  }
+  return Object.keys(record).some((key) => /^\d+$/.test(key) || key.startsWith("briefing."));
+}
+
 function asRecord(value: unknown): UnknownRecord {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as UnknownRecord) : {};
 }
@@ -21,16 +44,31 @@ function asString(value: unknown): string {
  * ele, por ter `previousStatus` e nenhum conteúdo de demanda.
  */
 export function parseWarStatusEvent(payload: unknown): WarStatusEvent | null {
+  const evt = parseWarDemandEvent(payload);
+  if (!evt || !evt.status) return null;
+  return { externalId: evt.externalId, status: evt.status, event: evt.event };
+}
+
+/**
+ * Reconhece qualquer evento do WAR que chega no webhook de demandas mas NÃO é
+ * criação/edição: comentário (`demanda.nota`), mudança de status
+ * (`demanda.status`) ou qualquer `event` sem conteúdo de demanda. Esses
+ * payloads trazem só id/cliente/nota — tratados como criação, o upsert apagava
+ * artes (a copy), briefing e o `raw_payload` com o `callback`. Para eles, no
+ * máximo o status é aplicado; o conteúdo da demanda nunca é tocado.
+ * Devolve null para payloads de criação/edição.
+ */
+export function parseWarDemandEvent(payload: unknown): WarDemandEvent | null {
   const record = asRecord(payload);
   const event = asString(record.event);
-  const hasDemandContent = "briefing" in record || "artes" in record || "artesArray" in record;
-  const isStatusEvent = /status/i.test(event) || (!hasDemandContent && "previousStatus" in record);
-  if (!isStatusEvent) return null;
+  const content = hasDemandContent(record);
+  const isEvent =
+    NON_CONTENT_EVENT.test(event) || (!content && (Boolean(event) || "previousStatus" in record));
+  if (!isEvent) return null;
 
   const externalId = asString(record.id);
-  const status = asString(record.status);
-  if (!externalId || !status) return null;
-  return { externalId, status, event: event || null };
+  if (!externalId) return null;
+  return { externalId, status: asString(record.status) || null, event: event || null };
 }
 
 /**
