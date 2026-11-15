@@ -1,3 +1,4 @@
+import { linkOrphanWarComments } from "@/lib/demands/war-comment";
 import {
   resolveDemandClient,
   backfillClientExternalId,
@@ -90,6 +91,8 @@ export async function ingestVideoDemand(
     console.error("[ingestVideoDemand]", error.message);
     return { ok: false, status: 500, error: error.message };
   }
+
+  await linkOrphanWarComments(supabase, { kind: "video", id: data.id, externalId: data.external_id });
 
   return {
     ok: true,

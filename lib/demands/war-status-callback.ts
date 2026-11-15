@@ -59,19 +59,11 @@ function authHeaderValue(header: string, secret: string): string {
 }
 
 /**
- * Notifica o WAR sobre a mudança de status. Best-effort: nunca lança — loga e
- * segue, para não derrubar a ação de UI se o WAR estiver indisponível (o status
- * já foi persistido no CreativeOS antes de chamar aqui).
+ * Faz o POST no callback do WAR. Best-effort: nunca lança — loga e segue, para
+ * não derrubar a ação de UI se o WAR estiver indisponível (a mudança já foi
+ * persistida no CreativeOS antes de chamar aqui).
  */
-export async function notifyWarStatusChange(params: {
-  externalId: string | null | undefined;
-  status: string;
-  rawPayload: unknown;
-  updatedBy?: string;
-}): Promise<void> {
-  const { externalId, status, rawPayload, updatedBy = "CreativeOS" } = params;
-  if (!externalId) return;
-
+async function postToWar(rawPayload: unknown, body: Record<string, unknown>): Promise<void> {
   const target = extractWarCallback(rawPayload);
   if (!target) return; // Sem callback no payload nem env configurada.
 
@@ -93,7 +85,7 @@ export async function notifyWarStatusChange(params: {
         "content-type": "application/json",
         [target.header]: authHeaderValue(target.header, secret),
       },
-      body: JSON.stringify({ id: externalId, status, updatedBy }),
+      body: JSON.stringify(body),
       signal: controller.signal,
     });
 
@@ -111,4 +103,39 @@ export async function notifyWarStatusChange(params: {
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** Notifica o WAR sobre a mudança de status. */
+export async function notifyWarStatusChange(params: {
+  externalId: string | null | undefined;
+  status: string;
+  rawPayload: unknown;
+  updatedBy?: string;
+}): Promise<void> {
+  const { externalId, status, rawPayload, updatedBy = "CreativeOS" } = params;
+  if (!externalId) return;
+  await postToWar(rawPayload, { id: externalId, status, updatedBy });
+}
+
+/**
+ * Notifica o WAR sobre a nova data de entrega (ISO 8601, ou `null` quando a
+ * data foi removida). Vai no MESMO callback do status, com o status atual junto
+ * — o endpoint do WAR exige `status`, e reenviar o mesmo status é inofensivo.
+ * O WAR precisa ler `dueDate` desse body para gravar o prazo do lado dele.
+ */
+export async function notifyWarDueDateChange(params: {
+  externalId: string | null | undefined;
+  dueDate: string | null;
+  status: string | null | undefined;
+  rawPayload: unknown;
+  updatedBy?: string;
+}): Promise<void> {
+  const { externalId, dueDate, status, rawPayload, updatedBy = "CreativeOS" } = params;
+  if (!externalId) return;
+  await postToWar(rawPayload, {
+    id: externalId,
+    ...(status ? { status } : {}),
+    dueDate,
+    updatedBy,
+  });
 }

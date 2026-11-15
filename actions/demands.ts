@@ -4,11 +4,20 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { mergeLegacyDemandFlowIntoClient } from "@/services/flow";
 import { linkUnmatchedDemandsByExternalName } from "@/lib/demands/link-unmatched-siblings";
-import { notifyWarStatusChange } from "@/lib/demands/war-status-callback";
+import {
+  notifyWarDueDateChange,
+  notifyWarStatusChange,
+} from "@/lib/demands/war-status-callback";
 import { externalClientIdFromPayload } from "@/lib/demands/parse-make-payload";
 import { autoRouteCarouselDemand } from "@/lib/carousel-studio/auto-trigger";
 import type { Database, Json } from "@/types/database";
-import { DEMAND_WORKING_STATUS, isDoneStatus, type DemandArte } from "@/types/demand";
+import {
+  DEMAND_INITIAL_STATUS,
+  DEMAND_QUEUE_STATUS,
+  DEMAND_WORKING_STATUS,
+  isDoneStatus,
+  type DemandArte,
+} from "@/types/demand";
 
 type DemandUpdate = Database["public"]["Tables"]["creative_demands"]["Update"];
 
@@ -123,6 +132,64 @@ export async function updateDemandStatusAction(
   });
 
   return { success: true };
+}
+
+export type DemandDueDateState = DemandStatusState & {
+  dueDate?: string | null;
+  status?: string | null;
+};
+
+/**
+ * Define (ou remove, com `null`) a data de entrega da demanda no CreativeOS e
+ * avisa o WAR pelo mesmo callback do status. `dueDate` chega como ISO 8601.
+ */
+export async function updateDemandDueDateAction(
+  demandId: string,
+  dueDate: string | null
+): Promise<DemandDueDateState> {
+  let normalized: string | null = null;
+  if (dueDate) {
+    const parsed = Date.parse(dueDate);
+    if (Number.isNaN(parsed)) return { error: "Data inválida." };
+    normalized = new Date(parsed).toISOString();
+  }
+
+  const supabase = await createClient();
+
+  const { data: current } = await supabase
+    .from("creative_demands")
+    .select("status")
+    .eq("id", demandId)
+    .maybeSingle();
+
+  // Definir a data tira a demanda de "Aguardando Definição de Data": ela entra
+  // na fila (no CreativeOS e no WAR, que recebe o novo status no mesmo callback).
+  const promoteToQueue = Boolean(normalized) && current?.status === DEMAND_INITIAL_STATUS;
+
+  const { data, error } = await supabase
+    .from("creative_demands")
+    .update({
+      due_date: normalized,
+      ...(promoteToQueue ? { status: DEMAND_QUEUE_STATUS } : {}),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", demandId)
+    .select("id, external_id, status, raw_payload")
+    .maybeSingle();
+
+  if (error) return { error: error.message };
+  if (!data) return { error: "Não foi possível atualizar a data de entrega." };
+
+  await notifyWarDueDateChange({
+    externalId: data.external_id,
+    dueDate: normalized,
+    status: data.status,
+    rawPayload: data.raw_payload,
+  });
+
+  revalidatePath(`/demands/${demandId}`);
+  revalidatePath("/demands");
+  return { success: true, dueDate: normalized, status: data.status };
 }
 
 const MAX_ARTE_FIELD = 4000;

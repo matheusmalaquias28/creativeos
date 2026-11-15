@@ -72,22 +72,43 @@ export function parseWarDemandEvent(payload: unknown): WarDemandEvent | null {
 }
 
 /**
- * Aplica só o status (e o arquivamento de concluída) na demanda de arte ou de
- * vídeo com esse `external_id` — nunca toca briefing/artes/raw_payload, nem cria
- * demanda nova. Não notifica o WAR de volta (a mudança veio dele).
+ * Data de entrega trazida por um evento do WAR. `undefined` quando o evento não
+ * fala de data (não mexe); `null` quando o WAR mandou a data vazia (remove).
+ */
+export function parseWarEventDueDate(payload: unknown): string | null | undefined {
+  const record = asRecord(payload);
+  if (!("dueDate" in record)) return undefined;
+  const raw = asString(record.dueDate);
+  if (!raw) return null;
+  const parsed = Date.parse(raw);
+  return Number.isNaN(parsed) ? undefined : new Date(parsed).toISOString();
+}
+
+/**
+ * Aplica só o status (e o arquivamento de concluída) e/ou a data de entrega na
+ * demanda de arte ou de vídeo com esse `external_id` — nunca toca
+ * briefing/artes/raw_payload, nem cria demanda nova. Não notifica o WAR de
+ * volta (a mudança veio dele).
  */
 export async function applyWarStatusEvent(
   supabase: ReturnType<typeof createAdminClient>,
-  evt: WarStatusEvent
+  evt: { externalId: string; status: string | null; dueDate?: string | null }
 ): Promise<{ table: "creative_demands" | "video_demands"; id: string } | null> {
   const now = new Date().toISOString();
-  const done = isDoneStatus(evt.status);
-  const update = {
-    status: evt.status,
-    updated_at: now,
-    is_archived: done,
-    ...(done ? { completed_at: now } : {}),
-  };
+  const update: {
+    updated_at: string;
+    status?: string;
+    is_archived?: boolean;
+    completed_at?: string;
+    due_date?: string | null;
+  } = { updated_at: now };
+  if (evt.status) {
+    const done = isDoneStatus(evt.status);
+    update.status = evt.status;
+    update.is_archived = done;
+    if (done) update.completed_at = now;
+  }
+  if (evt.dueDate !== undefined) update.due_date = evt.dueDate;
 
   for (const table of ["creative_demands", "video_demands"] as const) {
     const { data, error } = await supabase

@@ -3,6 +3,10 @@ import { AlertTriangle, ExternalLink, FileText, ImageIcon } from "lucide-react";
 import { DashboardPage } from "@/components/layout/dashboard-page";
 import { SectionHeader } from "@/components/layout/section-header";
 import { DemandDetailStatusBar } from "@/components/demands/demand-detail-status-bar";
+import { DemandDueDateField } from "@/components/demands/demand-due-date-field";
+import { DemandCommentsPanel } from "@/components/demands/demand-comments-panel";
+import { getDemandComments } from "@/services/demand-comments";
+import { isClosedStatus } from "@/types/demand";
 import { DemandSpaceSection } from "@/components/demands/demand-space-section";
 import { DemandDeliverDialog } from "@/components/demands/demand-deliver-dialog";
 import { MarkDemandReadOnMount } from "@/components/demands/mark-demand-read-on-mount";
@@ -111,7 +115,7 @@ export default async function DemandDetailPage({ params }: PageProps) {
 
   // Demandas de carrossel vão para o Carrossel Studio (criado sob demanda, sem custo).
   const carouselDemand = isCarouselDemand({ tipo: demand.tipo, briefing: demand.briefing });
-  const [clientAssets, demandRefs, exportFiles, driveAuth, studio, carouselStyles] = await Promise.all([
+  const [clientAssets, demandRefs, exportFiles, driveAuth, studio, carouselStyles, comments] = await Promise.all([
     demand.client_id && user
       ? getClientVisualAssets(demand.client_id, user.id)
       : Promise.resolve(null),
@@ -120,6 +124,7 @@ export default async function DemandDetailPage({ params }: PageProps) {
     getGoogleDriveAuth(),
     carouselDemand ? ensureStudioForDemand(id) : Promise.resolve(null),
     carouselDemand ? listCarouselStyleOptions().catch(() => []) : Promise.resolve([]),
+    getDemandComments({ demandId: id }),
   ]);
 
   const title =
@@ -209,7 +214,11 @@ export default async function DemandDetailPage({ params }: PageProps) {
                 label="Criada"
                 value={formatDate(demand.external_created_at ?? demand.created_at)}
               />
-              <MetaItem label="Prazo" value={formatDate(demand.due_date)} />
+              <DemandDueDateField
+                demandId={demand.id}
+                dueDate={demand.due_date}
+                closed={isClosedStatus(demand.status)}
+              />
             </dl>
 
             <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -251,6 +260,8 @@ export default async function DemandDetailPage({ params }: PageProps) {
             </div>
           </div>
         </Surface>
+
+        <DemandCommentsPanel comments={comments} />
 
         {studio ? (
           <DemandStudioSection initial={studio} hasClient={Boolean(demand.client_id)} styles={carouselStyles} />

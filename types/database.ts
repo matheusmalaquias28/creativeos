@@ -689,6 +689,41 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["google_drive_oauth_tokens"]["Row"]>;
         Relationships: [];
       };
+      demand_comments: {
+        Row: {
+          id: string;
+          external_demand_id: string;
+          demand_id: string | null;
+          video_demand_id: string | null;
+          source: string;
+          author: string | null;
+          body: string;
+          images: Json;
+          external_created_at: string | null;
+          dedupe_key: string;
+          raw_payload: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          external_demand_id: string;
+          demand_id?: string | null;
+          video_demand_id?: string | null;
+          source?: string;
+          author?: string | null;
+          body?: string;
+          images?: Json;
+          external_created_at?: string | null;
+          dedupe_key: string;
+          raw_payload?: Json;
+          created_at?: string;
+        };
+        Update: Partial<{
+          demand_id: string | null;
+          video_demand_id: string | null;
+        }>;
+        Relationships: [];
+      };
       demand_reference_image: {
         Row: {
           id: string;

@@ -15,7 +15,16 @@ import { isCarouselDemand } from "@/lib/carousel-studio/demand";
 import { autoRouteCarouselDemand } from "@/lib/carousel-studio/auto-trigger";
 import { isVideoDemandPayload } from "@/lib/video-demands/parse-payload";
 import { ingestVideoDemand } from "@/lib/video-demands/ingest";
-import { applyWarStatusEvent, parseWarDemandEvent } from "@/lib/demands/war-status-event";
+import {
+  applyWarStatusEvent,
+  parseWarDemandEvent,
+  parseWarEventDueDate,
+} from "@/lib/demands/war-status-event";
+import {
+  linkOrphanWarComments,
+  parseWarComment,
+  saveWarComment,
+} from "@/lib/demands/war-comment";
 import type { Database } from "@/types/database";
 
 type CreativeDemandInsert =
@@ -134,30 +143,53 @@ export async function POST(request: Request) {
   // (apagaria título, artes/copy e callback). Vale para arte e vídeo.
   const warEvent = parseWarDemandEvent(body);
   if (warEvent) {
-    if (!warEvent.status) {
+    const admin = createAdminClient();
+
+    // Comentário (`demanda.nota`): guarda na demanda. Falha aqui não derruba o
+    // evento — o status/data (se vierem) ainda são aplicados.
+    let comment: { saved: boolean; linked: boolean } | null = null;
+    const parsedComment = parseWarComment(body);
+    if (parsedComment) {
+      try {
+        const saved = await saveWarComment(admin, parsedComment);
+        comment = { saved: true, linked: Boolean(saved.demandId || saved.videoDemandId) };
+      } catch (err) {
+        console.error("[webhook/make/demands] comentário", err);
+        comment = { saved: false, linked: false };
+      }
+    }
+
+    const dueDate = parseWarEventDueDate(body);
+    if (!warEvent.status && dueDate === undefined) {
       return NextResponse.json({
         ok: true,
-        kind: "event",
+        kind: comment ? "comment" : "event",
         event: warEvent.event,
         externalId: warEvent.externalId,
+        comment,
         message: "Evento sem status: conteúdo da demanda preservado",
       });
     }
-    const statusEvent = { ...warEvent, status: warEvent.status };
     try {
-      const applied = await applyWarStatusEvent(createAdminClient(), statusEvent);
+      const applied = await applyWarStatusEvent(admin, {
+        externalId: warEvent.externalId,
+        status: warEvent.status,
+        dueDate,
+      });
       if (!applied) {
         return NextResponse.json(
-          { ok: false, kind: "status", error: "Demanda não encontrada", externalId: statusEvent.externalId },
+          { ok: false, kind: "status", error: "Demanda não encontrada", externalId: warEvent.externalId, comment },
           { status: 404 }
         );
       }
       return NextResponse.json({
         ok: true,
         kind: "status",
-        event: statusEvent.event,
+        event: warEvent.event,
         demandId: applied.id,
-        status: statusEvent.status,
+        status: warEvent.status,
+        ...(dueDate !== undefined ? { dueDate } : {}),
+        comment,
       });
     } catch (err) {
       console.error("[webhook/make/demands] status", err);
@@ -220,6 +252,7 @@ export async function POST(request: Request) {
   }
 
   const status = normalizeStatus(parsed.status);
+  const dueDate = parseDueDate(parsed.dueDate);
   const row: CreativeDemandInsert = {
     external_id: parsed.externalId,
     client_id: matchedClient?.id ?? null,
@@ -235,7 +268,9 @@ export async function POST(request: Request) {
     status,
     // Já chega concluída: sai do kanban (mesmo efeito de concluir por aqui).
     ...(isDoneStatus(status) ? { is_archived: true } : {}),
-    due_date: parseDueDate(parsed.dueDate),
+    // Data vazia no reenvio do WAR não apaga a data definida no CreativeOS:
+    // só gravamos quando ele manda uma data de fato (no insert, ausente = null).
+    ...(dueDate ? { due_date: dueDate } : {}),
     external_created_at: parseDueDate(parsed.externalCreatedAt),
     raw_payload: body as CreativeDemandInsert["raw_payload"],
     drive_folder_url: driveFolder.url,
@@ -255,6 +290,7 @@ export async function POST(request: Request) {
 
   // Persiste as imagens de referência da demanda assim que ela chega.
   await ingestReferenceImages(supabase, data.id, parsed.referenceImageUrls);
+  await linkOrphanWarComments(supabase, { kind: "arte", id: data.id, externalId: data.external_id });
 
   // Nota: o Space agora é criado sob demanda ao abrir a página (sem custo) e a
   // geração de imagens é manual (botão Executar no canvas) — o webhook não

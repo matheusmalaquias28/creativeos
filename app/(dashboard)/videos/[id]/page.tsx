@@ -19,6 +19,8 @@ import { layout, tones } from "@/lib/design/tokens";
 import { cn } from "@/lib/utils";
 import { displayExternalClientName } from "@/lib/demands/normalize-client-name";
 import { getVideoDemandById } from "@/services/video-demands";
+import { getDemandComments } from "@/services/demand-comments";
+import { DemandCommentsPanel } from "@/components/demands/demand-comments-panel";
 
 export const maxDuration = 120;
 
@@ -85,7 +87,10 @@ function LinkItem({ href, label }: { href: string; label: string }) {
 
 export default async function VideoDemandDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const demand = await getVideoDemandById(id);
+  const [demand, comments] = await Promise.all([
+    getVideoDemandById(id),
+    getDemandComments({ videoDemandId: id }),
+  ]);
   if (!demand) notFound();
 
   const payload = rec(demand.raw_payload);
@@ -287,6 +292,8 @@ export default async function VideoDemandDetailPage({ params }: PageProps) {
             </details>
           </Surface>
         </section>
+
+        <DemandCommentsPanel comments={comments} />
       </div>
     </DashboardPage>
   );

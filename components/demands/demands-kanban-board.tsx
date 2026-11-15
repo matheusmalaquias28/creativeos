@@ -19,6 +19,7 @@ import { tones } from "@/lib/design/tokens";
 import { cn } from "@/lib/utils";
 import { clientInitials } from "@/lib/utils/client";
 import type { DemandClientOption } from "@/components/demands/demand-client-linker";
+import { DemandDueDatePicker } from "@/components/demands/demand-due-date-picker";
 import {
   DEMAND_STATUSES,
   DEMAND_INITIAL_STATUS,
@@ -97,11 +98,13 @@ function KanbanCard({
   isDragging,
   onDragStart,
   onDragEnd,
+  onDueDateChange,
 }: {
   demand: CreativeDemandListItem;
   isDragging: boolean;
   onDragStart: (e: React.DragEvent) => void;
   onDragEnd: () => void;
+  onDueDateChange: (dueDate: string | null) => void;
 }) {
   const colorState = getDemandColorState(demand);
   const theme = CARD_NEON_THEMES[colorState];
@@ -199,20 +202,23 @@ function KanbanCard({
                 <span className="truncate">{demand.gestor}</span>
               </span>
             )}
-            {demand.due_date && (
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1 text-[0.6875rem]",
-                  overdue
-                    ? cn("rounded-md border px-1.5 py-px font-semibold", tones.red.badge)
-                    : "text-muted-foreground"
-                )}
-                title={overdue ? "Atrasada" : "Prazo"}
-              >
-                <Calendar className="size-3" />
-                {formatDate(demand.due_date)}
-              </span>
-            )}
+            <DemandDueDatePicker
+              demandId={demand.id}
+              dueDate={demand.due_date}
+              onChange={onDueDateChange}
+              title={demand.due_date ? (overdue ? "Atrasada — alterar data de entrega" : "Alterar data de entrega") : "Definir data de entrega"}
+              className={cn(
+                "inline-flex items-center gap-1 rounded-md text-[0.6875rem] transition-colors",
+                overdue
+                  ? cn("border px-1.5 py-px font-semibold", tones.red.badge)
+                  : demand.due_date
+                    ? "text-muted-foreground hover:text-foreground"
+                    : "border border-dashed border-border-strong px-1.5 py-px text-muted-foreground hover:border-primary/40 hover:text-foreground"
+              )}
+            >
+              <Calendar className="size-3" />
+              {demand.due_date ? formatDate(demand.due_date) : "Definir data"}
+            </DemandDueDatePicker>
           </div>
 
           <div className="flex shrink-0 items-center gap-1.5">
@@ -252,6 +258,7 @@ function KanbanColumn({
   draggingId,
   onCardDragStart,
   onCardDragEnd,
+  onDueDateChange,
 }: {
   column: KanbanColumn;
   demands: CreativeDemandListItem[];
@@ -262,6 +269,7 @@ function KanbanColumn({
   draggingId: string | null;
   onCardDragStart: (demand: CreativeDemandListItem) => (e: React.DragEvent) => void;
   onCardDragEnd: () => void;
+  onDueDateChange: (demandId: string, dueDate: string | null) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const visibleDemands = expanded ? demands : demands.slice(0, VISIBLE_CARDS_LIMIT);
@@ -306,6 +314,7 @@ function KanbanColumn({
               isDragging={demand.id === draggingId}
               onDragStart={onCardDragStart(demand)}
               onDragEnd={onCardDragEnd}
+              onDueDateChange={(dueDate) => onDueDateChange(demand.id, dueDate)}
             />
           ))
         )}
@@ -439,6 +448,10 @@ export function DemandsKanbanBoard({ initialDemands }: Props) {
     []
   );
 
+  const handleDueDateChange = useCallback((demandId: string, dueDate: string | null) => {
+    setDemands((prev) => prev.map((d) => (d.id === demandId ? { ...d, due_date: dueDate } : d)));
+  }, []);
+
   return (
     <div className="flex items-start gap-3 overflow-x-auto pb-4">
       {COLUMNS.map((col) => (
@@ -453,6 +466,7 @@ export function DemandsKanbanBoard({ initialDemands }: Props) {
           onDrop={handleColumnDrop(col.status)}
           onCardDragStart={handleCardDragStart}
           onCardDragEnd={handleCardDragEnd}
+          onDueDateChange={handleDueDateChange}
         />
       ))}
     </div>

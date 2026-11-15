@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AlertTriangle, Calendar, Sparkles, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DemandStatusSelector } from "@/components/demands/demand-status-selector";
+import { DemandDueDatePicker } from "@/components/demands/demand-due-date-picker";
 import {
   DemandClientLinker,
   type DemandClientOption,
@@ -31,34 +32,33 @@ function formatDate(value: string | null): string {
 }
 
 function DueDateLabel({
+  demandId,
   dueDate,
+  onChange,
   accentClass,
   mutedClass,
 }: {
+  demandId: string;
   dueDate: string | null;
+  onChange: (dueDate: string | null) => void;
   accentClass: string;
   mutedClass: string;
 }) {
-  if (!dueDate) {
-    return (
-      <span className={cn("inline-flex items-center gap-1.5", accentClass)}>
-        <Calendar className="size-3.5" />
-        Definir prazo
-      </span>
-    );
-  }
-  const isOverdue = new Date(dueDate) < new Date();
+  const isOverdue = Boolean(dueDate) && new Date(dueDate as string) < new Date();
   return (
-    <span
+    <DemandDueDatePicker
+      demandId={demandId}
+      dueDate={dueDate}
+      onChange={onChange}
       className={cn(
-        "inline-flex items-center gap-1.5",
-        isOverdue ? cn(accentClass, "font-medium") : mutedClass
+        "inline-flex items-center gap-1.5 hover:underline",
+        !dueDate || isOverdue ? accentClass : mutedClass,
+        isOverdue && "font-medium"
       )}
     >
       <Calendar className="size-3.5" />
-      {isOverdue ? "Atrasado · " : ""}
-      {formatDate(dueDate)}
-    </span>
+      {!dueDate ? "Definir prazo" : `${isOverdue ? "Atrasado · " : ""}${formatDate(dueDate)}`}
+    </DemandDueDatePicker>
   );
 }
 
@@ -78,6 +78,7 @@ export function DemandCard({
   onClientLinked?: (demandId: string, clientId: string, clientName: string) => void;
 }) {
   const [clientNotFound, setClientNotFound] = useState(demand.client_not_found);
+  const [dueDate, setDueDate] = useState(demand.due_date);
   const [clientName, setClientName] = useState(demand.client_name ?? null);
   const [clientId, setClientId] = useState(demand.client_id);
 
@@ -86,7 +87,11 @@ export function DemandCard({
     clientName || externalName || "Pendente de cadastro";
   const title = getDemandCardTitle(demand);
   const tipo = getDemandCardTipo(demand);
-  const colorState = getDemandColorState({ ...demand, client_not_found: clientNotFound });
+  const colorState = getDemandColorState({
+    ...demand,
+    due_date: dueDate,
+    client_not_found: clientNotFound,
+  });
   const theme = CARD_NEON_THEMES[colorState];
   const missingMateriaisEditados = isMateriaisEditadosMissing(demand.briefing);
 
@@ -182,7 +187,9 @@ export function DemandCard({
             </span>
           )}
           <DueDateLabel
-            dueDate={demand.due_date}
+            demandId={demand.id}
+            dueDate={dueDate}
+            onChange={setDueDate}
             accentClass={theme.accent}
             mutedClass={theme.muted}
           />
