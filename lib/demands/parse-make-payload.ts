@@ -85,8 +85,19 @@ function parsePortugueseDate(value: string): string | null {
     const hour = match[4] ? Number(match[4]) : 0;
     const minute = match[5] ? Number(match[5]) : 0;
 
-    if (month != null) {
-      const date = new Date(year, month, day, hour, minute);
+    if (
+      month != null &&
+      day >= 1 &&
+      day <= new Date(Date.UTC(year, month + 1, 0)).getUTCDate() &&
+      hour >= 0 &&
+      hour <= 23 &&
+      minute >= 0 &&
+      minute <= 59
+    ) {
+      const date = new Date(
+        `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}` +
+          `T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00-03:00`
+      );
       if (!Number.isNaN(date.getTime())) return date.toISOString();
     }
   }

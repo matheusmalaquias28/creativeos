@@ -16,6 +16,7 @@ export type DemandColorState =
  */
 const STATUS_COLOR: Record<string, DemandColorState> = {
   "Aguardando Definição de Data": "amber",
+  "Falta material do cliente": "amber",
   "Em Fila": "cyan",
   Fazendo: "blue",
   "Aprovação de Copy": "purple",

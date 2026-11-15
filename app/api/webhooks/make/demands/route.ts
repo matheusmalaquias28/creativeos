@@ -17,6 +17,7 @@ import { isVideoDemandPayload } from "@/lib/video-demands/parse-payload";
 import { ingestVideoDemand } from "@/lib/video-demands/ingest";
 import {
   applyWarStatusEvent,
+  isWarDemandRemovalEvent,
   parseWarDemandEvent,
   parseWarEventDueDate,
 } from "@/lib/demands/war-status-event";
@@ -160,7 +161,10 @@ export async function POST(request: Request) {
     }
 
     const dueDate = parseWarEventDueDate(body);
-    if (!warEvent.status && dueDate === undefined) {
+    const eventStatus = isWarDemandRemovalEvent(warEvent.event)
+      ? "Cancelada"
+      : warEvent.status;
+    if (!eventStatus && dueDate === undefined) {
       return NextResponse.json({
         ok: true,
         kind: comment ? "comment" : "event",
@@ -173,7 +177,7 @@ export async function POST(request: Request) {
     try {
       const applied = await applyWarStatusEvent(admin, {
         externalId: warEvent.externalId,
-        status: warEvent.status,
+        status: eventStatus,
         dueDate,
       });
       if (!applied) {
@@ -187,7 +191,7 @@ export async function POST(request: Request) {
         kind: "status",
         event: warEvent.event,
         demandId: applied.id,
-        status: warEvent.status,
+        status: eventStatus,
         ...(dueDate !== undefined ? { dueDate } : {}),
         comment,
       });

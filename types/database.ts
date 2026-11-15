@@ -1600,7 +1600,19 @@ export type Database = {
         Relationships: [];
       };
     };
-    Functions: Record<string, never>;
+    Functions: {
+      assign_creative_demand_due_dates: {
+        Args: { p_now?: string };
+        Returns: {
+          result_demand_id: string;
+          result_external_id: string;
+          result_action: "scheduled" | "missing_material";
+          result_status: string;
+          result_due_date: string | null;
+          result_raw_payload: Json;
+        }[];
+      };
+    };
     Enums: {
       client_status: ClientStatus;
       creative_brain_status:

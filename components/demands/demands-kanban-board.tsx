@@ -34,6 +34,9 @@ import {
 /** Status "custom" do WAR para a etapa de adaptar as artes para stories. */
 const STORIES_STATUS = "Formato Stories";
 
+/** Cliente em onboarding sem logo: a demanda espera o material antes de ter prazo. */
+const MISSING_MATERIAL_STATUS = "Falta material do cliente";
+
 /**
  * Colunas do kanban, na ordem do fluxo (Ajuste logo depois de Fazendo, e
  * Formato Stories ao lado de Ajuste). Fora daqui não aparece: "Concluído" sai
@@ -42,6 +45,7 @@ const STORIES_STATUS = "Formato Stories";
  */
 const KANBAN_STATUSES = [
   "Aguardando Definição de Data",
+  "Falta material do cliente",
   "Em Fila",
   "Fazendo",
   "Ajuste",
@@ -375,11 +379,17 @@ export function DemandsKanbanBoard({ initialDemands }: Props) {
         return demands.filter((d) => d.status === status && !d.due_date);
       }
 
+      if (status === MISSING_MATERIAL_STATUS) {
+        // Com data definida, a demanda já saiu da espera por material.
+        return demands.filter((d) => d.status === status && !d.due_date);
+      }
+
       if (status === DEMAND_QUEUE_STATUS) {
         return demands.filter(
           (d) =>
             d.status === status ||
-            (d.status === DEMAND_INITIAL_STATUS && Boolean(d.due_date))
+            ((d.status === DEMAND_INITIAL_STATUS || d.status === MISSING_MATERIAL_STATUS) &&
+              Boolean(d.due_date))
         );
       }
 

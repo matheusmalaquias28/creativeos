@@ -37,6 +37,7 @@ export type DemandBriefing = {
  */
 export const DEMAND_STATUSES = [
   "Aguardando Definição de Data",
+  "Falta material do cliente",
   "Em Fila",
   "Fazendo",
   "Aprovação de Copy",

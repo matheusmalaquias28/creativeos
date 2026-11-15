@@ -93,6 +93,32 @@ Acesse [http://localhost:3000](http://localhost:3000).
 2. Configure as mesmas variáveis de ambiente
 3. Atualize redirect URLs no Supabase para o domínio de produção
 
+### Prazos automáticos de demandas de arte
+
+A migração `20261115100000_automatic_creative_demand_due_dates.sql` agenda uma
+checagem do Storm a cada cinco minutos. Ela só processa demandas sem data que
+ficaram dez minutos sem atualização. Edits recebidos do War reiniciam a espera;
+eventos de remoção/cancelamento arquivam a demanda. Para cada dia útil, são
+consideradas no máximo cinco demandas ativas com data, inclusive ajustes que já
+tenham prazo. A janela de 16h usa o horário em que a demanda foi solicitada no
+fuso `America/Sao_Paulo`.
+
+Para ativar em produção:
+
+1. Defina `CREATIVE_DEMAND_DUE_CRON_SECRET` nas variáveis de ambiente da Vercel.
+2. Aplique a migração no Supabase.
+3. No SQL Editor do Supabase, configure a URL e o mesmo segredo usado no passo 1:
+
+   ```sql
+   alter database postgres set app.creative_demand_due_url = 'https://SEU-APP/api/cron/creative-demand-due-dates';
+   alter database postgres set app.creative_demand_due_secret = 'MESMO_SEGREDO_DA_VERCEL';
+   ```
+
+O agendamento já fica registrado pela migração, mas não chama a rota até os dois
+valores do banco estarem definidos. Demandas de clientes em onboarding sem logo
+recebem o status `Falta material do cliente` e continuam sem prazo; quando a logo
+for cadastrada, uma checagem posterior pode colocá-las na fila.
+
 ## Arquitetura
 
 | Camada | Responsabilidade |

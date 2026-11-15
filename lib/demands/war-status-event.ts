@@ -1,5 +1,5 @@
 import type { createAdminClient } from "@/lib/supabase/admin";
-import { isDoneStatus } from "@/types/demand";
+import { isClosedStatus, isDoneStatus } from "@/types/demand";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -11,8 +11,13 @@ export type WarStatusEvent = { externalId: string; status: string; event: string
  */
 export type WarDemandEvent = { externalId: string; status: string | null; event: string | null };
 
+/** Eventos de remoção/cancelamento da demanda: encerra a cópia no CreativeOS. */
+export function isWarDemandRemovalEvent(event: string | null): boolean {
+  return Boolean(event && /remov|exclu|delet|apag|cancel/i.test(event));
+}
+
 /** Eventos que nunca podem reescrever o conteúdo da demanda. */
-const NON_CONTENT_EVENT = /nota|coment|status/i;
+const NON_CONTENT_EVENT = /nota|coment|status|remov|exclu|delet|apag|cancel/i;
 
 /** Campos que só existem num payload de criação/edição (arte ou vídeo). */
 function hasDemandContent(record: UnknownRecord): boolean {
@@ -104,8 +109,9 @@ export async function applyWarStatusEvent(
   } = { updated_at: now };
   if (evt.status) {
     const done = isDoneStatus(evt.status);
+    const closed = isClosedStatus(evt.status);
     update.status = evt.status;
-    update.is_archived = done;
+    update.is_archived = closed;
     if (done) update.completed_at = now;
   }
   if (evt.dueDate !== undefined) update.due_date = evt.dueDate;

@@ -15,6 +15,7 @@ import {
   DEMAND_INITIAL_STATUS,
   DEMAND_QUEUE_STATUS,
   DEMAND_WORKING_STATUS,
+  isClosedStatus,
   isDoneStatus,
   type DemandArte,
 } from "@/types/demand";
@@ -84,6 +85,7 @@ export async function updateDemandStatusAction(
   const now = new Date();
   const isStarting = status === DEMAND_WORKING_STATUS;
   const isCompleted = isDoneStatus(status);
+  const isClosed = isClosedStatus(status);
 
   const update: DemandUpdate = {
     status,
@@ -96,8 +98,13 @@ export async function updateDemandStatusAction(
     update.elapsed_seconds = null;
   }
 
-  if (isCompleted) {
+  if (isClosed) {
     update.is_archived = true;
+  } else {
+    update.is_archived = false;
+  }
+
+  if (isCompleted) {
     update.completed_at = now.toISOString();
 
     if (current?.started_at) {
@@ -105,8 +112,6 @@ export async function updateDemandStatusAction(
       const rawElapsed = Math.round((now.getTime() - startedAt.getTime()) / 1000);
       update.elapsed_seconds = Math.min(rawElapsed, MAX_ELAPSED_SECONDS);
     }
-  } else {
-    update.is_archived = false;
   }
 
   const { data, error } = await supabase
@@ -164,7 +169,10 @@ export async function updateDemandDueDateAction(
 
   // Definir a data tira a demanda de "Aguardando Definição de Data": ela entra
   // na fila (no CreativeOS e no WAR, que recebe o novo status no mesmo callback).
-  const promoteToQueue = Boolean(normalized) && current?.status === DEMAND_INITIAL_STATUS;
+  const promoteToQueue =
+    Boolean(normalized) &&
+    (current?.status === DEMAND_INITIAL_STATUS ||
+      current?.status === "Falta material do cliente");
 
   const { data, error } = await supabase
     .from("creative_demands")
