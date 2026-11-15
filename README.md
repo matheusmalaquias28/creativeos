@@ -107,15 +107,17 @@ Para ativar em produção:
 
 1. Defina `CREATIVE_DEMAND_DUE_CRON_SECRET` nas variáveis de ambiente da Vercel.
 2. Aplique a migração no Supabase.
-3. No SQL Editor do Supabase, configure a URL e o mesmo segredo usado no passo 1:
+3. No SQL Editor do Supabase, guarde a URL e o mesmo segredo do passo 1 no
+   Vault (o Supabase não permite `alter database ... set` para parâmetros
+   próprios):
 
    ```sql
-   alter database postgres set app.creative_demand_due_url = 'https://SEU-APP/api/cron/creative-demand-due-dates';
-   alter database postgres set app.creative_demand_due_secret = 'MESMO_SEGREDO_DA_VERCEL';
+   select vault.create_secret('https://SEU-APP/api/cron/creative-demand-due-dates', 'creative_demand_due_url');
+   select vault.create_secret('MESMO_SEGREDO_DA_VERCEL', 'creative_demand_due_secret');
    ```
 
 O agendamento já fica registrado pela migração, mas não chama a rota até os dois
-valores do banco estarem definidos. Demandas de clientes em onboarding sem logo
+segredos existirem no Vault. Demandas de clientes em onboarding sem logo
 recebem o status `Falta material do cliente` e continuam sem prazo; quando a logo
 for cadastrada, uma checagem posterior pode colocá-las na fila.
 

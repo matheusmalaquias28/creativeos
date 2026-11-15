@@ -130,9 +130,11 @@ grant execute on function public.assign_creative_demand_due_dates(timestamptz)
   to service_role;
 
 -- O cron chama a rota a cada cinco minutos e so processa demandas estaveis
--- ha pelo menos dez minutos. Configure URL e segredo antes de ativar:
--- alter database postgres set app.creative_demand_due_url = 'https://SEU-APP/api/cron/creative-demand-due-dates';
--- alter database postgres set app.creative_demand_due_secret = 'mesmo valor de CREATIVE_DEMAND_DUE_CRON_SECRET';
+-- ha pelo menos dez minutos. O Supabase nao permite `alter database ... set`
+-- para parametros proprios, entao URL e segredo ficam no Vault. Configure antes
+-- de ativar (o job nao chama nada enquanto os dois segredos nao existirem):
+-- select vault.create_secret('https://SEU-APP/api/cron/creative-demand-due-dates', 'creative_demand_due_url');
+-- select vault.create_secret('mesmo valor de CREATIVE_DEMAND_DUE_CRON_SECRET', 'creative_demand_due_secret');
 
 create extension if not exists pg_cron;
 create extension if not exists pg_net;
@@ -147,14 +149,16 @@ select cron.schedule(
   '*/5 * * * *',
   $$
   select net.http_post(
-    url := current_setting('app.creative_demand_due_url', true),
+    url := url_secret.decrypted_secret,
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'x-cron-secret', current_setting('app.creative_demand_due_secret', true)
+      'x-cron-secret', key_secret.decrypted_secret
     ),
     body := '{}'::jsonb
   )
-  where current_setting('app.creative_demand_due_url', true) is not null
-    and current_setting('app.creative_demand_due_secret', true) is not null;
+  from vault.decrypted_secrets url_secret,
+       vault.decrypted_secrets key_secret
+  where url_secret.name = 'creative_demand_due_url'
+    and key_secret.name = 'creative_demand_due_secret';
   $$
 );
