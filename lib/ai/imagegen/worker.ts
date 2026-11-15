@@ -17,7 +17,8 @@
  * e o timeout do job escala com o número de rodadas.
  * Cancelamento: ao marcar o job como 'failed' externamente, o worker respeita.
  *
- * Versionamento: a numeração corre por FORMATO ('feed' 3:4 e 'story' 9:16).
+ * Versionamento: a numeração corre por FORMATO (feed 4:5 e story 9:16; jobs
+ * históricos de feed podem conservar a proporção antiga).
  * Regerar uma arte grava v2, v3… em vez de tentar reescrever v1 — era isso que
  * estourava o unique (job_id, version_number) e derrubava toda regeração.
  *
@@ -157,7 +158,7 @@ async function nextVersionNumber(
 
 /**
  * Grava a nova versão e move o `is_current` dentro do formato. Feed e story têm
- * cada um a sua versão atual — a aba de stories não pode roubar a arte 3:4.
+ * cada um a sua versão atual — a aba de stories não pode roubar a arte do feed.
  */
 async function publishVersion(
   supabase: ReturnType<typeof createAdminClient>,
@@ -396,7 +397,7 @@ async function runJob(
     subheadline: job.params.subheadline,
     cta: job.params.cta,
     informacoesExtras: job.params.informacoesExtras,
-    // Camada de direção de arte: 3:4 SEMPRE, seja qual for o perfil ou o que
+    // Camada de direção de arte: 4:5 SEMPRE, seja qual for o perfil ou o que
     // veio na arte do Make. O fluxo legado mantém a resolução antiga.
     aspect_ratio: approvedPrompt
       ? ART_ASPECT_RATIO
@@ -818,7 +819,7 @@ async function processStoryJob(job: StoryJobRow): Promise<void> {
       .maybeSingle();
 
     const sourceUrl = source?.result_url as string | undefined;
-    if (!sourceUrl) throw new Error("Arte 3:4 ainda não foi gerada");
+    if (!sourceUrl) throw new Error("Arte do feed ainda não foi gerada");
 
     const png = await withTimeout(
       adaptArtToStory({ artUrl: sourceUrl, imageSize: job.params.image_size ?? "2K" }),

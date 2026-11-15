@@ -110,6 +110,18 @@ function mapDemandListRow(
     external_created_at: row.external_created_at
       ? String(row.external_created_at)
       : null,
+    art_auto_generation_status: row.art_auto_generation_status
+      ? String(row.art_auto_generation_status)
+      : undefined,
+    art_auto_generation_started_at: row.art_auto_generation_started_at
+      ? String(row.art_auto_generation_started_at)
+      : null,
+    art_auto_generation_finished_at: row.art_auto_generation_finished_at
+      ? String(row.art_auto_generation_finished_at)
+      : null,
+    art_auto_generation_error: row.art_auto_generation_error
+      ? String(row.art_auto_generation_error)
+      : null,
     magnific_space_id: row.magnific_space_id ? String(row.magnific_space_id) : null,
     magnific_space_url: row.magnific_space_url ? String(row.magnific_space_url) : null,
     magnific_space_status:

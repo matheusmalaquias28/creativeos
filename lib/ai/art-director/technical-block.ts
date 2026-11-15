@@ -100,7 +100,7 @@ export function buildTextBlock(spec: TechnicalBlockSpec): string {
 export function buildStandardsBlock(spec: TechnicalBlockSpec): string {
   const lines = [
     "PRODUCTION STANDARDS — NON-NEGOTIABLE",
-    `- Canvas: ${spec.aspectRatio ?? "3:4"} portrait feed ad for Instagram/Facebook (Meta). Safe area: every text element and the button stay inside the central area, at least 7% from the left and right edges, 6% from the top and 9% from the bottom.`,
+    `- Canvas: ${spec.aspectRatio ?? "4:5"} portrait feed ad for Instagram/Facebook (Meta). Safe area: every text element and the button stay inside the central area, at least 7% from the left and right edges, 6% from the top and 9% from the bottom.`,
     `- RESERVED LOGO ZONE: the top-centre band from 0% to ${pct(LOGO_ZONE_BAND.to)} of the height, across the middle 60% of the width, is ONE uniform, calm background area — the same flat colour or softly blurred tone all across, with no edges, colour blocks, photo borders, paper edges, tape, objects or text crossing it. It must be a seamless continuation of the main background (e.g. the dark top of the scene or a soft vignette), never a separate hard-edged header bar. The headline or any other element starts below ${pct(CONTENT_TOP)} of the height. Do NOT draw any logo, monogram, brand name or watermark anywhere.`,
   ];
   if (spec.cta) {

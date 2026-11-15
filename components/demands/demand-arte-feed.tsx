@@ -176,7 +176,7 @@ export function DemandArteFeed({
           return (
             <article
               key={`${arte.headline}-${index}`}
-              className="surface-panel hover-lift group relative aspect-[3/4] overflow-hidden"
+              className="surface-panel hover-lift group relative aspect-[4/5] overflow-hidden"
             >
               <div className="absolute right-2 top-2 z-10 flex gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
                 <button

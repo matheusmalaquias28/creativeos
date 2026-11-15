@@ -1,6 +1,12 @@
 -- Define automaticamente o prazo das demandas de arte apos uma janela de
 -- estabilizacao de 10 minutos. Reprocessamentos sao serializados.
 
+alter table public.creative_demands
+  add column if not exists art_auto_generation_status text not null default 'manual',
+  add column if not exists art_auto_generation_started_at timestamptz,
+  add column if not exists art_auto_generation_finished_at timestamptz,
+  add column if not exists art_auto_generation_error text;
+
 create index if not exists creative_demands_auto_due_date_idx
   on public.creative_demands (updated_at, external_created_at, created_at)
   where is_archived = false and due_date is null;
@@ -64,6 +70,10 @@ begin
       if v_item.status <> 'Falta material do cliente' then
         update public.creative_demands d
         set status = 'Falta material do cliente',
+            art_auto_generation_status = case
+              when d.art_auto_generation_status = 'pending' then 'ready'
+              else d.art_auto_generation_status
+            end,
             updated_at = p_now
         where d.id = v_item.id and d.due_date is null
         returning d.id, d.external_id, d.status, d.due_date, d.raw_payload
@@ -108,6 +118,10 @@ begin
     update public.creative_demands d
     set due_date = (v_due_day::timestamp + time '23:59') at time zone 'America/Sao_Paulo',
         status = case when v_item.status = 'Ajuste' then 'Ajuste' else 'Em Fila' end,
+        art_auto_generation_status = case
+          when d.art_auto_generation_status = 'pending' then 'ready'
+          else d.art_auto_generation_status
+        end,
         updated_at = p_now
     where d.id = v_item.id
       and d.due_date is null

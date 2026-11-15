@@ -300,6 +300,10 @@ export type Database = {
           elapsed_seconds: number | null;
           due_date: string | null;
           external_created_at: string | null;
+          art_auto_generation_status: string;
+          art_auto_generation_started_at: string | null;
+          art_auto_generation_finished_at: string | null;
+          art_auto_generation_error: string | null;
           raw_payload: Json;
           magnific_space_id: string | null;
           magnific_space_url: string | null;
@@ -339,6 +343,10 @@ export type Database = {
           elapsed_seconds?: number | null;
           due_date?: string | null;
           external_created_at?: string | null;
+          art_auto_generation_status?: string;
+          art_auto_generation_started_at?: string | null;
+          art_auto_generation_finished_at?: string | null;
+          art_auto_generation_error?: string | null;
           raw_payload?: Json;
           magnific_space_id?: string | null;
           magnific_space_url?: string | null;
@@ -376,6 +384,10 @@ export type Database = {
           elapsed_seconds: number | null;
           due_date: string | null;
           external_created_at: string | null;
+          art_auto_generation_status: string;
+          art_auto_generation_started_at: string | null;
+          art_auto_generation_finished_at: string | null;
+          art_auto_generation_error: string | null;
           raw_payload: Json;
           magnific_space_id: string | null;
           magnific_space_url: string | null;
@@ -1606,10 +1618,19 @@ export type Database = {
         Returns: {
           result_demand_id: string;
           result_external_id: string;
-          result_action: "scheduled" | "missing_material";
+          result_action: "scheduled";
           result_status: string;
           result_due_date: string | null;
           result_raw_payload: Json;
+        }[];
+      };
+      claim_creative_demand_agent_task: {
+        Args: { p_now?: string };
+        Returns: {
+          result_demand_id: string;
+          result_external_id: string;
+          result_action: "claimed" | "blocked" | "check_materials";
+          result_error: string | null;
         }[];
       };
     };

@@ -53,7 +53,7 @@ describe("buildTextBlock", () => {
 describe("buildStandardsBlock", () => {
   it("impõe área segura e preserva a posição do CTA escolhida no briefing", () => {
     const out = buildStandardsBlock({ headline: "oi", cta: "Saiba mais", aspectRatio: ART_ASPECT_RATIO });
-    expect(out).toContain("3:4 portrait");
+    expect(out).toContain("4:5 portrait");
     expect(out).toContain("Meta");
     expect(out).toContain(`${Math.round(LOGO_ZONE_BAND.to * 100)}% of the height`);
     expect(out).toContain(`starts below ${Math.round(CONTENT_TOP * 100)}%`);
@@ -101,7 +101,7 @@ describe("appendTechnicalBlock", () => {
   });
 
   it("é determinístico", () => {
-    const spec = { headline: "oi", cta: "clique", aspectRatio: "3:4" };
+    const spec = { headline: "oi", cta: "clique", aspectRatio: "4:5" };
     const refs = [{ role: "estilo" as const, intent: "x" }];
     expect(appendTechnicalBlock(prompt, spec, refs)).toBe(appendTechnicalBlock(prompt, spec, refs));
   });

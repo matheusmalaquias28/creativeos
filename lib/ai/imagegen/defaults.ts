@@ -1,6 +1,6 @@
-/** Padrão único de geração de imagem — CreativeOS usa feed vertical (3:4). */
+/** Padrão único de geração de imagem — CreativeOS usa feed vertical (4:5). */
 export const IMAGE_GEN_DEFAULTS = {
-  aspectRatio: "3:4",
+  aspectRatio: "4:5",
   imageSize: "2K",
   /**
    * Campo legado — o provider real é escolhido por IMAGE_PROVIDER (ver

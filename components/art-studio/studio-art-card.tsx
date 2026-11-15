@@ -21,7 +21,7 @@ import { effectiveStudioPrompt, type ArtFormat, type StudioJob } from "@/lib/art
 
 type Props = {
   job: StudioJob;
-  /** URL da imagem a exibir — a arte 3:4 ou a story 9:16. */
+  /** URL da imagem a exibir — a arte 4:5 ou a story 9:16. */
   url: string | null;
   format: ArtFormat;
   onOpenFullscreen: (url: string) => void;
@@ -30,7 +30,7 @@ type Props = {
   onRegenerate: (jobId: string, prompt: string) => Promise<void>;
 };
 
-const ASPECT = { feed: "aspect-[3/4]", story: "aspect-[9/16]" } as const;
+const ASPECT = { feed: "aspect-[4/5]", story: "aspect-[9/16]" } as const;
 
 type Phase = "writing" | "generating" | "ready" | "failed";
 

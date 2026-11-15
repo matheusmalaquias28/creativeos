@@ -261,6 +261,20 @@ export default async function DemandDetailPage({ params }: PageProps) {
           </div>
         </Surface>
 
+        {(demand.art_auto_generation_status === "failed" ||
+          demand.art_auto_generation_status === "blocked") && demand.art_auto_generation_error ? (
+          <Surface padding="sm" className={cn("border", tones.amber.border)}>
+            <div className="flex items-start gap-2 text-sm">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-tone-amber" />
+              <div>
+                <p className="font-semibold text-foreground">A geração automática precisa de revisão</p>
+                <p className="mt-1 text-muted-foreground">{demand.art_auto_generation_error}</p>
+                <p className="mt-1 text-muted-foreground">As artes que foram geradas continuam no estúdio; nenhuma foi enviada ao Drive.</p>
+              </div>
+            </div>
+          </Surface>
+        ) : null}
+
         <DemandCommentsPanel comments={comments} />
 
         {studio ? (
@@ -276,7 +290,7 @@ export default async function DemandDetailPage({ params }: PageProps) {
             icon={FileText}
             tone="cyan"
             title={`Briefing das artes (${demand.artes.length})`}
-            description="Headlines e CTAs no formato 3:4"
+            description="Headlines e CTAs no formato 4:5"
           />
           <DemandArteFeed
             demandId={id}

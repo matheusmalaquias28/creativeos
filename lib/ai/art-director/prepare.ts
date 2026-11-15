@@ -315,7 +315,7 @@ export async function prepareDemandPrompts(
   // A view já resolve a logo do onboarding quando o perfil não sincronizou.
   const effectiveLogoUrl = readiness.logo_url ?? profile.logo_url ?? null;
 
-  // 3:4 SEMPRE: ignora profile.aspect_ratio e o aspectRatio da arte do Make.
+  // 4:5 SEMPRE: ignora profile.aspect_ratio e o aspectRatio da arte do Make.
   const aspectRatio = ART_ASPECT_RATIO;
   const imageSize = profile.image_size ?? ART_IMAGE_SIZE_FALLBACK;
   // Logo nunca é referência do modelo de imagem (ver cabeçalho).

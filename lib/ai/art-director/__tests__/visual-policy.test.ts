@@ -9,7 +9,7 @@ import type { ArtDirectionInput } from "../types";
 const input: ArtDirectionInput = {
   client: { name: "Cliente novo", dna: null, basePrompt: "", palette: [], directionNotes: [], visualMode: "free" },
   catalog: buildReferenceCatalog([]), demand: { titulo: null, tipo: null },
-  art: { index: 0, headline: "Sua próxima conquista começa aqui", cta: "Saiba mais", aspectRatio: "3:4", imageSize: "2K" },
+  art: { index: 0, headline: "Sua próxima conquista começa aqui", cta: "Saiba mais", aspectRatio: "4:5", imageSize: "2K" },
   siblings: [], clientPhotos: [],
 };
 describe("copy-first direction", () => {

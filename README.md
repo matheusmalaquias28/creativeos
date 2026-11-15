@@ -95,31 +95,17 @@ Acesse [http://localhost:3000](http://localhost:3000).
 
 ### Prazos automáticos de demandas de arte
 
-A migração `20261115100000_automatic_creative_demand_due_dates.sql` agenda uma
-checagem do Storm a cada cinco minutos. Ela só processa demandas sem data que
-ficaram dez minutos sem atualização. Edits recebidos do War reiniciam a espera;
-eventos de remoção/cancelamento arquivam a demanda. Para cada dia útil, são
-consideradas no máximo cinco demandas ativas com data, inclusive ajustes que já
-tenham prazo. A janela de 16h usa o horário em que a demanda foi solicitada no
-fuso `America/Sao_Paulo`.
+A rotina do Supabase chama o endpoint do CreativeOS a cada cinco minutos. O endpoint espera dez minutos sem alterações, agenda no máximo cinco demandas ativas por dia útil e usa o horário de São Paulo. Pedidos depois das 16h passam para o próximo dia útil. Ajustes com prazo também contam no limite.
 
-Para ativar em produção:
+Clientes em onboarding passam primeiro por uma checagem do Drive Materiais pelo agente. Sem logo, a demanda fica como Falta material do cliente e sem prazo. Com logo, o material precisa estar cadastrado no cliente do Storm; só então o cron define a data.
 
-1. Defina `CREATIVE_DEMAND_DUE_CRON_SECRET` nas variáveis de ambiente da Vercel.
-2. Aplique a migração no Supabase.
-3. No SQL Editor do Supabase, guarde a URL e o mesmo segredo do passo 1 no
-   Vault (o Supabase não permite `alter database ... set` para parâmetros
-   próprios):
+As migrações 20261115100000_automatic_creative_demand_due_dates.sql, 20261115110000_creative_demand_agent_queue.sql, 20261115120000_rearm_creative_agent_after_materials.sql e 20261115130000_onboarding_drive_material_triage.sql aplicam a regra e a fila no banco CreativeOS. O cron usa os segredos creative_demand_due_url e creative_demand_due_secret do Vault.
 
-   ```sql
-   select vault.create_secret('https://SEU-APP/api/cron/creative-demand-due-dates', 'creative_demand_due_url');
-   select vault.create_secret('MESMO_SEGREDO_DA_VERCEL', 'creative_demand_due_secret');
-   ```
+### Criação de artes para revisão
 
-O agendamento já fica registrado pela migração, mas não chama a rota até os dois
-segredos existirem no Vault. Demandas de clientes em onboarding sem logo
-recebem o status `Falta material do cliente` e continuam sem prazo; quando a logo
-for cadastrada, uma checagem posterior pode colocá-las na fila.
+Após o prazo ser definido, o endpoint encaminha até seis demandas por dia para a rotina OpenBot CreativeOS: processar demanda de arte. O agente verifica a copy, logo e referências, ajusta o prompt e gera Feed 4:5. Cada arte recebe no máximo uma geração inicial; Stories, exportação ao Drive e publicação esperam aprovação expressa do usuário. O status operacional da demanda permanece sem alteração durante a revisão.
+
+Na Vercel do projeto CreativeOS, configure OPENBOT_CREATIVE_DEMAND_WEBHOOK_URL, OPENBOT_CREATIVE_DEMAND_WEBHOOK_SECRET e CREATIVEOS_APP_URL. O segredo precisa ser o mesmo que está em Routines settings; ele não deve ser colocado no repositório ou no chat. O endpoint não retira tarefas da fila enquanto URL e segredo não estiverem configurados.
 
 ## Arquitetura
 

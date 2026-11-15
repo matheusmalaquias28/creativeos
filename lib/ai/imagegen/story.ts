@@ -1,7 +1,7 @@
 /**
  * Adaptação da arte aprovada para o formato stories (9:16).
  *
- * Não é uma nova direção de arte: a arte 3:4 já foi aprovada pelo operador, e
+ * Não é uma nova direção de arte: a arte 4:5 já foi aprovada pelo operador, e
  * o que se quer aqui é a MESMA peça reenquadrada. Por isso a arte entra como
  * referência única e o prompt é uma instrução de reenquadramento — nada de
  * catálogo, briefing ou bloco técnico, que reabririam decisões já fechadas.

@@ -102,6 +102,10 @@ export type CreativeDemand = {
   elapsed_seconds: number | null;
   due_date: string | null;
   external_created_at: string | null;
+  art_auto_generation_status?: string;
+  art_auto_generation_started_at?: string | null;
+  art_auto_generation_finished_at?: string | null;
+  art_auto_generation_error?: string | null;
   magnific_space_id: string | null;
   magnific_space_url: string | null;
   magnific_space_status: MagnificSpaceStatus;

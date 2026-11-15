@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyWarDueDateChange } from "@/lib/demands/war-status-callback";
+import { notifyCreativeDemandAgent } from "@/lib/demands/creative-agent-webhook";
 
 export const maxDuration = 300;
 
@@ -25,21 +26,7 @@ async function run(request: Request) {
     if (error) throw new Error(error.message);
 
     let assigned = 0;
-    let missingMaterials = 0;
-
     for (const result of data ?? []) {
-      if (result.result_action === "missing_material") {
-        missingMaterials += 1;
-        await notifyWarDueDateChange({
-          externalId: result.result_external_id,
-          dueDate: null,
-          status: result.result_status,
-          rawPayload: result.result_raw_payload,
-          updatedBy: "CreativeOS automatico",
-        });
-        continue;
-      }
-
       assigned += 1;
       await notifyWarDueDateChange({
         externalId: result.result_external_id,
@@ -50,11 +37,68 @@ async function run(request: Request) {
       });
     }
 
-    if (assigned || missingMaterials) {
-      console.info("[creative-demand-due-dates]", JSON.stringify({ assigned, missingMaterials }));
+    let agentTaskDispatched = 0;
+    const agentWebhookConfigured = Boolean(
+      process.env.OPENBOT_CREATIVE_DEMAND_WEBHOOK_URL?.trim() &&
+        process.env.OPENBOT_CREATIVE_DEMAND_WEBHOOK_SECRET?.trim()
+    );
+    const { data: claims, error: claimError } = agentWebhookConfigured
+      ? await createAdminClient().rpc("claim_creative_demand_agent_task", {})
+      : { data: [], error: null };
+    if (claimError) throw new Error(claimError.message);
+
+    for (const claim of claims ?? []) {
+      if (claim.result_action === "blocked") {
+        continue;
+      }
+
+      if (claim.result_action !== "claimed" && claim.result_action !== "check_materials") continue;
+
+      const supabase = createAdminClient();
+      const { data: handedOff, error: handoffError } = await supabase
+        .from("creative_demands")
+        .update({ art_auto_generation_status: "awaiting_agent" })
+        .eq("id", claim.result_demand_id)
+        .eq("art_auto_generation_status", "processing")
+        .eq("is_archived", false)
+        .select("id")
+        .maybeSingle();
+      if (handoffError) throw new Error(handoffError.message);
+      if (!handedOff) continue;
+
+      const { data: demand, error: demandError } = await supabase
+        .from("creative_demands")
+        .select("id, external_id, client_name_external, briefing, artes, status, due_date, updated_at, is_archived")
+        .eq("id", claim.result_demand_id)
+        .eq("art_auto_generation_status", "awaiting_agent")
+        .maybeSingle();
+      if (demandError) throw new Error(demandError.message);
+      if (!demand || demand.is_archived) continue;
+
+      const sent = await notifyCreativeDemandAgent(
+        demand,
+        claim.result_action === "check_materials" ? "check_materials" : "scheduled"
+      );
+      if (sent) {
+        agentTaskDispatched += 1;
+      } else {
+        const { error: retryError } = await supabase
+          .from("creative_demands")
+          .update({ art_auto_generation_status: "pending", art_auto_generation_started_at: null })
+          .eq("id", demand.id)
+          .eq("art_auto_generation_status", "awaiting_agent");
+        if (retryError) throw new Error(retryError.message);
+      }
     }
 
-    return NextResponse.json({ ok: true, assigned, missingMaterials });
+    if (assigned || agentTaskDispatched) {
+      console.info(
+        "[creative-demand-due-dates]",
+        JSON.stringify({ assigned, agentTaskDispatched })
+      );
+    }
+
+    return NextResponse.json({ ok: true, assigned, agentTaskDispatched });
   } catch (error) {
     console.error("[creative-demand-due-dates] falhou", error);
     return NextResponse.json(
