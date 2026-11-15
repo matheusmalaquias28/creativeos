@@ -62,3 +62,14 @@ describe("data de entrega no seletor", () => {
     expect(dueDateToInputValue(iso)).toBe("2026-11-20");
   });
 });
+
+describe("grade do calendário", () => {
+  it("novembro/2026 começa no domingo 1º e completa a última semana", async () => {
+    const { monthGrid, addDays } = await import("@/lib/demands/due-date");
+    const grid = monthGrid(2026, 10);
+    expect(grid[0]).toBe("2026-11-01");
+    expect(grid.length % 7).toBe(0);
+    expect(grid.at(-1)).toBe("2026-12-05");
+    expect(addDays("2026-02-28", 1)).toBe("2026-03-01");
+  });
+});

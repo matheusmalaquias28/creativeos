@@ -20,3 +20,34 @@ export function inputValueToDueDate(value: string): string | null {
   const date = new Date(`${value}T23:59:00${TZ_OFFSET}`);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
+
+/** "YYYY-MM-DD" de hoje em São Paulo. */
+export function todayInputValue(now: Date = new Date()): string {
+  return dueDateToInputValue(now.toISOString());
+}
+
+/** Soma dias a um "YYYY-MM-DD" (aritmética em UTC, sem efeito de fuso). */
+export function addDays(value: string, days: number): string {
+  const [y, m, d] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d + days));
+  return date.toISOString().slice(0, 10);
+}
+
+/** Dia da semana (0 = domingo) de um "YYYY-MM-DD". */
+export function weekday(value: string): number {
+  const [y, m, d] = value.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+
+/**
+ * Grade do mês (semanas começando no domingo) como "YYYY-MM-DD", incluindo os
+ * dias do mês anterior/seguinte que completam a primeira e a última semana.
+ * `month` é 0-based.
+ */
+export function monthGrid(year: number, month: number): string[] {
+  const first = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10);
+  const start = addDays(first, -weekday(first));
+  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const cells = Math.ceil((weekday(first) + daysInMonth) / 7) * 7;
+  return Array.from({ length: cells }, (_, i) => addDays(start, i));
+}
