@@ -20,7 +20,7 @@ export const getDesignProfilesAsTweetProfiles = cache(async (): Promise<TweetPro
   const supabase = await createClient();
   const { data } = await supabase
     .from("carousel_profiles")
-    .select("id, user_id, name, logo_url, instagram_handle, created_at, updated_at")
+    .select("id, user_id, name, logo_url, instagram_avatar_url, instagram_handle, created_at, updated_at")
     .order("updated_at", { ascending: false });
   return (data ?? []).map(designProfileToTweetProfile);
 });

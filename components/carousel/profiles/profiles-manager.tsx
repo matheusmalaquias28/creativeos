@@ -81,6 +81,7 @@ function ProfileEditor({
 }) {
   const [draft, setDraft] = useState<CarouselProfileDraft>(initialDraft);
   const [uploading, setUploading] = useState(false);
+  const [uploadingIg, setUploadingIg] = useState(false);
   const [uploadingRefs, setUploadingRefs] = useState(false);
   const [saving, startSaving] = useTransition();
   const [newSwatch, setNewSwatch] = useState("#3b82f6");
@@ -145,10 +146,14 @@ function ProfileEditor({
     }
   }
 
-  async function handleLogo(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleLogo(
+    e: React.ChangeEvent<HTMLInputElement>,
+    kind: "logo" | "instagram" = "logo"
+  ) {
     const file = e.target.files?.[0];
     if (!file) return;
-    setUploading(true);
+    const setBusy = kind === "logo" ? setUploading : setUploadingIg;
+    setBusy(true);
     try {
       const fd = new FormData();
       fd.append("logo", file);
@@ -158,12 +163,17 @@ function ProfileEditor({
       });
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error ?? "Falha no upload");
-      patch({ logo_url: data.url, logo_storage_path: data.storagePath });
-      toast.success("Logo enviada");
+      if (kind === "logo") {
+        patch({ logo_url: data.url, logo_storage_path: data.storagePath });
+        toast.success("Logo enviada");
+      } else {
+        patch({ instagram_avatar_url: data.url, instagram_avatar_storage_path: data.storagePath });
+        toast.success("Logo do perfil do Instagram enviada");
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro no upload");
     } finally {
-      setUploading(false);
+      setBusy(false);
       e.target.value = "";
     }
   }
@@ -252,7 +262,7 @@ function ProfileEditor({
               </div>
             </div>
 
-            {/* Logo + handle */}
+            {/* Logos */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground">Logo</label>
@@ -264,7 +274,7 @@ function ProfileEditor({
                       : "border-border-strong bg-surface text-muted-foreground hover:border-primary/50 hover:bg-primary/5 hover:text-foreground"
                   )}
                 >
-                  <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={handleLogo} />
+                  <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => handleLogo(e, "logo")} />
                   {uploading ? <Loader2 className="size-3.5 animate-spin" /> : <ImagePlus className="size-3.5" />}
                   {draft.logo_url ? "Trocar logo" : "Carregar logo"}
                 </label>
@@ -277,6 +287,46 @@ function ProfileEditor({
                   </button>
                 )}
               </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Logo do perfil do Instagram <span className="font-normal">(opcional)</span>
+                </label>
+                <label
+                  className={cn(
+                    "flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed py-3 text-xs transition-colors",
+                    draft.instagram_avatar_url
+                      ? "border-primary/40 bg-primary/5 text-primary"
+                      : "border-border-strong bg-surface text-muted-foreground hover:border-primary/50 hover:bg-primary/5 hover:text-foreground"
+                  )}
+                >
+                  <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => handleLogo(e, "instagram")} />
+                  {uploadingIg ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : draft.instagram_avatar_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={draft.instagram_avatar_url} alt="" className="size-5 rounded-full object-cover" />
+                  ) : (
+                    <ImagePlus className="size-3.5" />
+                  )}
+                  {draft.instagram_avatar_url ? "Trocar logo do perfil" : "Carregar logo do perfil"}
+                </label>
+                {draft.instagram_avatar_url ? (
+                  <button
+                    onClick={() => patch({ instagram_avatar_url: null, instagram_avatar_storage_path: null })}
+                    className="text-xs font-semibold text-tone-red hover:underline"
+                  >
+                    Remover logo do perfil
+                  </button>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Foto redonda do perfil nos carrosséis tweet. Sem ela, usa a logo normal.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Handle */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground">@ do Instagram</label>
                 <Input
@@ -454,7 +504,7 @@ function ProfileEditor({
 
           <div className="flex justify-end gap-2 border-t border-border bg-surface/60 px-6 py-4">
             <Button variant="ghost" size="sm" onClick={onClose}>Cancelar</Button>
-            <Button size="sm" onClick={handleSave} disabled={saving || uploading}>
+            <Button size="sm" onClick={handleSave} disabled={saving || uploading || uploadingIg}>
               {saving ? <Loader2 className="animate-spin" /> : null}
               Salvar perfil
             </Button>

@@ -68,6 +68,7 @@ export function designProfileToTweetProfile(p: {
   user_id: string;
   name: string;
   logo_url: string | null;
+  instagram_avatar_url?: string | null;
   instagram_handle: string | null;
   created_at: string;
   updated_at: string;
@@ -77,7 +78,8 @@ export function designProfileToTweetProfile(p: {
     user_id: p.user_id,
     name: p.name,
     handle: normalizeHandle(p.instagram_handle ?? ""),
-    avatar_url: p.logo_url,
+    // Logo do perfil do Instagram quando houver; senão, a logo normal.
+    avatar_url: p.instagram_avatar_url || p.logo_url,
     created_at: p.created_at,
     updated_at: p.updated_at,
     source: "design",

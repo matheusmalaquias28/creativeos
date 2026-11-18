@@ -1382,6 +1382,8 @@ export type Database = {
           palette: Json;
           reference_images: Json;
           instagram_handle: string | null;
+          instagram_avatar_url: string | null;
+          instagram_avatar_storage_path: string | null;
           business_context: string | null;
           context_md: string | null;
           created_at: string;
@@ -1403,6 +1405,8 @@ export type Database = {
           palette?: Json;
           reference_images?: Json;
           instagram_handle?: string | null;
+          instagram_avatar_url?: string | null;
+          instagram_avatar_storage_path?: string | null;
           business_context?: string | null;
           context_md?: string | null;
           created_at?: string;
@@ -1422,6 +1426,8 @@ export type Database = {
           palette: Json;
           reference_images: Json;
           instagram_handle: string | null;
+          instagram_avatar_url: string | null;
+          instagram_avatar_storage_path: string | null;
           business_context: string | null;
           context_md: string | null;
           updated_at: string;

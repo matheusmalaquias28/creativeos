@@ -23,6 +23,9 @@ export type CarouselProfile = {
   /** Referências visuais usadas para gerar as imagens de fundo. */
   reference_images: ProfileReferenceImage[];
   instagram_handle: string | null;
+  /** Logo do perfil do Instagram (opcional). Foto do perfil no carrossel tweet. */
+  instagram_avatar_url: string | null;
+  instagram_avatar_storage_path: string | null;
   /** Raw business/brand context typed by the user. */
   business_context: string | null;
   /** AI-generated markdown context read by the Gerador Turbo. */
@@ -53,6 +56,8 @@ export function makeEmptyProfileDraft(): CarouselProfileDraft {
     palette: [],
     reference_images: [],
     instagram_handle: null,
+    instagram_avatar_url: null,
+    instagram_avatar_storage_path: null,
     business_context: null,
     context_md: null,
   };

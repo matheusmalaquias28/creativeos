@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
   if (body.profileSource === "design") {
     const { data } = await supabase
       .from("carousel_profiles")
-      .select("id, user_id, name, logo_url, instagram_handle, created_at, updated_at")
+      .select("id, user_id, name, logo_url, instagram_avatar_url, instagram_handle, created_at, updated_at")
       .eq("id", body.profileId)
       .single();
     profile = data ? designProfileToTweetProfile(data) : null;
