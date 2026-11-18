@@ -4,6 +4,7 @@ import { openaiJsonStream, responseText } from "@/lib/ai/openai-text";
 import {
   BUILD_CAROUSEL_TOOL,
   buildSystemPrompt,
+  type TurboContentMode,
   type TurboSpec,
 } from "@/lib/carousel/turbo/schema";
 import { stripTravessao } from "@/lib/text/strip-dash";
@@ -12,7 +13,15 @@ import type { CarouselProfile } from "@/types/carousel-profile";
 export const maxDuration = 120;
 
 
-type ContentBody = { profileId: string; theme: string; cardCount?: number };
+type ContentBody = {
+  profileId: string;
+  /** Tema (modo "ai") ou o conteúdo completo do usuário (modo "manual"). */
+  theme: string;
+  cardCount?: number;
+  mode?: TurboContentMode;
+};
+
+const MAX_INPUT = 20_000;
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
@@ -28,8 +37,15 @@ export async function POST(req: NextRequest) {
     return new Response(JSON.stringify({ error: "Body inválido" }), { status: 400 });
   }
   const theme = body.theme?.trim();
+  const mode: TurboContentMode = body.mode === "manual" ? "manual" : "ai";
   if (!body.profileId || !theme) {
     return new Response(JSON.stringify({ error: "Perfil e tema são obrigatórios" }), { status: 400 });
+  }
+  if (theme.length > MAX_INPUT) {
+    return new Response(
+      JSON.stringify({ error: "Conteúdo muito longo (máx. 20 mil caracteres)" }),
+      { status: 400 }
+    );
   }
   const cardCount =
     body.cardCount && body.cardCount >= 3 && body.cardCount <= 10
@@ -52,7 +68,13 @@ export async function POST(req: NextRequest) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
 
       try {
-        send({ type: "status", message: "Pesquisando o tema e pensando na narrativa…" });
+        send({
+          type: "status",
+          message:
+            mode === "manual"
+              ? "Organizando seu conteúdo em cards…"
+              : "Pesquisando o tema e pensando na narrativa…",
+        });
 
         // Pesquisa na web (ferramenta nativa da OpenAI) e devolve o carrossel no
         // schema do build_carousel. O resumo do raciocínio vai para o painel
@@ -61,10 +83,13 @@ export async function POST(req: NextRequest) {
         let writing = false;
         const final = await openaiJsonStream(
           {
-            system: buildSystemPrompt(profile, theme, cardCount),
+            system: buildSystemPrompt(profile, theme, cardCount, mode),
             input:
-              "Pesquise o tema com dados atuais e gere o conteúdo do carrossel completo no formato pedido.",
-            tools: [{ type: "web_search" }],
+              mode === "manual"
+                ? `Conteúdo do carrossel (organize em cards, sem reescrever):\n"""\n${theme}\n"""`
+                : "Pesquise o tema com dados atuais e gere o conteúdo do carrossel completo no formato pedido.",
+            // Conteúdo próprio: nada de pesquisa na web.
+            tools: mode === "manual" ? undefined : [{ type: "web_search" }],
             schemaName: BUILD_CAROUSEL_TOOL.name,
             // Schema com campos opcionais (cta, gridPrompts, textGlass): modo não-estrito.
             jsonSchema: BUILD_CAROUSEL_TOOL.input_schema,

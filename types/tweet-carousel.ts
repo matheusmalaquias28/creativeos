@@ -8,6 +8,11 @@ export type TweetProfile = {
   avatar_url: string | null;
   created_at: string;
   updated_at: string;
+  /**
+   * De onde o perfil vem. Ausente = `tweet_profiles`. "design" = perfil do
+   * Carrossel Avançado (`carousel_profiles`): usa a logo, o nome e o @ do Instagram.
+   */
+  source?: "design";
 };
 
 /** Snapshot do perfil gravado no carrossel (não quebra se o perfil for editado/excluído). */
@@ -55,4 +60,26 @@ export function makeTweetCard(overrides?: Partial<TweetCard>): TweetCard {
 export function normalizeHandle(handle: string): string {
   const clean = handle.trim().replace(/^@+/, "").replace(/\s+/g, "");
   return clean ? `@${clean}` : "";
+}
+
+/** Perfil de design (Carrossel Avançado) no formato de perfil do carrossel tweet. */
+export function designProfileToTweetProfile(p: {
+  id: string;
+  user_id: string;
+  name: string;
+  logo_url: string | null;
+  instagram_handle: string | null;
+  created_at: string;
+  updated_at: string;
+}): TweetProfile {
+  return {
+    id: p.id,
+    user_id: p.user_id,
+    name: p.name,
+    handle: normalizeHandle(p.instagram_handle ?? ""),
+    avatar_url: p.logo_url,
+    created_at: p.created_at,
+    updated_at: p.updated_at,
+    source: "design",
+  };
 }

@@ -1,6 +1,10 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import type { TweetCarousel, TweetProfile } from "@/types/tweet-carousel";
+import {
+  designProfileToTweetProfile,
+  type TweetCarousel,
+  type TweetProfile,
+} from "@/types/tweet-carousel";
 
 export const getTweetProfilesForUser = cache(async (): Promise<TweetProfile[]> => {
   const supabase = await createClient();
@@ -9,6 +13,16 @@ export const getTweetProfilesForUser = cache(async (): Promise<TweetProfile[]> =
     .select("*")
     .order("updated_at", { ascending: false });
   return (data ?? []) as TweetProfile[];
+});
+
+/** Perfis de design (Carrossel Avançado) usáveis no carrossel tweet: logo, nome e @. */
+export const getDesignProfilesAsTweetProfiles = cache(async (): Promise<TweetProfile[]> => {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("carousel_profiles")
+    .select("id, user_id, name, logo_url, instagram_handle, created_at, updated_at")
+    .order("updated_at", { ascending: false });
+  return (data ?? []).map(designProfileToTweetProfile);
 });
 
 export const getTweetCarouselsForUser = cache(async (): Promise<TweetCarousel[]> => {

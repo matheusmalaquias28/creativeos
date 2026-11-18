@@ -6,14 +6,14 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   Zap, X, Loader2, ArrowLeft, Sparkles, Check, AlertCircle, Image as ImageIcon,
-  LayoutTemplate, MessageSquareText,
+  LayoutTemplate, MessageSquareText, FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { SlidePreview } from "@/components/carousel/slide-preview";
-import { applyImageToSlide, type TurboSpec } from "@/lib/carousel/turbo/schema";
+import { applyImageToSlide, type TurboContentMode, type TurboSpec } from "@/lib/carousel/turbo/schema";
 import type { CarouselDesign, CarouselSlide } from "@/types/carousel";
 import { TweetWizard } from "@/components/carousel/tweet/tweet-wizard";
 import type { TweetProfile } from "@/types/tweet-carousel";
@@ -26,7 +26,7 @@ export type TurboProfile = {
   hasContext: boolean;
 };
 
-type Step = "type" | "tweet" | "profile" | "theme" | "review" | "building";
+type Step = "type" | "tweet" | "profile" | "mode" | "theme" | "review" | "building";
 
 async function readSSE(res: Response, onEvent: (e: Record<string, unknown>) => void) {
   const reader = res.body!.getReader();
@@ -53,14 +53,19 @@ async function readSSE(res: Response, onEvent: (e: Record<string, unknown>) => v
 export function TurboButton({
   profiles,
   tweetProfiles,
+  designTweetProfiles,
 }: {
   profiles: TurboProfile[];
   tweetProfiles: TweetProfile[];
+  /** Perfis do Carrossel Avançado, também selecionáveis no carrossel tweet. */
+  designTweetProfiles: TweetProfile[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<Step>("type");
   const [profileId, setProfileId] = useState<string | null>(null);
+  const [contentMode, setContentMode] = useState<TurboContentMode>("ai");
+  // Tema (modo IA) ou o conteúdo completo do usuário (modo "Já tenho o conteúdo").
   const [theme, setTheme] = useState("");
 
   // content phase
@@ -89,6 +94,7 @@ export function TurboButton({
   function reset() {
     setStep("type");
     setProfileId(null);
+    setContentMode("ai");
     setTheme("");
     setThinking("");
     setStatus("");
@@ -126,12 +132,12 @@ export function TurboButton({
       setContentLoading(true);
       setError(null);
       setThinking("");
-      setStatus("Pesquisando o tema…");
+      setStatus(contentMode === "manual" ? "Organizando seu conteúdo…" : "Pesquisando o tema…");
       try {
         const res = await fetch("/api/carousel/turbo/content", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ profileId, theme: theme.trim(), cardCount: count }),
+          body: JSON.stringify({ profileId, theme: theme.trim(), cardCount: count, mode: contentMode }),
         });
         if (!res.ok || !res.body) {
           const data = await res.json().catch(() => ({}));
@@ -165,7 +171,7 @@ export function TurboButton({
         setContentLoading(false);
       }
     },
-    [profileId, theme]
+    [profileId, theme, contentMode]
   );
 
   function startContent() {
@@ -193,7 +199,8 @@ export function TurboButton({
       const res = await fetch("/api/carousel/turbo/build", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profileId, spec, theme: theme.trim() }),
+        // No modo manual o "tema" é o texto inteiro: o nome sai do 1º card.
+        body: JSON.stringify({ profileId, spec, theme: contentMode === "manual" ? undefined : theme.trim() }),
       });
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => ({}));
@@ -352,7 +359,11 @@ export function TurboButton({
                 )}
 
                 {step === "tweet" && (
-                  <TweetWizard profiles={tweetProfiles} onBack={() => setStep("type")} />
+                  <TweetWizard
+                    profiles={tweetProfiles}
+                    designProfiles={designTweetProfiles}
+                    onBack={() => setStep("type")}
+                  />
                 )}
 
                 {/* Step 1 — profile */}
@@ -375,7 +386,7 @@ export function TurboButton({
                             key={p.id}
                             onClick={() => {
                               setProfileId(p.id);
-                              setStep("theme");
+                              setStep("mode");
                             }}
                             className="flex w-full items-center gap-3 rounded-xl border border-border bg-card p-3 text-left transition-premium hover:border-primary/50 hover:bg-accent"
                           >
@@ -401,27 +412,73 @@ export function TurboButton({
                   </div>
                 )}
 
-                {/* Step 2 — theme */}
-                {step === "theme" && (
-                  <div className="space-y-4">
+                {/* Step 2 — de onde vem o conteúdo */}
+                {step === "mode" && (
+                  <div className="space-y-3">
                     <button onClick={() => setStep("profile")} className="inline-flex items-center gap-1 rounded-lg text-[0.8125rem] font-medium text-muted-foreground transition-colors hover:text-foreground">
                       <ArrowLeft className="size-3.5" />
                       {selectedProfile?.name}
                     </button>
+                    <p className="text-sm font-semibold text-foreground">Como vamos montar o conteúdo?</p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {(
+                        [
+                          { value: "ai", icon: Sparkles, title: "Criar com IA", desc: "Você manda o tema, a IA pesquisa e escreve os cards." },
+                          { value: "manual", icon: FileText, title: "Já tenho o conteúdo", desc: "Cole o texto e a IA só organiza em cards e cria as artes." },
+                        ] as const
+                      ).map((o) => (
+                        <button
+                          key={o.value}
+                          onClick={() => {
+                            if (o.value !== contentMode) setTheme("");
+                            setContentMode(o.value);
+                            setStep("theme");
+                          }}
+                          className="flex flex-col items-start gap-2 rounded-xl border border-border bg-card p-4 text-left transition-premium hover:border-primary/50 hover:bg-accent"
+                        >
+                          <span className="flex size-9 items-center justify-center rounded-xl bg-tone-pink/14 text-tone-pink">
+                            <o.icon className="size-4" />
+                          </span>
+                          <span className="text-sm font-semibold text-foreground">{o.title}</span>
+                          <span className="text-xs leading-snug text-muted-foreground">{o.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 3 — tema ou conteúdo */}
+                {step === "theme" && (
+                  <div className="space-y-4">
+                    <button onClick={() => setStep("mode")} className="inline-flex items-center gap-1 rounded-lg text-[0.8125rem] font-medium text-muted-foreground transition-colors hover:text-foreground">
+                      <ArrowLeft className="size-3.5" />
+                      {contentMode === "manual" ? "Já tenho o conteúdo" : "Criar com IA"}
+                    </button>
                     <div className="space-y-2">
-                      <p className="text-sm font-semibold text-foreground">O que vamos gerar hoje?</p>
+                      <p className="text-sm font-semibold text-foreground">
+                        {contentMode === "manual" ? "Cole o conteúdo do carrossel" : "O que vamos gerar hoje?"}
+                      </p>
                       <Textarea
                         autoFocus
                         value={theme}
                         onChange={(e) => setTheme(e.target.value)}
-                        placeholder="Ex: 5 erros que travam as vendas do seu e-commerce em 2026"
-                        rows={4}
+                        placeholder={
+                          contentMode === "manual"
+                            ? "Cole aqui o texto completo. Se já estiver separado por card (Card 1, Card 2… ou blocos com linha em branco), a divisão é respeitada."
+                            : "Ex: 5 erros que travam as vendas do seu e-commerce em 2026"
+                        }
+                        rows={contentMode === "manual" ? 10 : 4}
                         className="resize-none text-sm"
                       />
+                      {contentMode === "manual" && (
+                        <p className="text-xs text-muted-foreground">
+                          A IA mantém o seu texto: só divide em cards, escolhe layout, cores e gera as imagens.
+                        </p>
+                      )}
                     </div>
                     <Button onClick={startContent} disabled={!theme.trim()} className="w-full">
                       <Sparkles />
-                      Gerar conteúdo
+                      {contentMode === "manual" ? "Organizar em cards" : "Gerar conteúdo"}
                     </Button>
                   </div>
                 )}
@@ -431,7 +488,7 @@ export function TurboButton({
                   <div className="space-y-4">
                     <button onClick={() => setStep("theme")} className="inline-flex items-center gap-1 rounded-lg text-[0.8125rem] font-medium text-muted-foreground transition-colors hover:text-foreground">
                       <ArrowLeft className="size-3.5" />
-                      Trocar tema
+                      {contentMode === "manual" ? "Editar conteúdo" : "Trocar tema"}
                     </button>
 
                     {!spec ? (
@@ -479,11 +536,15 @@ export function TurboButton({
                               ) : (
                                 <Check className="size-3.5" />
                               )}
-                              Confirmar {cardCount} cards e reescrever conteúdo
+                              {contentMode === "manual"
+                                ? `Confirmar ${cardCount} cards e reorganizar`
+                                : `Confirmar ${cardCount} cards e reescrever conteúdo`}
                             </Button>
                           ) : (
                             <p className="mt-1 text-[0.6875rem] text-muted-foreground">
-                              Ajuste o slider e confirme para a IA reescrever o conteúdo.
+                              {contentMode === "manual"
+                                ? "Ajuste o slider e confirme para a IA redistribuir o seu texto."
+                                : "Ajuste o slider e confirme para a IA reescrever o conteúdo."}
                             </p>
                           )}
                         </div>

@@ -89,9 +89,12 @@ async function uploadImage(file: File, kind: "avatar" | "card"): Promise<string>
 export function TweetCarouselEditor({
   carousel,
   profiles,
+  designProfiles = [],
 }: {
   carousel: TweetCarousel;
   profiles: TweetProfile[];
+  /** Perfis do Carrossel Avançado (logo, nome e @ do Instagram). */
+  designProfiles?: TweetProfile[];
 }) {
   const { draft, update, status, restored } = useTweetAutosave(
     carousel.id,
@@ -196,17 +199,29 @@ export function TweetCarouselEditor({
     }
   }
 
+  const usableDesignProfiles = designProfiles.filter((p) => p.handle);
+
   function changeProfile(profileId: string) {
-    const p = profiles.find((x) => x.id === profileId);
+    const p =
+      profiles.find((x) => x.id === profileId) ??
+      usableDesignProfiles.find((x) => x.id === profileId);
     if (!p) return;
     update((d) => ({
       ...d,
-      profileId: p.id,
+      // profile_id só referencia tweet_profiles; perfil de design vive no snapshot.
+      profileId: p.source === "design" ? null : p.id,
       profile: { name: p.name, handle: p.handle, avatarUrl: p.avatar_url },
     }));
   }
 
-  const profileInList = profiles.some((p) => p.id === draft.profileId);
+  // Perfil de design não tem profileId salvo: reconhece pelo snapshot.
+  const selectedProfileValue =
+    (draft.profileId && profiles.some((p) => p.id === draft.profileId) ? draft.profileId : null) ??
+    usableDesignProfiles.find(
+      (p) => p.name === profile.name && p.handle === profile.handle && p.avatar_url === profile.avatarUrl
+    )?.id ??
+    "";
+  const profileInList = selectedProfileValue !== "";
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 pb-24 sm:px-6">
@@ -241,17 +256,38 @@ export function TweetCarouselEditor({
         {/* Ajustes globais — valem para todos os cards */}
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <select
-            value={profileInList ? draft.profileId ?? "" : ""}
+            value={selectedProfileValue}
             onChange={(e) => changeProfile(e.target.value)}
             aria-label="Perfil"
             className="h-8 max-w-[14rem] rounded-lg border border-border bg-card px-2 text-[0.8125rem] font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           >
             {!profileInList && <option value="">{profile.name} ({profile.handle})</option>}
-            {profiles.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} ({p.handle})
-              </option>
-            ))}
+            {usableDesignProfiles.length > 0 ? (
+              <>
+                {profiles.length > 0 && (
+                  <optgroup label="Perfis tweet">
+                    {profiles.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.handle})
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                <optgroup label="Perfis de design">
+                  {usableDesignProfiles.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.handle})
+                    </option>
+                  ))}
+                </optgroup>
+              </>
+            ) : (
+              profiles.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} ({p.handle})
+                </option>
+              ))
+            )}
           </select>
 
           <SegmentedControl

@@ -50,17 +50,30 @@ function BackLink({ onClick, children }: { onClick: () => void; children: React.
   );
 }
 
+function GroupLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="pt-1 text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
+      {children}
+    </p>
+  );
+}
+
 /** Fluxo do carrossel tweet dentro do modal do gerador: perfil → modo → conteúdo. */
 export function TweetWizard({
   profiles: initialProfiles,
+  designProfiles = [],
   onBack,
 }: {
   profiles: TweetProfile[];
+  /** Perfis do Carrossel Avançado: entram com logo, nome e @ do Instagram. */
+  designProfiles?: TweetProfile[];
   onBack: () => void;
 }) {
   const router = useRouter();
   const [profiles, setProfiles] = useState(initialProfiles);
-  const [step, setStep] = useState<Step>(initialProfiles.length ? "profile" : "new-profile");
+  const [step, setStep] = useState<Step>(
+    initialProfiles.length || designProfiles.length ? "profile" : "new-profile"
+  );
   const [profileId, setProfileId] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>("ai");
   const [input, setInput] = useState("");
@@ -74,7 +87,9 @@ export function TweetWizard({
   const [uploading, setUploading] = useState(false);
   const [creating, setCreating] = useState(false);
 
-  const selected = profiles.find((p) => p.id === profileId) ?? null;
+  const selected =
+    profiles.find((p) => p.id === profileId) ?? designProfiles.find((p) => p.id === profileId) ?? null;
+  const hasAnyProfile = profiles.length > 0 || designProfiles.length > 0;
 
   async function uploadAvatar(file: File | undefined) {
     if (!file) return;
@@ -128,7 +143,13 @@ export function TweetWizard({
       const res = await fetch("/api/carousel/tweet/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profileId, mode, input: input.trim(), cardCount: cardCount ?? undefined }),
+        body: JSON.stringify({
+          profileId,
+          profileSource: selected?.source === "design" ? "design" : "tweet",
+          mode,
+          input: input.trim(),
+          cardCount: cardCount ?? undefined,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.id) throw new Error(data.error ?? "Falha ao gerar o carrossel");
@@ -151,6 +172,7 @@ export function TweetWizard({
         <>
           <BackLink onClick={onBack}>Tipo de carrossel</BackLink>
           <p className="text-sm font-semibold text-foreground">Qual perfil vai aparecer nos cards?</p>
+          {profiles.length > 0 && designProfiles.length > 0 && <GroupLabel>Perfis tweet</GroupLabel>}
           <div className="space-y-2">
             {profiles.map((p) => (
               <div
@@ -185,6 +207,38 @@ export function TweetWizard({
               </div>
             ))}
           </div>
+          {designProfiles.length > 0 && (
+            <>
+              <GroupLabel>Perfis de design</GroupLabel>
+              <div className="space-y-2">
+                {designProfiles.map((p) => {
+                  const noHandle = !p.handle;
+                  return (
+                    <button
+                      key={p.id}
+                      disabled={noHandle}
+                      onClick={() => {
+                        setProfileId(p.id);
+                        setStep("mode");
+                      }}
+                      className="flex w-full items-center gap-3 rounded-xl border border-border bg-card p-3 text-left transition-premium enabled:hover:border-primary/50 enabled:hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <Avatar src={p.avatar_url} name={p.name} />
+                      <div className="min-w-0 flex-1">
+                        <p className="flex items-center gap-1 truncate text-sm font-semibold text-foreground">
+                          {p.name}
+                          <VerifiedBadge size={15} />
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {noHandle ? "Sem @ do Instagram — cadastre em Perfis de design" : p.handle}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
           <Button variant="outline" className="w-full" onClick={() => setStep("new-profile")}>
             <Plus />
             Criar novo perfil
@@ -195,8 +249,8 @@ export function TweetWizard({
       {/* Passo 1b — novo perfil */}
       {step === "new-profile" && (
         <>
-          <BackLink onClick={() => (profiles.length ? setStep("profile") : onBack())}>
-            {profiles.length ? "Perfis salvos" : "Tipo de carrossel"}
+          <BackLink onClick={() => (hasAnyProfile ? setStep("profile") : onBack())}>
+            {hasAnyProfile ? "Perfis salvos" : "Tipo de carrossel"}
           </BackLink>
           <p className="text-sm font-semibold text-foreground">Novo perfil</p>
 

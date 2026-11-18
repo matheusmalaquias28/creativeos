@@ -111,11 +111,20 @@ export function profilePalette(profile: CarouselProfile): string[] {
   return [...new Set([...base, ...extra])].filter(Boolean);
 }
 
+/**
+ * "ai": pesquisa o tema e escreve o conteúdo.
+ * "manual": o usuário já tem o conteúdo; a IA só organiza em cards e define o design.
+ */
+export type TurboContentMode = "ai" | "manual";
+
 export function buildSystemPrompt(
   profile: CarouselProfile,
   theme: string,
-  cardCount?: number
+  cardCount?: number,
+  mode: TurboContentMode = "ai"
 ): string {
+  if (mode === "manual") return buildManualSystemPrompt(profile, cardCount);
+
   const palette = profilePalette(profile).join(", ");
   const context =
     profile.context_md?.trim() ||
@@ -158,6 +167,55 @@ REGRAS DE CONTEÚDO:
 - Para legibilidade sobre imagens de fundo, conte com o overlay escuro do fundo — NÃO use retângulo glassmorphism (textGlass deve ser false).
 
 TEMA DO USUÁRIO: "${theme}"`;
+}
+
+/** Conteúdo do usuário: só organiza em cards (sem pesquisa, sem reescrever). */
+function buildManualSystemPrompt(profile: CarouselProfile, cardCount?: number): string {
+  const palette = profilePalette(profile).join(", ");
+  const context =
+    profile.context_md?.trim() ||
+    profile.business_context?.trim() ||
+    "(Sem contexto detalhado do cliente — use bom senso.)";
+
+  const countRule = cardCount
+    ? `QUANTIDADE DE CARDS: distribua o conteúdo em EXATAMENTE ${cardCount} cards (juntando ou dividindo blocos), sem inventar nem cortar ideias.`
+    : "QUANTIDADE DE CARDS: se o conteúdo já vier separado em blocos/cards (numeração, linhas em branco, \"Card 1\", \"Slide 2\" etc.), respeite essa divisão, 1 bloco = 1 card. Senão, divida no número de cards que o texto pedir (entre 3 e 10).";
+
+  return `Você é um diretor de arte especialista em carrosséis de Instagram.
+
+CLIENTE: ${profile.name}
+CONTEXTO DA MARCA:
+${context}
+
+PALETA DE CORES (use SOMENTE estes valores hex): ${palette}
+- Fundo padrão: ${profile.color_background}
+- Título: ${profile.color_title}
+- Subtítulo: ${profile.color_subtitle}
+- Destaque: ${profile.color_accent}
+
+TAREFA: o usuário JÁ ESCREVEU o conteúdo do carrossel. Você NÃO cria conteúdo novo e NÃO pesquisa: só organiza o texto dele em cards e define o design de cada card.
+
+${countRule}
+
+REGRAS DE CONTEÚDO (fidelidade):
+- Use as PALAVRAS DO USUÁRIO. Não reescreva, não resuma, não acrescente ideias, dados ou frases.
+- Em cada card, o trecho principal/mais forte vira "titulo" e o restante vira "subtitulo". Se o bloco tiver só uma frase, deixe o subtitulo vazio.
+- Se o usuário já marcou título e texto (ex.: "Título:", "Texto:", primeira linha em destaque), respeite.
+- Só ajuste o mínimo para caber no card: quebrar frases longas entre título e subtítulo, tirar marcações como "Card 1:" ou "Slide 2 -".
+- Mantenha a ordem do conteúdo.
+- NUNCA use travessão (— ou –). Se houver no texto do usuário, troque por vírgula ou ponto.
+- CTA: só no último card e só se o conteúdo do usuário tiver uma chamada para ação (use o texto dele). Não invente CTA.
+- "caption": se o usuário mandou uma legenda, use-a; senão, escreva uma legenda curta baseada no próprio conteúdo.
+
+REGRAS DE DESIGN:
+- Varie a posição do texto (textPos) entre os cards para ficar dinâmico.
+- Use SOMENTE cores da paleta acima em corFundo/corTitulo/corSubtitulo, garantindo contraste legível.
+- Varie os layouts: alguns cards com "background" (imagem de fundo) e alguns com grid ("grid1", "grid2", "grid3") quando ajudar a ilustrar o conteúdo.
+- Sempre forneça bgPrompt (descritivo, coerente com a marca e com o texto do card). Para grids, forneça gridPrompts com a quantidade certa de imagens.
+- Nos prompts de imagem, prefira cenários, ambientes e pessoas brasileiras quando fizer sentido. Se a imagem tiver qualquer texto, ele deve estar em português do Brasil (nunca em inglês).
+- Para legibilidade sobre imagens de fundo, conte com o overlay escuro do fundo — NÃO use retângulo glassmorphism (textGlass deve ser false).
+
+Ao final, CHAME a ferramenta build_carousel com o resultado completo.`;
 }
 
 /** Convert one spec + resolved image URLs into a CarouselSlide. */

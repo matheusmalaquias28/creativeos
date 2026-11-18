@@ -13,6 +13,7 @@ import { getCarouselProfilesForUser } from "@/services/carousel-profiles";
 import { getClientOptionsForCurrentUser } from "@/services/clients";
 import { getTweetCarouselsForUser, getTweetProfilesForUser } from "@/services/tweet-carousels";
 import { TweetCarouselCard } from "@/components/carousel/tweet/tweet-carousel-card";
+import { designProfileToTweetProfile } from "@/types/tweet-carousel";
 import { StudioListCard } from "@/components/carousel-studio/studio-list-card";
 import { listStudioCarousels } from "@/services/carousel-studio";
 
@@ -54,7 +55,11 @@ export default async function CarouselPage() {
             <Palette />
             Perfis de design
           </Link>
-          <TurboButton profiles={turboProfiles} tweetProfiles={tweetProfiles} />
+          <TurboButton
+            profiles={turboProfiles}
+            tweetProfiles={tweetProfiles}
+            designTweetProfiles={profiles.map(designProfileToTweetProfile)}
+          />
           <CreateCarouselDialog />
         </>
       }

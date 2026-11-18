@@ -10,6 +10,7 @@ import {
   type TweetSpec,
 } from "@/lib/carousel/tweet/prompt";
 import {
+  designProfileToTweetProfile,
   makeTweetCard,
   type TweetProfile,
   type TweetProfileSnapshot,
@@ -21,6 +22,7 @@ const MAX_INPUT = 20_000;
 
 type GenerateBody = {
   profileId: string;
+  profileSource?: "tweet" | "design";
   mode: TweetContentMode;
   input: string;
   cardCount?: number;
@@ -54,12 +56,29 @@ export async function POST(req: NextRequest) {
       ? Math.round(body.cardCount)
       : undefined;
 
-  const { data: profileData } = await supabase
-    .from("tweet_profiles")
-    .select("*")
-    .eq("id", body.profileId)
-    .single();
-  const profile = profileData as TweetProfile | null;
+  // Perfil tweet próprio ou perfil de design do Carrossel Avançado (logo, nome e @).
+  let profile: TweetProfile | null = null;
+  if (body.profileSource === "design") {
+    const { data } = await supabase
+      .from("carousel_profiles")
+      .select("id, user_id, name, logo_url, instagram_handle, created_at, updated_at")
+      .eq("id", body.profileId)
+      .single();
+    profile = data ? designProfileToTweetProfile(data) : null;
+    if (profile && !profile.handle) {
+      return NextResponse.json(
+        { error: "Esse perfil de design não tem @ do Instagram cadastrado" },
+        { status: 400 }
+      );
+    }
+  } else {
+    const { data } = await supabase
+      .from("tweet_profiles")
+      .select("*")
+      .eq("id", body.profileId)
+      .single();
+    profile = data as TweetProfile | null;
+  }
   if (!profile) return NextResponse.json({ error: "Perfil não encontrado" }, { status: 404 });
 
   let spec: TweetSpec;
@@ -113,7 +132,8 @@ export async function POST(req: NextRequest) {
     .from("tweet_carousels")
     .insert({
       user_id: user.id,
-      profile_id: profile.id,
+      // profile_id referencia tweet_profiles; perfis de design ficam só no snapshot.
+      profile_id: profile.source === "design" ? null : profile.id,
       name: stripTravessao(spec.titulo?.trim() || "Carrossel tweet").slice(0, 80),
       profile: snapshot,
       cards,
