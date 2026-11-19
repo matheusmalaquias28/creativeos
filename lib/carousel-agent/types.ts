@@ -26,6 +26,8 @@ export type AgentRunOptions = {
   frame?: boolean;
   /** Versão da logo colada em código: auto (pelo contraste, padrão), light, dark ou false (sem logo). */
   logo?: "auto" | "light" | "dark" | false;
+  /** Em quais cards vai a logo: "edges" (capa e último, padrão) ou "all". */
+  logoCards?: "edges" | "all";
   /** Posição da logo (sem isso, a do perfil de design). */
   logoPosition?: "top-center" | "top-left" | "top-right" | null;
 };

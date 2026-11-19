@@ -282,8 +282,7 @@ export function buildCardPrompt(input: {
     refs.push(
       `Imagem ${order.cover} é a CAPA deste mesmo carrossel. Use exatamente os mesmos elementos visuais dela: paleta, fundo, tipografia (mesma fonte, peso e tamanho do título), caixas de texto, botões e tratamento de foto. Varie só o layout (onde ficam texto e imagem), para os cards não ficarem iguais à capa. Os cards precisam parecer da mesma peça. Não copie os textos da capa${
         input.reserveFooter ? " nem o rodapé dela (barra de progresso, @, ícones): a faixa de baixo fica vazia" : ""
-      }${input.reserveTop ? ". Não copie a logo da capa: o topo fica livre" : ""
-      }.`
+      }. Não copie a logo da capa${input.reserveTop ? ": o topo fica livre" : ""}.`
     );
   }
   if (order.logo) {

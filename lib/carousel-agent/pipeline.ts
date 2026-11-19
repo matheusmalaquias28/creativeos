@@ -37,6 +37,7 @@ import {
 import { reviewCardText } from "./qa";
 import { downloadImage, finalizeCard } from "./images";
 import { prepareLogo } from "./logo";
+import { logoOnCard } from "./logo-layout";
 import { renderTweetCard } from "./tweet-render";
 import { getRun, notifyAgent, toAgentRun, type Admin } from "./runs";
 import { GENERATION_TIME_BUDGET_MS, reserveImage } from "./limits";
@@ -247,13 +248,17 @@ export async function runGeneration(runId: string, opts: GenerationOptions = {})
             return null;
           })
         : null;
-    const logoFor = logoAsset && logoMode !== false
-      ? {
-          asset: logoAsset,
-          position: run.options.logoPosition ?? profile.logo_position ?? "top-center",
-          mode: logoMode,
-        }
-      : null;
+    const logoApply =
+      logoAsset && logoMode !== false
+        ? {
+            asset: logoAsset,
+            position: run.options.logoPosition ?? profile.logo_position ?? "top-left",
+            mode: logoMode,
+          }
+        : null;
+    // Padrão: logo só na capa e no último card (o @ já está no rodapé de todos).
+    const logoFor = (index: number) =>
+      logoApply && logoOnCard(index, plan.cards.length, run.options.logoCards ?? "edges") ? logoApply : null;
     // Rodapé fixo (barra de progresso, @, ícones) aplicado em código depois da arte.
     const useFrame = !isTweet && run.options.frame !== false;
     const framePalette = brandPalette(profile);
@@ -337,7 +342,7 @@ export async function runGeneration(runId: string, opts: GenerationOptions = {})
         index,
         format: run.format,
         hasLogo: false,
-        reserveTop: !!logoFor,
+        reserveTop: !!logoFor(index),
         coverAsReference: coverRef.length > 0,
         profileReferenceCount: profileRefs.length,
         instruction: run.cards[index].instruction,
@@ -358,7 +363,7 @@ export async function runGeneration(runId: string, opts: GenerationOptions = {})
           resolution: "2K",
           quality: imageQuality(),
         });
-        const { url, path } = await uploadCard(index, await finalizeCard(buffer, { frame: frameFor(index), logo: logoFor }));
+        const { url, path } = await uploadCard(index, await finalizeCard(buffer, { frame: frameFor(index), logo: logoFor(index) }));
         const qa = await reviewCardText(url, expectedTexts(plan, index), profile.name).catch((e) => {
           console.warn("[carousel-agent] revisão falhou", e instanceof Error ? e.message : e);
           return null;

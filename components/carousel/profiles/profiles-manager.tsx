@@ -370,16 +370,16 @@ function ProfileEditor({
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground">Posição da logo no Agente</label>
                 <select
-                  value={draft.logo_position ?? "top-center"}
+                  value={draft.logo_position ?? "top-left"}
                   onChange={(e) => patch({ logo_position: e.target.value as CarouselProfileDraft["logo_position"] })}
                   className="h-10 w-full rounded-xl border border-border bg-input px-3.5 text-sm text-foreground outline-none transition-premium hover:border-border-strong focus-visible:border-primary/60 focus-visible:ring-3 focus-visible:ring-ring/20 [&>option]:bg-popover [&>option]:text-popover-foreground"
                 >
-                  <option value="top-center">Topo, centralizada</option>
                   <option value="top-left">Topo, à esquerda</option>
+                  <option value="top-center">Topo, centralizada</option>
                   <option value="top-right">Topo, à direita</option>
                 </select>
                 <p className="text-xs text-muted-foreground">
-                  A logo é colada por cima da arte, sempre no mesmo lugar. Use PNG transparente na logo principal.
+                  Vai na capa e no último card, sempre no mesmo lugar. Use PNG transparente na logo principal.
                 </p>
               </div>
             </div>

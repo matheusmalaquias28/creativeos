@@ -7,6 +7,12 @@ import type { LogoPosition } from "@/types/carousel-profile";
 
 export type { LogoPosition };
 export type LogoMode = "auto" | "light" | "dark";
+/** Em quais cards vai a logo: "edges" = capa e último (padrão), "all" = todos. */
+export type LogoCards = "edges" | "all";
+
+export function logoOnCard(index: number, total: number, cards: LogoCards = "edges"): boolean {
+  return cards === "all" || index === 0 || index === total - 1;
+}
 
 /** Caixa máxima da logo e margens, em px do card 1080×1350. */
 export const LOGO_MAX_WIDTH = 300;

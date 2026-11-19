@@ -30,9 +30,11 @@ agente ─POST /runs─▶ fila ─▶ plano (GPT: textos, guia de estilo, legen
 - **Tweet:** foto do perfil = "Logo do perfil do Instagram" do perfil de design
   (ou a logo normal), nome do perfil e o @. Fonte Inter (baixada do Google Fonts
   e guardada em memória); se falhar, cai na Noto Sans do `next/og`.
-- **Logo (`logo.ts`):** colada em código depois da arte, sempre no mesmo lugar
-  (posição do perfil de design: topo centralizado, à esquerda ou à direita). A IA
-  só deixa os primeiros 16% do topo sem texto e não desenha logo. Versões: a
+- **Logo (`logo.ts`):** colada em código depois da arte, só na capa e no último
+  card (o @ já está no rodapé de todos; `"logoCards": "all"` põe em todos),
+  sempre no mesmo lugar (posição do perfil de design; padrão: topo à esquerda,
+  para não cair no rosto das pessoas das fotos). Nesses cards a IA deixa os
+  primeiros 16% do topo sem texto; em nenhum card ela desenha logo. Versões: a
   logo principal e a "logo clara" do perfil (enviadas) + a logo toda branca e
   toda na cor escura da marca (geradas). Em cada card, o código mede o fundo
   embaixo da logo e escolhe a de mais contraste (prefere as enviadas); em foto
@@ -111,6 +113,7 @@ Base: `https://creative.energymidia.com.br`. Todas as chamadas usam
 | `visualDirection` | não | Direção de arte do pedido inteiro, até 4 mil caracteres: fundo, se tem foto ou não (e em quais cards), estilo da foto, o que evitar. Vale acima das regras visuais padrão. Ignorado no `tweet`. |
 | `brandFrame` | não | `true` (padrão): rodapé fixo da marca desenhado em código (barra de progresso, @, ícones). `false` desliga. Ignorado no `tweet`. |
 | `logo` | não | `"auto"` (padrão: versão pelo contraste com o fundo), `"light"`, `"dark"` ou `false` (sem logo). Ignorado no `tweet`. |
+| `logoCards` | não | `"edges"` (padrão: logo só na capa e no último card) ou `"all"` (todos). |
 | `logoPosition` | não | `"top-center"`, `"top-left"` ou `"top-right"`. Sem isso, a posição do perfil de design. |
 | `cards` | não | Cards prontos, na ordem: `[{ "text": "…", "visual": "…" }]`. O texto não é reescrito (vira `mode: "manual"`, 1 card por item; `cardCount` é ignorado). `visual` (opcional, até 2 mil caracteres) é a direção daquele card e é usada ao pé da letra; sem ele, a IA decide pelas regras padrão. `carousel`: 2 a 10 cards; `single`: exatamente 1. No `tweet`, `visual` é ignorado. |
 | `theme` | não | Só no `tweet`: `"light"` (padrão) ou `"dark"`. |

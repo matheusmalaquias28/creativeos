@@ -393,3 +393,24 @@ describe("logo aplicada em código", () => {
     expect(createRunSchema.safeParse({ instagram: "@x", content: "tema", logo: "branca" }).success).toBe(false);
   });
 });
+
+import { logoOnCard } from "../logo-layout";
+
+describe("logo só na capa e no último card", () => {
+  it("edges (padrão): primeiro e último; all: todos; arte única: o único card", () => {
+    expect([0, 1, 2, 3, 4, 5].map((i) => logoOnCard(i, 6))).toEqual([true, false, false, false, false, true]);
+    expect([0, 1, 2].map((i) => logoOnCard(i, 3, "all"))).toEqual([true, true, true]);
+    expect(logoOnCard(0, 1)).toBe(true);
+  });
+
+  it("cards do meio não copiam a logo da capa", () => {
+    const p = buildCardPrompt({ plan, index: 1, hasLogo: false, coverAsReference: true, profileReferenceCount: 0 });
+    expect(p).toContain("Não copie a logo da capa.");
+    expect(p).not.toContain("FAIXA RESERVADA NO TOPO");
+  });
+
+  it("agente escolhe logoCards", () => {
+    const f = runFieldsFromBody(createRunSchema.parse({ instagram: "@x", content: "tema", logoCards: "all" }));
+    expect(f.options.logoCards).toBe("all");
+  });
+});

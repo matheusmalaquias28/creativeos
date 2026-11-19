@@ -78,7 +78,7 @@ function draftToRow(draft: CarouselProfileDraft) {
     instagram_avatar_storage_path: draft.instagram_avatar_storage_path ?? null,
     logo_light_url: draft.logo_light_url ?? null,
     logo_light_storage_path: draft.logo_light_storage_path ?? null,
-    logo_position: draft.logo_position ?? "top-center",
+    logo_position: draft.logo_position ?? "top-left",
     business_context: draft.business_context,
     context_md: draft.context_md,
   };

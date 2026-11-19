@@ -67,7 +67,7 @@ export function makeEmptyProfileDraft(): CarouselProfileDraft {
     instagram_avatar_storage_path: null,
     logo_light_url: null,
     logo_light_storage_path: null,
-    logo_position: "top-center",
+    logo_position: "top-left",
     business_context: null,
     context_md: null,
   };

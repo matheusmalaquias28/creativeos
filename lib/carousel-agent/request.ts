@@ -23,6 +23,8 @@ export const createRunSchema = z
     brandFrame: z.boolean().optional(),
     /** Logo colada em código: "auto" (versão pelo contraste, padrão), "light", "dark" ou false (sem logo). */
     logo: z.union([z.enum(["auto", "light", "dark"]), z.literal(false)]).optional(),
+    /** Em quais cards vai a logo: "edges" (capa e último, padrão) ou "all" (todos). */
+    logoCards: z.enum(["edges", "all"]).optional(),
     /** Posição da logo; sem isso, a do perfil de design. */
     logoPosition: z.enum(["top-center", "top-left", "top-right"]).optional(),
     /** carousel (padrão): cards em imagem · single: arte única · tweet: carrossel "print de tweet". */
@@ -67,6 +69,7 @@ export function runFieldsFromBody(body: CreateRunBody): {
         frame: body.brandFrame !== false,
         ...(body.logo !== undefined ? { logo: body.logo } : {}),
         ...(body.logoPosition ? { logoPosition: body.logoPosition } : {}),
+        ...(body.logoCards ? { logoCards: body.logoCards } : {}),
       };
 
   if (body.cards?.length) {
