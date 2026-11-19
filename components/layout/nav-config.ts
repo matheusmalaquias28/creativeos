@@ -114,6 +114,7 @@ export const NAV_SECTIONS: NavSection[] = [
           { href: "/carousel", label: "Todos os carrosséis" },
           { href: "/carousel/estilos", label: "Estilos" },
           { href: "/carousel/perfis", label: "Perfis" },
+          { href: "/carousel/agente", label: "Agente" },
         ],
       },
       {
@@ -172,7 +173,8 @@ export function isNavChildActive(pathname: string, href: string) {
       pathname === "/carousel" ||
       (pathname.startsWith("/carousel/") &&
         !pathname.startsWith("/carousel/perfis") &&
-        !pathname.startsWith("/carousel/estilos"))
+        !pathname.startsWith("/carousel/estilos") &&
+        !pathname.startsWith("/carousel/agente"))
     );
   }
   return isNavItemActive(pathname, href);
