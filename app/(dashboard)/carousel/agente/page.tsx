@@ -1,5 +1,6 @@
 import { DashboardPage } from "@/components/layout/dashboard-page";
 import { AgentRunsBoard } from "@/components/carousel-agent/agent-runs-board";
+import { ResetUsageButton } from "@/components/carousel-agent/reset-usage-button";
 import { layout } from "@/lib/design/tokens";
 import { isAdminRole } from "@/lib/auth/permissions";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -16,13 +17,16 @@ async function UsageLine() {
   const [used, limit, active] = [await imagesUsedLast24h(createAdminClient()), dailyImageLimit(), maxActiveRuns()];
   const pct = limit > 0 ? used / limit : 1;
   return (
-    <p className="text-xs text-muted-foreground">
-      Imagens geradas nas últimas 24h:{" "}
-      <span className={pct >= 1 ? "font-semibold text-tone-red" : pct >= 0.8 ? "font-semibold text-tone-amber" : "font-semibold text-foreground"}>
-        {used} de {limit}
-      </span>{" "}
-      · até {active} pedido{active > 1 ? "s" : ""} gerando ao mesmo tempo · cada card é gerado uma vez (refazer é manual)
-    </p>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      <p className="text-xs text-muted-foreground">
+        Imagens geradas nas últimas 24h:{" "}
+        <span className={pct >= 1 ? "font-semibold text-tone-red" : pct >= 0.8 ? "font-semibold text-tone-amber" : "font-semibold text-foreground"}>
+          {used} de {limit}
+        </span>{" "}
+        · até {active} pedido{active > 1 ? "s" : ""} gerando ao mesmo tempo · cada card é gerado uma vez (refazer é manual)
+      </p>
+      <ResetUsageButton used={used} limit={limit} />
+    </div>
   );
 }
 

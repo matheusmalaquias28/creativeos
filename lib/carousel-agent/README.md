@@ -54,6 +54,9 @@ agente ─POST /runs─▶ fila ─▶ plano (GPT: textos, guia de estilo, legen
 - Pedido novo, refazer e retomar são recusados com **429** quando já há pedidos
   demais gerando ou quando o teto do dia não comporta as imagens do pedido.
 - O carrossel tweet não gera imagem e não entra no teto.
+- **Zerar limite** (botão na aba, só admin logado; `POST /api/carousel-agent/usage/reset`):
+  apaga as reservas das últimas 24h e o agente volta a ter o teto inteiro. O teto
+  continua valendo a partir dali; a chave do agente não consegue zerar.
 - A aba mostra quantas imagens já foram usadas nas últimas 24h.
 - **Conta:** sai do @ do perfil de design. Precisa ser uma conta conectada nas
   variáveis `INSTAGRAM_ACCESS_TOKEN*`. Se não for, o pedido é recusado na hora.

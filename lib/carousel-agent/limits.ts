@@ -51,6 +51,21 @@ export async function imagesUsedLast24h(admin: Admin): Promise<number> {
   return count ?? 0;
 }
 
+/**
+ * Zera o teto diário na hora (botão "Zerar limite" da aba, só admin): apaga as
+ * reservas das últimas 24h. O teto continua valendo daqui para a frente.
+ * Retorna quantas imagens estavam contando.
+ */
+export async function resetImageUsage(admin: Admin): Promise<number> {
+  const since = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
+  const { count, error } = await admin
+    .from("carousel_agent_image_usage")
+    .delete({ count: "exact" })
+    .gt("created_at", since);
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
 /** Reserva uma imagem do teto diário. false = teto atingido, não gere. */
 export async function reserveImage(admin: Admin, runId: string): Promise<boolean> {
   const { data, error } = await admin.rpc("reserve_carousel_agent_image", {
