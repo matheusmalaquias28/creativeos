@@ -10,9 +10,15 @@ export type AgentRunStatus =
 
 export type AgentRunMode = "ai" | "manual";
 
-/** carousel: cards em imagem · single: arte única · tweet: carrossel "print de tweet". */
-export type AgentFormat = "carousel" | "single" | "tweet";
-export const AGENT_FORMATS: AgentFormat[] = ["carousel", "single", "tweet"];
+/**
+ * carousel: cards em imagem · single: arte única · tweet: carrossel "print de tweet" ·
+ * studio: cards montados nas páginas-modelo de um estilo do Carrossel Studio.
+ */
+export type AgentFormat = "carousel" | "single" | "tweet" | "studio";
+export const AGENT_FORMATS: AgentFormat[] = ["carousel", "single", "tweet", "studio"];
+
+/** Card pedido no formato studio (texto exato; visual e modelo opcionais). */
+export type AgentStudioCard = { text: string; visual?: string | null; template?: string | null; cta?: string | null };
 
 export type TweetTheme = "light" | "dark";
 export type AgentRunOptions = {
@@ -28,6 +34,10 @@ export type AgentRunOptions = {
   logo?: "auto" | "light" | "dark" | false;
   /** Em quais cards vai a logo: "edges" (capa e último, padrão) ou "all". */
   logoCards?: "edges" | "all";
+  /** Studio: estilo do acervo, cards pedidos e o carrossel do Studio criado para o pedido. */
+  styleId?: string | null;
+  studioCards?: AgentStudioCard[] | null;
+  studioCarouselId?: string | null;
   /** Posição da logo (sem isso, a do perfil de design). */
   logoPosition?: "top-center" | "top-left" | "top-right" | null;
 };

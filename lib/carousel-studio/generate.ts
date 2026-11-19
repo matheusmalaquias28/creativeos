@@ -87,7 +87,20 @@ export function isGenerationStale(generation: StudioGeneration | null | undefine
   return Date.now() - newest > STALE_GENERATION_MS;
 }
 
-export async function runStudioGeneration(carouselId: string): Promise<void> {
+/**
+ * Entradas de quem não é demanda (Agente de Carrossel): as artes vêm direto e
+ * cada imagem passa pelo teto de gasto do agente antes de ser gerada.
+ */
+export type StudioGenerationOptions = {
+  artes?: DemandArte[];
+  handle?: string | null;
+  /** Logo a usar no lugar da logo da ficha (ex.: PNG transparente do perfil de design). */
+  logoUrl?: string | null;
+  /** Reserva uma imagem do teto; false = não gera (a camada fica "falhou"). */
+  reserveImage?: () => Promise<boolean>;
+};
+
+export async function runStudioGeneration(carouselId: string, opts: StudioGenerationOptions = {}): Promise<void> {
   const supabase = createAdminClient();
   const startedAt = Date.now();
   const runId = randomUUID();
@@ -125,8 +138,8 @@ export async function runStudioGeneration(carouselId: string): Promise<void> {
   try {
     // 1. Demanda + ficha
     let title = row.name;
-    let artes: DemandArte[] = [];
-    let handle: string | null = null;
+    let artes: DemandArte[] = opts.artes ?? [];
+    let handle: string | null = opts.handle ?? null;
     let clientId = row.client_id;
     const demandReferenceUrls: string[] = [];
 
@@ -154,7 +167,8 @@ export async function runStudioGeneration(carouselId: string): Promise<void> {
     }
     demandReferenceUrls.push(...((row.reference_urls as string[] | null) ?? []));
 
-    const brand = await loadStudioBrandKit({ clientId, handle });
+    const loadedBrand = await loadStudioBrandKit({ clientId, handle });
+    const brand = opts.logoUrl ? { ...loadedBrand, logoUrl: opts.logoUrl } : loadedBrand;
     const format = isStudioFormat(row.format) ? row.format : "4:5";
 
     // Estilo do acervo: a tipografia é do estilo (ignora as fontes do perfil
@@ -278,6 +292,9 @@ export async function runStudioGeneration(carouselId: string): Promise<void> {
           if (Date.now() - startedAt > RUN_BUDGET_MS - 60_000) {
             layer.status = "failed";
             layer.error = "Tempo da geração esgotado — gere esta imagem de novo.";
+          } else if (opts.reserveImage && !(await opts.reserveImage())) {
+            layer.status = "failed";
+            layer.error = "Limite diário de imagens do agente atingido.";
           } else {
             try {
               const result = await generateStudioImage({

@@ -19,7 +19,15 @@ export type BrandFrameInput = {
   accent: string;
   /** Cores da marca, para achar a "tinta" escura sobre fundo claro. */
   palette: string[];
+  /**
+   * Só a barra de progresso, sem pintar a faixa nem desenhar @/ícones: o modelo
+   * do Studio já traz o rodapé como camadas (editável no editor).
+   */
+  progressOnly?: boolean;
 };
+
+/** Distância do topo da faixa até a barra de progresso (mesma posição nos dois modos). */
+export const PROGRESS_TOP = 33;
 
 export type Rgb = { r: number; g: number; b: number };
 

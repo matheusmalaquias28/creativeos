@@ -414,3 +414,71 @@ describe("logo só na capa e no último card", () => {
     expect(f.options.logoCards).toBe("all");
   });
 });
+
+import { splitStudioText } from "@/lib/carousel-studio/server-text";
+import { placeImage } from "@/lib/carousel-studio/server-image";
+import { studioCardsToArtes, pageTexts } from "../studio-shape";
+
+describe("formato studio", () => {
+  it("texto do Studio em palavras, com destaque grudado na pontuação", () => {
+    const [p1, p2] = splitStudioText("Aposentadoria *negada pelo INSS*?\nVeja");
+    expect(p1.map((w) => w.map((x) => `${x.accent ? "*" : ""}${x.text}`).join(""))).toEqual([
+      "Aposentadoria",
+      "*negada",
+      "*pelo",
+      "*INSS?",
+    ]);
+    expect(p1[3]).toEqual([{ text: "INSS", accent: true }, { text: "?", accent: false }]);
+    expect(p2).toEqual([[{ text: "Veja", accent: false }]]);
+    expect(splitStudioText("a\n\nb")[1]).toEqual([]);
+    expect(splitStudioText("ação", true)[0][0][0].text).toBe("AÇÃO");
+  });
+
+  it("imagem: cover centraliza e corta; contain cabe inteira; zoom a partir do foco", () => {
+    expect(placeImage({ boxW: 100, boxH: 100, imgW: 200, imgH: 100, fit: "cover", focusX: 50, focusY: 50, zoom: 1 })).toEqual({
+      left: -50, top: 0, width: 200, height: 100,
+    });
+    expect(placeImage({ boxW: 100, boxH: 100, imgW: 200, imgH: 100, fit: "contain", focusX: 50, focusY: 50, zoom: 3 })).toEqual({
+      left: 0, top: 25, width: 100, height: 50,
+    });
+    const z = placeImage({ boxW: 100, boxH: 100, imgW: 100, imgH: 100, fit: "cover", focusX: 0, focusY: 0, zoom: 2 });
+    expect(z).toEqual({ left: 0, top: 0, width: 200, height: 200 });
+  });
+
+  it("cards do agente viram artes do briefing (CTA na última linha do último card)", () => {
+    const artes = studioCardsToArtes([
+      { text: "Título 1\nApoio 1", visual: "foto de idosa", template: "M1" },
+      { text: "Fecho\nApoio\nFale com a Previtas" },
+    ]);
+    expect(artes[0]).toMatchObject({ headline: "Título 1", subheadline: "Apoio 1", cta: "", observacaoVisual: "Use o modelo M1. foto de idosa" });
+    expect(artes[1]).toMatchObject({ headline: "Fecho", subheadline: "Apoio", cta: "Fale com a Previtas" });
+  });
+
+  it("pedido studio exige styleId e cards; sem rodapé/logo do agente", () => {
+    expect(createRunSchema.safeParse({ instagram: "@x", format: "studio", cards: [{ text: "a" }, { text: "b" }] }).success).toBe(false);
+    const body = createRunSchema.parse({
+      instagram: "@x",
+      format: "studio",
+      styleId: "cc3baa8e-a2a4-4de2-9375-650ee01f9f50",
+      cards: [{ text: "a", template: "m2" }, { text: "b" }],
+    });
+    const f = runFieldsFromBody(body);
+    expect(f.options).toMatchObject({ styleId: body.styleId, frame: false, logo: false });
+    expect(f.options.studioCards?.[0].template).toBe("M2");
+    expect(createRunSchema.safeParse({ ...body, cards: [{ text: "a", template: "capa" }, { text: "b" }] }).success).toBe(false);
+  });
+
+  it("textos da página na ordem de leitura, sem marcadores de destaque", () => {
+    const base = { name: "", rotation: 0, opacity: 1, width: 100, height: 50, x: 0 };
+    const page = {
+      id: "p", name: "P", background: "#fff",
+      layers: [
+        { ...base, id: "b", type: "button", y: 900, text: "Saiba mais" },
+        { ...base, id: "t2", type: "text", y: 400, text: "apoio" },
+        { ...base, id: "t1", type: "text", y: 100, text: "Título *forte*" },
+        { ...base, id: "h", type: "text", y: 50, text: "oculto", hidden: true },
+      ],
+    } as never;
+    expect(pageTexts(page)).toEqual({ texts: ["Título forte", "apoio"], cta: "Saiba mais" });
+  });
+});

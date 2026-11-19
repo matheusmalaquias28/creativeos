@@ -39,6 +39,8 @@ export const GENERATION_TIME_BUDGET_MS = 190_000;
 export function estimatedImages(format: AgentFormat, cardCount: number | null): number {
   if (format === "tweet") return 0;
   if (format === "single") return 1;
+  // Studio: só as fotos dos campos de imagem (no máximo ~1 por card).
+  if (format === "studio") return cardCount ?? 7;
   return cardCount ?? 7;
 }
 

@@ -6,7 +6,7 @@ export function toAgentRun(row: any): AgentRun {
   return {
     ...row,
     mode: row.mode === "manual" ? "manual" : "ai",
-    format: (["carousel", "single", "tweet"].includes(row.format) ? row.format : "carousel") as AgentFormat,
+    format: (["carousel", "single", "tweet", "studio"].includes(row.format) ? row.format : "carousel") as AgentFormat,
     options: (row.options && typeof row.options === "object" ? row.options : {}) as AgentRunOptions,
     status: row.status as AgentRunStatus,
     plan: (row.plan ?? null) as AgentPlan | null,

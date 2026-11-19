@@ -12,10 +12,15 @@ import { AGENT_CARD_HEIGHT, AGENT_CARD_WIDTH } from "./types";
  */
 export async function finalizeCard(
   art: Buffer,
-  opts: { frame?: BrandFrameInput | null; logo?: LogoApplyInput | null } = {}
+  opts: {
+    frame?: BrandFrameInput | null;
+    logo?: LogoApplyInput | null;
+    /** A arte já é 1080×1350 com a faixa de baixo livre (modelos do Studio): só desenha o rodapé por cima. */
+    frameOverlay?: boolean;
+  } = {}
 ): Promise<Buffer> {
   const { frame, logo } = opts;
-  let canvas: Buffer = frame
+  let canvas: Buffer = frame && !opts.frameOverlay
     ? await withFooterBand(art)
     : await sharp(art)
         .resize(AGENT_CARD_WIDTH, AGENT_CARD_HEIGHT, { fit: "cover", position: "centre" })
@@ -49,9 +54,9 @@ async function withFooterBand(art: Buffer): Promise<Buffer> {
     .resize(AGENT_CARD_WIDTH, artHeight, { fit: "cover", position: "centre" })
     .png()
     .toBuffer();
-  const edge = await sharp(top)
-    .extract({ left: 0, top: artHeight - 6, width: AGENT_CARD_WIDTH, height: 6 })
-    .stats();
+  // stats() do sharp ignora o extract encadeado: recorta antes, mede depois.
+  const edgeStrip = await sharp(top).extract({ left: 0, top: artHeight - 6, width: AGENT_CARD_WIDTH, height: 6 }).toBuffer();
+  const edge = await sharp(edgeStrip).stats();
   const [r, g, b] = edge.channels.map((c) => Math.round(c.mean));
   return sharp(top)
     .extend({ bottom: FOOTER_BAND_HEIGHT, background: { r, g, b, alpha: 1 } })

@@ -33,7 +33,7 @@ export type LogoApplyInput = {
 };
 
 /** PNG com transparência de verdade; logo com fundo branco chapado perde o fundo. */
-async function toTransparent(input: Buffer): Promise<Buffer> {
+export async function toTransparent(input: Buffer): Promise<Buffer> {
   const img = sharp(input).ensureAlpha();
   const { data, info } = await img.raw().toBuffer({ resolveWithObject: true });
   const { width, height } = info;
@@ -58,6 +58,31 @@ async function toTransparent(input: Buffer): Promise<Buffer> {
     }
   }
   return sharp(data, { raw: { width, height, channels: 4 } }).png().toBuffer();
+}
+
+/**
+ * Versão clara da logo para fundo escuro/foto: o que é escuro (texto, contorno)
+ * vira branco e as cores vivas (ex.: o laranja do ícone) ficam. PNG transparente.
+ */
+export async function lightLogoVersion(png: Buffer): Promise<Buffer> {
+  const { data, info } = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] === 0) continue;
+    const r = data[i], g = data[i + 1], b = data[i + 2];
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    const saturation = max === 0 ? 0 : (max - min) / max;
+    const lum = luminance({ r, g, b });
+    // Escuro e pouco saturado (ou só escuro): vira branco. Cor viva: fica.
+    if (lum < 0.18 && !(saturation > 0.6 && max > 140)) {
+      data[i] = 255;
+      data[i + 1] = 255;
+      data[i + 2] = 255;
+    }
+  }
+  return sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } })
+    .trim({ threshold: 1 })
+    .png()
+    .toBuffer();
 }
 
 /** Corta as bordas transparentes e cabe na caixa da logo. */
@@ -132,7 +157,8 @@ export async function applyLogo(card: Buffer, input: LogoApplyInput): Promise<Bu
     width: Math.min(W - Math.max(0, at.left - pad), ref.width + pad * 2),
     height: Math.min(H - Math.max(0, at.top - pad), ref.height + pad * 2),
   };
-  const stats = await sharp(card).extract(region).stats();
+  // stats() do sharp ignora o extract encadeado: recorta antes, mede depois.
+  const stats = await sharp(await sharp(card).extract(region).toBuffer()).stats();
   const [r, g, b] = stats.channels;
   const bg: Rgb = { r: r.mean, g: g.mean, b: b.mean };
   const bgLum = luminance(bg);

@@ -38,6 +38,7 @@ import { reviewCardText } from "./qa";
 import { downloadImage, finalizeCard } from "./images";
 import { prepareLogo } from "./logo";
 import { logoOnCard } from "./logo-layout";
+import { loadStudioDocument, pageTexts, planStudioRun, renderStudioCard } from "./studio";
 import { renderTweetCard } from "./tweet-render";
 import { getRun, notifyAgent, toAgentRun, type Admin } from "./runs";
 import { GENERATION_TIME_BUDGET_MS, reserveImage } from "./limits";
@@ -200,8 +201,19 @@ export async function runGeneration(runId: string, opts: GenerationOptions = {})
     const profile = profileRow as CarouselProfile | null;
     if (!profile) throw new Error("O perfil de design deste carrossel foi excluído.");
 
-    // 1. Plano
-    if (!run.plan) {
+    // 1. Plano (studio: o Carrossel Studio monta as páginas a partir dos modelos)
+    if (!run.plan && run.format === "studio") {
+      const studio = await planStudioRun(admin, run, profile, () => reserveImage(admin, run.id));
+      const options = { ...run.options, studioCarouselId: studio.studioCarouselId };
+      run = {
+        ...run,
+        options,
+        plan: studio.plan,
+        caption: buildCaption(studio.plan),
+        cards: studio.plan.cards.map((_, i) => emptyCard(i)),
+      };
+      await save({ plan: studio.plan as unknown as Json, caption: run.caption, options: options as unknown as Json });
+    } else if (!run.plan) {
       const plan = await makePlan(profile, run);
       run = { ...run, plan, caption: buildCaption(plan), cards: plan.cards.map((_, i) => emptyCard(i)) };
       await save({ plan: plan as unknown as Json, caption: run.caption });
@@ -228,6 +240,12 @@ export async function runGeneration(runId: string, opts: GenerationOptions = {})
     await save();
 
     const isTweet = run.format === "tweet";
+    // Studio: documento atual (pega ajustes feitos no editor do Studio).
+    const studioDoc =
+      run.format === "studio" && run.options.studioCarouselId
+        ? await loadStudioDocument(admin, run.options.studioCarouselId)
+        : null;
+    if (run.format === "studio" && !studioDoc) throw new Error("Pedido studio sem carrossel do Studio.");
     const tweetProfile = designProfileToTweetProfile(profile);
     const theme = run.options.theme === "dark" ? "dark" : "light";
     const avatar =
@@ -270,6 +288,8 @@ export async function runGeneration(runId: string, opts: GenerationOptions = {})
             handle: run.ig_username ?? profile.instagram_handle,
             accent: profile.color_accent,
             palette: framePalette,
+            // Studio: o @ e os ícones são camadas do modelo; o código só põe a barra.
+            progressOnly: run.format === "studio",
           }
         : null;
     const profileRefs = (profile.reference_images ?? [])
@@ -319,9 +339,34 @@ export async function runGeneration(runId: string, opts: GenerationOptions = {})
       await save();
     };
 
+    // Studio: a página é desenhada no servidor; texto exato, sem modelo de imagem.
+    const generateStudioCard = async (index: number) => {
+      if (fenced || !studioDoc) return;
+      run.cards[index] = { ...run.cards[index], status: "generating", attempts: run.cards[index].attempts + 1 };
+      await save();
+      try {
+        const png = await renderStudioCard(studioDoc, index);
+        // Rodapé do agente (barra de progresso, @, ícones) por cima da faixa de baixo do modelo.
+        const { url, path } = await uploadCard(index, await finalizeCard(png, { frame: frameFor(index), frameOverlay: true }));
+        const page = studioDoc.pages[index];
+        if (page) {
+          const { texts, cta } = pageTexts(page);
+          plan.cards[index] = { ...plan.cards[index], texts, cta };
+        }
+        run.cards[index] = { ...run.cards[index], status: "ready", url, path, prompt: null, qa: null, error: null };
+        await save({ plan: plan as unknown as Json });
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Erro ao desenhar o card";
+        console.error(`[carousel-agent] card studio ${index + 1}`, message);
+        run.cards[index] = { ...run.cards[index], status: run.cards[index].url ? "ready" : "failed", error: message };
+        await save();
+      }
+    };
+
     const generateCard = async (index: number) => {
       if (fenced) return;
       if (isTweet) return generateTweetCard(index);
+      if (studioDoc) return generateStudioCard(index);
       const cover = index > 0 && run.format === "carousel" ? run.cards[0] : null;
       const coverRef = cover?.status === "ready" && cover.url ? [{ url: cover.url }] : [];
       const fail = async (message: string) => {

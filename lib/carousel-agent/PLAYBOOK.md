@@ -1,8 +1,42 @@
 # Playbook do agente: como pedir carrossel ao CreativeOS
 
-Cole isto nas instruções do agente. É o mesmo jeito de pedir que gerou o
-carrossel de teste da Previtas que ficou bom (contrato completo da API no
-[README](README.md)).
+Cole isto nas instruções do agente (contrato completo da API no [README](README.md)).
+
+## Previtas: use o formato studio (padrão)
+
+Os cards saem das páginas-modelo do estilo **Previtas** do Carrossel Studio: capa com
+foto no padrão da marca, miolos numerados (claro/escuro), destaque com etiqueta,
+miolo com foto e CTA final. Texto exato, só as fotos passam pela IA (~1 a 2 por
+carrossel), tudo editável no Studio.
+
+```json
+{
+  "instagram": "@previtasbrasil_",
+  "format": "studio",
+  "styleId": "772f8391-4614-458b-8463-d592f19b6de8",
+  "brandFrame": true,
+  "content": "Público, tom e objetivo (vira contexto da legenda).",
+  "cards": [
+    { "text": "*Auxílio-acidente:* quando uma sequela muda sua rotina de trabalho\nEntenda quando pode existir esse direito.", "template": "M1", "visual": "Foto: trabalhador brasileiro de uns 45 anos com o braço na tipoia, sentado à mesa de um escritório claro" },
+    { "text": "1. Quem tem direito\nSegurado que ficou com sequela permanente depois de um acidente." },
+    { "text": "2. Não precisa parar de trabalhar\nO benefício é uma indenização e pode ser recebido junto com o salário." },
+    { "text": "A sequela não pode passar em branco\nVeja se você tem esse direito.", "cta": "Fale com a Previtas" }
+  ]
+}
+```
+
+- Modelos (`template`): **M1** capa · **M2** número (fundo claro) · **M3** número
+  (fundo escuro) · **M4** destaque com etiqueta ("ATENÇÃO") · **M5** miolo com foto ·
+  **M6** CTA final. Sem `template`, o diretor escolhe (capa, miolos alternando, CTA).
+- Capa: 1ª linha = título da caixa verde (palavra-chave entre `*asteriscos*` sai em
+  laranja), 2ª linha = frase da direita. Use `visual` só para descrever a foto.
+- Lista: comece o título com o número ("1. ...") e alterne M2/M3 para o leitor
+  sentir o ritmo; use M5 no máximo 1 vez (gasta foto).
+- Lista de estilos e modelos: `GET /api/carousel-agent/styles`.
+
+## Formato carousel (arte inteira pela IA)
+
+Use só se o studio não servir. É o jeito que gerou o teste 3 da Previtas.
 
 ## Regras
 

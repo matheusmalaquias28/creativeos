@@ -15,6 +15,7 @@ import { loadInter } from "./tweet-render";
 import { AGENT_CARD_HEIGHT, AGENT_CARD_WIDTH } from "./types";
 import {
   FOOTER_BAND_HEIGHT,
+  PROGRESS_TOP,
   inkFor,
   progressFill,
   PROGRESS_GAP,
@@ -50,9 +51,9 @@ export async function applyBrandFrame(card: Buffer, input: BrandFrameInput): Pro
   const H = AGENT_CARD_HEIGHT;
   const bandTop = H - FOOTER_BAND_HEIGHT;
 
-  const stats = await sharp(card)
-    .extract({ left: 0, top: bandTop, width: W, height: FOOTER_BAND_HEIGHT })
-    .stats();
+  // stats() do sharp ignora o extract encadeado: recorta antes, mede depois.
+  const band0 = await sharp(card).extract({ left: 0, top: bandTop, width: W, height: FOOTER_BAND_HEIGHT }).toBuffer();
+  const stats = await sharp(band0).stats();
   const bandRgb = bandColor(stats);
   const band = toHex(bandRgb);
   const ink = inkFor(bandRgb, input.palette);
@@ -66,6 +67,35 @@ export async function applyBrandFrame(card: Buffer, input: BrandFrameInput): Pro
     ...(regular ? [{ name: "Inter", data: regular, weight: 400 as const, style: "normal" as const }] : []),
     ...(bold ? [{ name: "Inter", data: bold, weight: 700 as const, style: "normal" as const }] : []),
   ];
+
+  if (input.progressOnly) {
+    if (!showProgress) return sharp(card).png().toBuffer();
+    const bar = new ImageResponse(
+      (
+        <div style={{ display: "flex", width: W, height: FOOTER_BAND_HEIGHT, justifyContent: "center" }}>
+          <div
+            style={{
+              display: "flex",
+              marginTop: PROGRESS_TOP,
+              width: PROGRESS_WIDTH,
+              height: PROGRESS_HEIGHT,
+              gap: rest > 0 ? PROGRESS_GAP : 0,
+            }}
+          >
+            <div style={{ display: "flex", width: fill, height: PROGRESS_HEIGHT, borderRadius: 4, background: input.accent }} />
+            {rest > 0 ? (
+              <div style={{ display: "flex", width: rest, height: PROGRESS_HEIGHT, borderRadius: 4, background: ink, opacity: 0.85 }} />
+            ) : null}
+          </div>
+        </div>
+      ),
+      { width: W, height: FOOTER_BAND_HEIGHT }
+    );
+    return sharp(card)
+      .composite([{ input: Buffer.from(await bar.arrayBuffer()), left: 0, top: bandTop }])
+      .png()
+      .toBuffer();
+  }
 
   const overlay = new ImageResponse(
     (

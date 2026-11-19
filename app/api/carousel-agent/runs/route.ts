@@ -24,6 +24,7 @@ import {
 } from "@/lib/carousel-agent/runs";
 import { runGeneration } from "@/lib/carousel-agent/pipeline";
 import { checkCanStart, estimatedImages } from "@/lib/carousel-agent/limits";
+import { loadStyleTemplatePages } from "@/lib/carousel-styles/templates";
 
 export const maxDuration = 300;
 
@@ -64,6 +65,14 @@ export async function POST(request: Request) {
     if (!profile) throw new AgentRunError("Perfil de design não encontrado.", 404);
 
     const account = await resolveProfileAccount(profile.instagram_handle);
+
+    // Studio: o estilo precisa existir e ter páginas-modelo.
+    if (body.format === "studio" && body.styleId) {
+      const pages = await loadStyleTemplatePages(body.styleId);
+      if (!pages.length) {
+        throw new AgentRunError("Estilo sem páginas-modelo (ou inexistente). Veja GET /api/carousel-agent/styles.", 422);
+      }
+    }
 
     // Freios de gasto: pedidos gerando ao mesmo tempo e teto diário de imagens.
     const fields = runFieldsFromBody(body);

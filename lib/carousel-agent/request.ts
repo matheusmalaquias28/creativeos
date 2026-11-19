@@ -6,6 +6,10 @@ import { AGENT_MAX_CARDS, AGENT_MIN_CARDS, type AgentRunMode, type AgentRunOptio
 const requestCardSchema = z.object({
   text: z.string().trim().min(1).max(3000),
   visual: z.string().trim().max(2000).optional(),
+  /** Só no studio: código da página-modelo do estilo (M1, M2…). Sem isso, o diretor escolhe. */
+  template: z.string().trim().regex(/^M\d{1,2}$/i, "use o código do modelo, ex.: M2").optional(),
+  /** Só no studio: texto do botão de CTA deste card. */
+  cta: z.string().trim().max(60).optional(),
 });
 
 /** Corpo do `POST /api/carousel-agent/runs` (contrato com o agente). */
@@ -28,7 +32,9 @@ export const createRunSchema = z
     /** Posição da logo; sem isso, a do perfil de design. */
     logoPosition: z.enum(["top-center", "top-left", "top-right"]).optional(),
     /** carousel (padrão): cards em imagem · single: arte única · tweet: carrossel "print de tweet". */
-    format: z.enum(["carousel", "single", "tweet"]).default("carousel"),
+    format: z.enum(["carousel", "single", "tweet", "studio"]).default("carousel"),
+    /** Só no studio: estilo do Carrossel Studio (GET /api/carousel-agent/styles). */
+    styleId: z.string().uuid().optional(),
     mode: z.enum(["ai", "manual"]).default("ai"),
     /** Só no tweet: fundo claro (padrão) ou escuro. */
     theme: z.enum(["light", "dark"]).optional(),
@@ -39,6 +45,10 @@ export const createRunSchema = z
   })
   .refine((b) => b.profileId || b.instagram, { message: "Informe profileId ou instagram (o @ do perfil)" })
   .refine((b) => b.content || b.cards?.length, { message: "Informe content ou cards", path: ["content"] })
+  .refine((b) => b.format !== "studio" || (b.styleId && b.cards?.length), {
+    message: "O formato studio precisa de styleId e cards",
+    path: ["styleId"],
+  })
   .refine((b) => !b.cards || b.format !== "single" || b.cards.length === 1, {
     message: "Arte única (single) leva exatamente 1 card",
     path: ["cards"],
@@ -62,6 +72,30 @@ export function runFieldsFromBody(body: CreateRunBody): {
   options: AgentRunOptions;
 } {
   const isTweet = body.format === "tweet";
+  if (body.format === "studio" && body.cards?.length) {
+    // O Studio desenha tudo a partir dos modelos: sem rodapé/logo do agente.
+    const studioCards = body.cards.map((c) => ({
+      text: c.text.trim(),
+      visual: c.visual?.trim() || null,
+      template: c.template?.trim().toUpperCase() || null,
+      cta: c.cta?.trim() || null,
+    }));
+    const context = body.content?.trim();
+    const blocks = studioCards.map((c, i) => `Card ${i + 1}:\n${c.text}`).join("\n\n");
+    return {
+      mode: "manual",
+      input: context ? `${blocks}\n\nContexto do pedido:\n${context}` : blocks,
+      cardCount: studioCards.length,
+      options: {
+        styleId: body.styleId ?? null,
+        studioCards,
+        visualDirection: body.visualDirection?.trim() || null,
+        // Rodapé só se pedido: o modelo precisa deixar os 150px de baixo livres.
+        frame: body.brandFrame === true,
+        logo: false,
+      },
+    };
+  }
   const options: AgentRunOptions = isTweet
     ? { theme: body.theme ?? "light" }
     : {

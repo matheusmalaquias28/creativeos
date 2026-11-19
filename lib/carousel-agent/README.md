@@ -1,12 +1,13 @@
 # Agente de Carrossel
 
-O agente pede um post por API, em três formatos:
+O agente pede um post por API, em quatro formatos:
 
 | `format` | O que sai | Como é feito |
 | --- | --- | --- |
 | `carousel` (padrão) | Carrossel com cards 100% em imagem | GPT Image; capa primeiro e usada como referência dos outros cards |
 | `single` | Arte única de feed (post simples) | GPT Image, 1 card |
 | `tweet` | Carrossel "print de tweet" (foto, nome, @ verificado, texto) | A IA só escreve o texto; o card é desenhado no servidor (`next/og`), igual ao editor do Carrossel Tweet. Texto exato, sem revisão |
+| `studio` | Carrossel montado nas páginas-modelo de um estilo do Carrossel Studio | O diretor do Studio escolhe o modelo de cada card e preenche os campos; só as fotos dos campos de imagem passam pela IA; cada página é desenhada no servidor (`lib/carousel-studio/server-render.tsx`). Texto exato, editável no Studio |
 
 O CreativeOS gera os cards, escreve a legenda com hashtags e deixa o post
 **aguardando aprovação** na aba **Carrosséis → Agente**
@@ -108,7 +109,8 @@ Base: `https://creative.energymidia.com.br`. Todas as chamadas usam
 | Campo | Obrigatório | O que é |
 | --- | --- | --- |
 | `instagram` ou `profileId` | um dos dois | `@` do perfil de design (Carrosséis → Perfis) ou o id dele. |
-| `format` | não | `"carousel"` (padrão), `"single"` ou `"tweet"`. |
+| `format` | não | `"carousel"` (padrão), `"single"`, `"tweet"` ou `"studio"`. |
+| `styleId` | só no `studio` | Estilo do Carrossel Studio (lista em `GET /api/carousel-agent/styles`). |
 | `content` | sim, sem `cards` | Tema (`mode: "ai"`) ou o texto pronto (`mode: "manual"`, a IA só divide em cards, sem reescrever). Até 20 mil caracteres. Com `cards`, é opcional e vira só contexto para a legenda. |
 | `visualDirection` | não | Direção de arte do pedido inteiro, até 4 mil caracteres: fundo, se tem foto ou não (e em quais cards), estilo da foto, o que evitar. Vale acima das regras visuais padrão. Ignorado no `tweet`. |
 | `brandFrame` | não | `true` (padrão): rodapé fixo da marca desenhado em código (barra de progresso, @, ícones). `false` desliga. Ignorado no `tweet`. |
@@ -132,7 +134,7 @@ Com direção visual (recomendado para a Previtas):
   "cards": [
     { "text": "5 erros que fazem o INSS negar sua aposentadoria", "visual": "Foto de uma senhora brasileira de 60 anos lendo uma carta do INSS na cozinha, título em cima." },
     { "text": "1. Tempo de contribuição sem comprovante
-Carteira sem registro não conta sozinha.", "visual": "Sem imagem. Número 1 gigante em amarelo à esquerda." },
+\nCarteira sem registro não conta sozinha.", "visual": "Sem imagem. Número 1 gigante em amarelo à esquerda." },
     { "text": "Salve este post e fale com a Previtas", "visual": "Sem imagem. Título centralizado, botão de CTA embaixo." }
   ]
 }
@@ -149,6 +151,49 @@ mesmo @), `422` (perfil sem @ ou conta não conectada).
 **429** (limite de gasto): já há pedidos demais gerando ou o teto diário de imagens
 não comporta o pedido. Espere alguns minutos (ou peça um `tweet`, que não gasta
 imagem). Não reenvie em loop.
+
+### Formato `studio` (páginas-modelo do Carrossel Studio)
+
+Gasta só as fotos dos campos de imagem dos modelos (cards só tipográficos não
+gastam nada) e o texto sai exato, porque é texto de verdade, não imagem.
+
+1. `GET /api/carousel-agent/styles` lista os estilos com páginas-modelo:
+   `id`, `name` e `templates` (`code` M1, M2…, `role` cover/inner/cta, `name` e
+   os campos com o texto de exemplo). Os modelos são montados no Studio
+   (**Carrosséis → Estilos → Páginas-modelo**).
+2. Peça com `"format": "studio"`, `styleId` e `cards`:
+
+```json
+{
+  "instagram": "@previtasbrasil_",
+  "format": "studio",
+  "styleId": "…",
+  "content": "Contexto para a legenda (público, tom, objetivo).",
+  "cards": [
+    { "text": "Aposentadoria negada pelo INSS?
+\nVeja os 4 motivos mais comuns", "template": "M1", "visual": "Foto: mulher brasileira de 60 anos lendo uma carta na cozinha" },
+    { "text": "1. Falta de tempo de contribuição
+\nPeríodos sem registro podem não aparecer no extrato." },
+    { "text": "A negativa não é o fim
+\nDá para recorrer.", "cta": "Fale com a Previtas" }
+  ]
+}
+```
+
+- Em cada card: 1ª linha = título, o resto = apoio. `template` (opcional) força a
+  página-modelo; sem ele, o diretor escolhe (capa no 1º, CTA no último). `visual`
+  descreve a foto do campo de imagem. `cta` = texto do botão; sem ele, a última
+  linha do último card (com 3+ linhas) vira o CTA.
+- A logo vem do modelo: camada de logo com "clara" no nome recebe a versão clara do
+  perfil de design (sem ela, gerada em código: texto branco, cores vivas mantidas);
+  as outras, a versão escura transparente.
+- `"brandFrame": true` desenha só a **barra de progresso** (muda em cada card) na
+  faixa de baixo; o @ e os ícones do rodapé são camadas do próprio modelo (os da
+  Previtas trazem), então aparecem e são editáveis no Studio. `logo`,
+  `logoPosition` e `logoCards` não se aplicam.
+- O carrossel fica salvo no Studio: **Editar no Studio** na aba abre o editor, e
+  **Atualizar do Studio** no card desenha de novo a partir do documento editado
+  (sem gastar imagem). O `regenerate` com `cardIndex` faz o mesmo pela API.
 
 ### `GET /api/carousel-agent/runs/{id}`: status
 
@@ -218,6 +263,9 @@ aprova o próprio carrossel.
 | `images.ts` | 1080×1350 e JPEG do feed. |
 | `limits.ts` | Teto diário de imagens, pedidos simultâneos, tempo por geração. |
 | `tweet-render.tsx` / `tweet-layout.ts` | Card tweet desenhado no servidor e o cálculo do tamanho da fonte. |
+| `studio.ts` / `studio-shape.ts` | Formato studio: cards → carrossel do Studio (diretor + páginas-modelo) → páginas desenhadas. |
+| `brand-frame.tsx` / `logo.ts` | Rodapé fixo e logo aplicados em código (formatos de imagem). |
+| `../carousel-studio/server-render.tsx` | Página do Studio → PNG no servidor (Satori): texto com destaque, formas, botões, imagens (`server-image.ts`) e fontes (`server-fonts.ts`). |
 | `decide.ts` | Aprovar (vira `instagram_posts`) e reprovar. |
 | `runs.ts` | Banco, conta pelo @ do perfil, resposta pública e callback. |
 | `request.ts` / `auth.ts` | Validação do pedido e autenticação do agente. |

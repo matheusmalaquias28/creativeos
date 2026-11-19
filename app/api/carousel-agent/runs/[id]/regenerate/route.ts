@@ -35,9 +35,10 @@ export async function POST(request: Request, { params }: Params) {
   }
   const instruction = typeof body.instruction === "string" ? body.instruction.trim().slice(0, 1000) : null;
 
-  // Mesmos freios do pedido novo (o tweet não gasta imagem).
+  // Mesmos freios do pedido novo (o tweet não gasta imagem; no studio, refazer
+  // só desenha de novo a página a partir do documento do Studio).
   const images =
-    run.format === "tweet" ? 0 : index !== null ? 1 : run.cards.filter((c) => c.status !== "ready").length || run.cards.length;
+    run.format === "tweet" || (run.format === "studio" && run.plan) ? 0 : index !== null ? 1 : run.cards.filter((c) => c.status !== "ready").length || run.cards.length;
   const limit = await checkCanStart(admin, { images, exceptRunId: run.id });
   if (limit) return NextResponse.json({ error: limit.message }, { status: limit.status });
 

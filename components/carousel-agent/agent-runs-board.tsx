@@ -30,6 +30,7 @@ const FORMAT: Record<AgentFormat, { label: string; noun: string }> = {
   carousel: { label: "Carrossel", noun: "carrossel" },
   single: { label: "Arte única", noun: "arte" },
   tweet: { label: "Carrossel tweet", noun: "carrossel tweet" },
+  studio: { label: "Carrossel Studio", noun: "carrossel" },
 };
 
 
@@ -202,7 +203,9 @@ function RunCard({
       <header className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4">
         <div className="min-w-0">
           <p className="flex items-center gap-2 truncate text-base font-semibold text-foreground">
-            <Badge variant={run.format === "tweet" ? "blue" : run.format === "single" ? "violet" : "lime"}>
+            <Badge
+              variant={run.format === "tweet" ? "blue" : run.format === "single" ? "violet" : run.format === "studio" ? "green" : "lime"}
+            >
               {FORMAT[run.format].label}
             </Badge>
             <span className="truncate">
@@ -214,6 +217,19 @@ function RunCard({
             {run.mode === "manual" ? "conteúdo do agente" : "tema"}
             {run.format === "tweet" ? ` · fundo ${run.options.theme === "dark" ? "escuro" : "claro"}` : ""} · pedido em{" "}
             {formatInstagramDate(run.created_at)}
+            {run.format === "studio" && run.options.studioCarouselId ? (
+              <>
+                {" · "}
+                <a
+                  href={`/carousel/studio/${run.options.studioCarouselId}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-semibold text-primary hover:underline"
+                >
+                  Editar no Studio
+                </a>
+              </>
+            ) : null}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -382,7 +398,19 @@ function CardThumb({
         </p>
       )}
 
-      {canAdjust && !redoOpen && (
+      {canAdjust && run.format === "studio" && (
+        <button
+          type="button"
+          onClick={redo}
+          disabled={busy}
+          title="Desenha o card de novo a partir do Carrossel Studio (pega o que você ajustou no editor)"
+          className="inline-flex items-center gap-1 text-[0.6875rem] font-semibold text-muted-foreground hover:text-foreground"
+        >
+          {busy ? <Loader2 className="size-3 animate-spin" /> : <RefreshCw className="size-3" />}
+          Atualizar do Studio
+        </button>
+      )}
+      {canAdjust && run.format !== "studio" && !redoOpen && (
         <button
           type="button"
           onClick={() => setRedoOpen(true)}
@@ -392,7 +420,7 @@ function CardThumb({
           Refazer
         </button>
       )}
-      {canAdjust && redoOpen && (
+      {canAdjust && run.format !== "studio" && redoOpen && (
         <div className="space-y-1.5">
           <Textarea
             value={instruction}
