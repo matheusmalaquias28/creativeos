@@ -36,6 +36,7 @@ import {
 } from "./prompts";
 import { reviewCardText } from "./qa";
 import { downloadImage, finalizeCard } from "./images";
+import { prepareLogo } from "./logo";
 import { renderTweetCard } from "./tweet-render";
 import { getRun, notifyAgent, toAgentRun, type Admin } from "./runs";
 import { GENERATION_TIME_BUDGET_MS, reserveImage } from "./limits";
@@ -52,6 +53,16 @@ function imageQuality(): OpenAIImageQuality {
   const q = process.env.CAROUSEL_AGENT_IMAGE_QUALITY?.trim().toLowerCase();
   // "medium", igual ao gerador de feed do Spaces; "high" custa ~4x por imagem.
   return q === "low" || q === "medium" || q === "high" ? q : "medium";
+}
+
+function brandPalette(profile: CarouselProfile): string[] {
+  return [
+    profile.color_background,
+    profile.color_title,
+    profile.color_subtitle,
+    profile.color_accent,
+    ...(Array.isArray(profile.palette) ? profile.palette : []),
+  ].filter(Boolean);
 }
 
 function emptyCard(index: number): AgentCard {
@@ -86,7 +97,8 @@ async function makePlan(profile: CarouselProfile, run: AgentRun): Promise<AgentP
       run.mode,
       run.format === "single" ? 1 : run.card_count,
       run.format,
-      run.options.visualDirection
+      run.options.visualDirection,
+      run.format !== "tweet" && run.options.frame !== false
     ),
     input: buildPlanInput(run.mode, run.input, run.format, run.options.cardVisuals),
     schemaName: "carousel_plan",
@@ -219,8 +231,42 @@ export async function runGeneration(runId: string, opts: GenerationOptions = {})
     const theme = run.options.theme === "dark" ? "dark" : "light";
     const avatar =
       isTweet && tweetProfile.avatar_url ? await downloadImage(tweetProfile.avatar_url).catch(() => null) : null;
-    // A logo vai como referência (a IA aplica); sem colagem por cima.
-    const logoRef = !isTweet && profile.logo_url ? [{ url: profile.logo_url }] : [];
+    // Logo colada em código depois da arte (versão pelo contraste). A IA só
+    // deixa o topo livre; ela não recebe mais a logo como referência.
+    const logoMode = run.options.logo ?? "auto";
+    const logoAsset =
+      !isTweet && logoMode !== false && profile.logo_url
+        ? await (async () => {
+            const [primary, light] = await Promise.all([
+              downloadImage(profile.logo_url!),
+              profile.logo_light_url ? downloadImage(profile.logo_light_url).catch(() => null) : null,
+            ]);
+            return prepareLogo({ primary, light, palette: brandPalette(profile) });
+          })().catch((e) => {
+            console.error("[carousel-agent] logo não preparada", e instanceof Error ? e.message : e);
+            return null;
+          })
+        : null;
+    const logoFor = logoAsset && logoMode !== false
+      ? {
+          asset: logoAsset,
+          position: run.options.logoPosition ?? profile.logo_position ?? "top-center",
+          mode: logoMode,
+        }
+      : null;
+    // Rodapé fixo (barra de progresso, @, ícones) aplicado em código depois da arte.
+    const useFrame = !isTweet && run.options.frame !== false;
+    const framePalette = brandPalette(profile);
+    const frameFor = (index: number) =>
+      useFrame
+        ? {
+            index,
+            total: plan.cards.length,
+            handle: run.ig_username ?? profile.instagram_handle,
+            accent: profile.color_accent,
+            palette: framePalette,
+          }
+        : null;
     const profileRefs = (profile.reference_images ?? [])
       .slice(0, MAX_PROFILE_REFERENCES)
       .map((r) => ({ url: r.url }));
@@ -290,11 +336,13 @@ export async function runGeneration(runId: string, opts: GenerationOptions = {})
         plan,
         index,
         format: run.format,
-        hasLogo: logoRef.length > 0,
+        hasLogo: false,
+        reserveTop: !!logoFor,
         coverAsReference: coverRef.length > 0,
         profileReferenceCount: profileRefs.length,
         instruction: run.cards[index].instruction,
         visualDirection: run.options.visualDirection,
+        reserveFooter: useFrame,
       });
       run.cards[index] = { ...run.cards[index], status: "generating", prompt, attempts: run.cards[index].attempts + 1 };
       await save();
@@ -303,13 +351,13 @@ export async function runGeneration(runId: string, opts: GenerationOptions = {})
         // refazer é a pessoa na aprovação ("Refazer").
         const { buffer } = await generateOpenAIImage({
           prompt,
-          references: [...coverRef, ...logoRef, ...profileRefs],
+          references: [...coverRef, ...profileRefs],
           referencesInPrompt: true,
           aspectRatio: "4:5",
           resolution: "2K",
           quality: imageQuality(),
         });
-        const { url, path } = await uploadCard(index, await finalizeCard(buffer));
+        const { url, path } = await uploadCard(index, await finalizeCard(buffer, { frame: frameFor(index), logo: logoFor }));
         const qa = await reviewCardText(url, expectedTexts(plan, index), profile.name).catch((e) => {
           console.warn("[carousel-agent] revisão falhou", e instanceof Error ? e.message : e);
           return null;

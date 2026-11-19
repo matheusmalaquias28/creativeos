@@ -1384,6 +1384,9 @@ export type Database = {
           instagram_handle: string | null;
           instagram_avatar_url: string | null;
           instagram_avatar_storage_path: string | null;
+          logo_light_url: string | null;
+          logo_light_storage_path: string | null;
+          logo_position: "top-center" | "top-left" | "top-right";
           business_context: string | null;
           context_md: string | null;
           created_at: string;
@@ -1407,6 +1410,9 @@ export type Database = {
           instagram_handle?: string | null;
           instagram_avatar_url?: string | null;
           instagram_avatar_storage_path?: string | null;
+          logo_light_url?: string | null;
+          logo_light_storage_path?: string | null;
+          logo_position?: "top-center" | "top-left" | "top-right";
           business_context?: string | null;
           context_md?: string | null;
           created_at?: string;
@@ -1428,6 +1434,9 @@ export type Database = {
           instagram_handle: string | null;
           instagram_avatar_url: string | null;
           instagram_avatar_storage_path: string | null;
+          logo_light_url: string | null;
+          logo_light_storage_path: string | null;
+          logo_position: "top-center" | "top-left" | "top-right";
           business_context: string | null;
           context_md: string | null;
           updated_at: string;

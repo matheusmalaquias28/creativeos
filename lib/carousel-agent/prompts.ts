@@ -12,9 +12,23 @@ import type { AgentFormat, AgentPlan, AgentRunMode } from "./types";
 
 export const EXACT_TEXT_RULE = "A IMAGEM DEVE CONTER SOMENTE ESSES TEXTOS, NADA MAIS:";
 
+/**
+ * Faixa de baixo reservada: o rodapé da marca (barra de progresso, @, ícones)
+ * é desenhado em código depois (brand-frame.tsx), igual em todos os cards.
+ */
+export const FOOTER_RESERVED_RULE =
+  "FAIXA RESERVADA NO RODAPÉ: os últimos 11% da altura da arte (a faixa de baixo, de ponta a ponta) ficam VAZIOS, só com a cor de fundo lisa: sem textos, botões, ícones, barra de progresso, @, redes sociais, foto ou qualquer elemento. O rodapé da marca é aplicado ali depois, automaticamente. Todo o conteúdo, inclusive o CTA, fica acima dessa faixa.";
+
+/**
+ * Topo reservado: a logo da marca é colada em código depois (logo.ts), na
+ * versão que contrasta com o fundo.
+ */
+export const TOP_RESERVED_RULE =
+  "FAIXA RESERVADA NO TOPO: os primeiros 14% da altura da arte (a faixa de cima, de ponta a ponta) ficam sem textos, títulos, botões, molduras ou elementos gráficos; a foto ou o fundo podem continuar ali normalmente. A logo da marca é aplicada ali depois, automaticamente: NÃO desenhe logo nenhuma, nem copie a logo das imagens anexadas.";
+
 /** Vai em todo card de imagem: nada além do que foi descrito. */
 export const CLEAN_COMPOSITION_RULE =
-  "COMPOSIÇÃO LIMPA: a arte tem só os textos, a logo e o que está descrito acima. Não acrescente ícones, formas, setas, adesivos, objetos ou enfeites que não foram pedidos. Se houver foto ou ilustração, ela mostra literalmente o assunto do card; nada de foto genérica de fundo ou cena sem relação com o texto. Se o card diz \"Sem imagem\", não coloque imagem: fundo da marca e tipografia.";
+  "COMPOSIÇÃO LIMPA: a arte tem só os textos, os elementos da identidade da marca (os do modelo/capa) e o que está descrito acima. Não acrescente ícones, formas, setas, adesivos, objetos ou enfeites que não foram pedidos. Se houver foto ou ilustração, ela mostra literalmente o assunto do card; nada de foto genérica de fundo ou cena sem relação com o texto. Se o card diz \"Sem imagem\", não coloque imagem: fundo da marca e tipografia.";
 
 
 type ProfileForPrompt = Pick<
@@ -47,7 +61,7 @@ export function visualRules(visualDirection?: string | null): string {
   const rules = `DIREÇÃO VISUAL
 - Padrão: layout editorial e tipográfico. Fundo da marca (cor sólida ou gradiente sutil da paleta), título forte, hierarquia clara e no máximo UM elemento de destaque por card.
 - Foto ou ilustração só quando mostrar LITERALMENTE o assunto daquele card (ex.: card sobre carteira de trabalho → foto de uma carteira de trabalho). Se não dá para dizer numa frase concreta o que a imagem mostra e por que ela tem a ver com o texto, o card fica sem imagem.
-- Proibido: ícones, formas, setas, adesivos, objetos 3D ou enfeites soltos; foto genérica de fundo (escritório, aperto de mão, pessoa sorrindo sem contexto); cena sem relação direta com o texto; estilos de imagem diferentes entre os cards.
+- Proibido: ícones, formas, setas, adesivos, objetos 3D ou enfeites soltos que não fazem parte da identidade da marca; foto genérica de fundo (escritório, aperto de mão, pessoa sorrindo sem contexto); cena sem relação direta com o texto; estilos de imagem diferentes entre os cards.
 - Bom uso: capa com uma foto forte e concreta do tema; cards do meio tipográficos; número ou dado em destaque grande no lugar de ilustração.
 - No campo "visual" de cada card, descreva a composição concreta: onde fica o título, o que está em destaque e, se tiver imagem, o que ela mostra exatamente. Se for só tipografia, comece com "Sem imagem" e descreva o destaque tipográfico.`;
   const direction = visualDirection?.trim();
@@ -64,7 +78,9 @@ export function buildPlanSystemPrompt(
   mode: AgentRunMode,
   cardCount: number | null,
   format: AgentFormat = "carousel",
-  visualDirection?: string | null
+  visualDirection?: string | null,
+  /** O rodapé (barra de progresso, @, ícones) é aplicado em código depois. */
+  brandFrame = false
 ): string {
   if (format === "tweet") return buildTweetPlanSystemPrompt(profile, mode, cardCount);
   const single = format === "single";
@@ -110,7 +126,11 @@ REGRAS DOS TEXTOS
 GUIA DE ESTILO (styleGuide)
 - Um único guia que vale para TODOS os cards, para o carrossel parecer uma peça só: fundo, paleta, tipografia descrita, posição dos textos, o elemento de destaque que se repete e, se houver foto, o estilo dela.
 - Quando houver foto: pessoas, cenários e situações brasileiras, reais e ligadas ao tema.
-- A logo da marca vai anexada e é aplicada no canto superior esquerdo de todos os cards: não descreva logo no guia, só reserve esse canto.
+- A logo da marca é aplicada automaticamente depois, no topo de todos os cards: não descreva logo no guia nem nos cards, e não ponha textos no topo (os primeiros 14% da altura).${
+    brandFrame
+      ? "\n- O rodapé (barra de progresso, @ e ícones de redes) é aplicado automaticamente depois, numa faixa lisa na parte de baixo de todos os cards: não descreva rodapé, barra de progresso, @ nem ícones de redes no guia nem nos cards, e não coloque nada nessa faixa."
+      : ""
+  }
 
 ${visualRules(visualDirection)}
 
@@ -236,6 +256,10 @@ export function buildCardPrompt(input: {
   instruction?: string | null;
   /** Direção de arte mandada pelo agente para o pedido inteiro. */
   visualDirection?: string | null;
+  /** Deixar a faixa de baixo vazia: o rodapé da marca entra depois, em código. */
+  reserveFooter?: boolean;
+  /** Deixar o topo sem texto: a logo entra depois, em código. */
+  reserveTop?: boolean;
 }): string {
   const { plan, index } = input;
   const card = plan.cards[index];
@@ -251,7 +275,10 @@ export function buildCardPrompt(input: {
   const refs: string[] = [];
   if (order.cover) {
     refs.push(
-      `Imagem ${order.cover} é a CAPA deste mesmo carrossel: siga exatamente o mesmo estilo (fundo, paleta, tipografia, tamanho e posição dos textos, elementos gráficos, posição da logo). Os cards precisam parecer da mesma peça. Não copie os textos nem a composição da capa.`
+      `Imagem ${order.cover} é a CAPA deste mesmo carrossel. Use exatamente os mesmos elementos visuais dela: paleta, fundo, tipografia (mesma fonte, peso e tamanho do título), caixas de texto, botões e tratamento de foto. Varie só o layout (onde ficam texto e imagem), para os cards não ficarem iguais à capa. Os cards precisam parecer da mesma peça. Não copie os textos da capa${
+        input.reserveFooter ? " nem o rodapé dela (barra de progresso, @, ícones): a faixa de baixo fica vazia" : ""
+      }${input.reserveTop ? ". Não copie a logo da capa: o topo fica livre" : ""
+      }.`
     );
   }
   if (order.logo) {
@@ -262,7 +289,14 @@ export function buildCardPrompt(input: {
   if (order.profile) {
     const { first, last } = order.profile;
     const range = first === last ? `Imagem ${first} é referência` : `Imagens ${first} a ${last} são referências`;
-    refs.push(`${range} de identidade visual do cliente: use só como inspiração de estilo, cores e tipografia; não copie os textos, as fotos nem os elementos delas.`);
+    refs.push(
+      `${range} o MODELO VISUAL da marca: siga a mesma linguagem (caixas de texto, botões, cores, tipografia, tratamento e enquadramento de foto)${
+        order.cover ? ", junto com a capa" : ""
+      }. Troque a foto e os textos pelos deste card; não copie os textos nem a foto delas.${
+        input.reserveFooter ? " Não reproduza o rodapé delas (barra de progresso, @, ícones de redes): ele é aplicado depois." : ""
+      }${input.reserveTop ? " Não reproduza a logo delas: ela é aplicada depois." : ""
+      }`
+    );
   }
 
   const parts = [
@@ -277,13 +311,17 @@ export function buildCardPrompt(input: {
       : []),
     `${single ? "A ARTE" : "ESTE CARD"}:\n${card.visual.trim()}`,
     CLEAN_COMPOSITION_RULE,
+    ...(input.reserveTop ? [TOP_RESERVED_RULE] : []),
+    ...(input.reserveFooter ? [FOOTER_RESERVED_RULE] : []),
     `${EXACT_TEXT_RULE}\n${lines.join("\n")}`,
     "Escreva os textos exatamente como estão, em português do Brasil, com acentuação correta, sem inventar, traduzir ou repetir palavras. Textos grandes, nítidos e legíveis no celular, com bom contraste.",
   ];
 
   if (card.cta?.trim()) {
     parts.push(
-      "O CTA é um BOTÃO com fundo de cor sólida, SEMPRE centralizado na parte inferior da imagem, com o texto do CTA dentro dele."
+      `O CTA é um BOTÃO com fundo de cor sólida, SEMPRE centralizado na parte inferior da imagem${
+        input.reserveFooter ? ", logo acima da faixa reservada do rodapé" : ""
+      }, com o texto do CTA dentro dele.`
     );
   }
 
@@ -295,7 +333,7 @@ export function buildCardPrompt(input: {
   parts.push(
     single
       ? "Não escreva numeração nem setas de 'arraste': é um post único."
-      : "Não escreva numeração de página nem setas de 'arraste'."
+      : "Não escreva numeração de página, barra de progresso nem setas de 'arraste'."
   );
   if (refs.length) parts.push(refs.join("\n"));
 

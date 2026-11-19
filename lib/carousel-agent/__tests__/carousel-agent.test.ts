@@ -286,6 +286,7 @@ describe("direção visual", () => {
     expect(f.input).toContain("Contexto do pedido");
     expect(f.options).toEqual({
       visualDirection: "Sem ícones.",
+      frame: true,
       cardVisuals: ["Foto de um aposentado brasileiro", null],
     });
   });
@@ -298,5 +299,95 @@ describe("direção visual", () => {
       createRunSchema.parse({ instagram: "@x", format: "tweet", content: "tema", visualDirection: "ignorado" })
     );
     expect(tweet.options).toEqual({ theme: "light" });
+  });
+});
+
+import { bandColor, inkFor, progressFill } from "../brand-frame-layout";
+import { FOOTER_RESERVED_RULE } from "../prompts";
+
+describe("rodapé fixo da marca", () => {
+  it("barra de progresso cresce card a card e fecha cheia no último", () => {
+    expect(progressFill(0, 6, 360)).toBe(60);
+    expect(progressFill(2, 6, 360)).toBe(180);
+    expect(progressFill(5, 6, 360)).toBe(360);
+    expect(progressFill(0, 1, 360)).toBe(360);
+  });
+
+  it("tinta branca em fundo escuro, cor escura da marca em fundo claro", () => {
+    expect(inkFor({ r: 10, g: 40, b: 50 }, ["#0b3b45"])).toBe("#ffffff");
+    expect(inkFor({ r: 250, g: 250, b: 250 }, ["#ff6a13", "#0b3b45"])).toBe("#0b3b45");
+    expect(inkFor({ r: 250, g: 250, b: 250 }, ["#ff6a13"])).toBe("#15202b");
+  });
+
+  it("o prompt reserva a faixa de baixo só quando o rodapé está ligado", () => {
+    const on = buildCardPrompt({ plan, index: 2, hasLogo: false, coverAsReference: true, profileReferenceCount: 1, reserveFooter: true });
+    expect(on).toContain(FOOTER_RESERVED_RULE);
+    expect(on).toContain("logo acima da faixa reservada do rodapé");
+    expect(on).toContain("Não reproduza o rodapé delas");
+    const off = buildCardPrompt({ plan, index: 2, hasLogo: false, coverAsReference: true, profileReferenceCount: 0 });
+    expect(off).not.toContain("FAIXA RESERVADA");
+  });
+
+  it("faixa lisa usa a média exata; faixa com conteúdo usa a dominante", () => {
+    const ch = (mean: number, stdev: number) => ({ mean, stdev });
+    const dominant = { r: 8, g: 56, b: 72 };
+    expect(bandColor({ channels: [ch(11, 1), ch(59, 1), ch(69, 1)], dominant })).toEqual({ r: 11, g: 59, b: 69 });
+    expect(bandColor({ channels: [ch(90, 60), ch(80, 50), ch(70, 40)], dominant })).toEqual(dominant);
+  });
+
+  it("brandFrame: false desliga", () => {
+    const f = runFieldsFromBody(createRunSchema.parse({ instagram: "@x", content: "tema", brandFrame: false }));
+    expect(f.options.frame).toBe(false);
+  });
+});
+
+import { chooseLogo, contrastRatio, logoPlacement, LOGO_MAX_HEIGHT, LOGO_TOP } from "../logo-layout";
+import { TOP_RESERVED_RULE } from "../prompts";
+
+describe("logo aplicada em código", () => {
+  const variants = [
+    { key: "primary", lum: 0.07, uploaded: true },
+    { key: "white", lum: 1, uploaded: false },
+    { key: "dark", lum: 0.02, uploaded: false },
+  ];
+
+  it("auto: enviada em fundo claro, branca gerada em fundo escuro", () => {
+    expect(chooseLogo(variants, 0.95).key).toBe("primary");
+    expect(chooseLogo(variants, 0.03).key).toBe("white");
+  });
+
+  it("auto prefere a logo clara enviada à branca gerada", () => {
+    const withLight = [...variants, { key: "light", lum: 0.7, uploaded: true }];
+    expect(chooseLogo(withLight, 0.03).key).toBe("light");
+  });
+
+  it("light/dark forçados pelo agente", () => {
+    expect(chooseLogo(variants, 0.95, "light").key).toBe("white");
+    expect(chooseLogo(variants, 0.03, "dark").key).toBe("primary");
+  });
+
+  it("mesma posição em todos os cards, centro vertical fixo", () => {
+    const a = logoPlacement("top-center", { width: 300, height: 89 }, 1080);
+    expect(a.left).toBe(390);
+    expect(Math.abs(a.top + 89 / 2 - (LOGO_TOP + LOGO_MAX_HEIGHT / 2))).toBeLessThanOrEqual(1);
+    expect(logoPlacement("top-left", { width: 200, height: 100 }, 1080)).toEqual({ left: 64, top: LOGO_TOP });
+    expect(logoPlacement("top-right", { width: 200, height: 100 }, 1080).left).toBe(1080 - 64 - 200);
+    expect(contrastRatio(1, 0)).toBeCloseTo(21, 0);
+  });
+
+  it("o prompt reserva o topo e não manda desenhar logo", () => {
+    const p = buildCardPrompt({ plan, index: 1, hasLogo: false, coverAsReference: true, profileReferenceCount: 1, reserveTop: true });
+    expect(p).toContain(TOP_RESERVED_RULE);
+    expect(p).toContain("Não copie a logo da capa");
+    expect(p).toContain("Não reproduza a logo delas");
+    expect(p).toContain("Não desenhe logo");
+  });
+
+  it("agente controla logo e posição", () => {
+    const f = runFieldsFromBody(createRunSchema.parse({ instagram: "@x", content: "tema", logo: "light", logoPosition: "top-left" }));
+    expect(f.options).toMatchObject({ logo: "light", logoPosition: "top-left" });
+    const off = runFieldsFromBody(createRunSchema.parse({ instagram: "@x", content: "tema", logo: false }));
+    expect(off.options.logo).toBe(false);
+    expect(createRunSchema.safeParse({ instagram: "@x", content: "tema", logo: "branca" }).success).toBe(false);
   });
 });

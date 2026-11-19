@@ -82,6 +82,7 @@ function ProfileEditor({
   const [draft, setDraft] = useState<CarouselProfileDraft>(initialDraft);
   const [uploading, setUploading] = useState(false);
   const [uploadingIg, setUploadingIg] = useState(false);
+  const [uploadingLight, setUploadingLight] = useState(false);
   const [uploadingRefs, setUploadingRefs] = useState(false);
   const [saving, startSaving] = useTransition();
   const [newSwatch, setNewSwatch] = useState("#3b82f6");
@@ -148,11 +149,11 @@ function ProfileEditor({
 
   async function handleLogo(
     e: React.ChangeEvent<HTMLInputElement>,
-    kind: "logo" | "instagram" = "logo"
+    kind: "logo" | "instagram" | "light" = "logo"
   ) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const setBusy = kind === "logo" ? setUploading : setUploadingIg;
+    const setBusy = kind === "logo" ? setUploading : kind === "light" ? setUploadingLight : setUploadingIg;
     setBusy(true);
     try {
       const fd = new FormData();
@@ -166,6 +167,9 @@ function ProfileEditor({
       if (kind === "logo") {
         patch({ logo_url: data.url, logo_storage_path: data.storagePath });
         toast.success("Logo enviada");
+      } else if (kind === "light") {
+        patch({ logo_light_url: data.url, logo_light_storage_path: data.storagePath });
+        toast.success("Logo clara enviada");
       } else {
         patch({ instagram_avatar_url: data.url, instagram_avatar_storage_path: data.storagePath });
         toast.success("Logo do perfil do Instagram enviada");
@@ -322,6 +326,61 @@ function ProfileEditor({
                     Foto redonda do perfil nos carrosséis tweet. Sem ela, usa a logo normal.
                   </p>
                 )}
+              </div>
+            </div>
+
+            {/* Logo nos cards do Agente de Carrossel: aplicada em código, versão escolhida pelo contraste */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Logo clara, para fundo escuro <span className="font-normal">(opcional)</span>
+                </label>
+                <label
+                  className={cn(
+                    "flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed py-3 text-xs transition-colors",
+                    draft.logo_light_url
+                      ? "border-primary/40 bg-primary/5 text-primary"
+                      : "border-border-strong bg-surface text-muted-foreground hover:border-primary/50 hover:bg-primary/5 hover:text-foreground"
+                  )}
+                >
+                  <input type="file" accept="image/png,image/webp" className="sr-only" onChange={(e) => handleLogo(e, "light")} />
+                  {uploadingLight ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : draft.logo_light_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={draft.logo_light_url} alt="" className="h-5 w-auto max-w-[60px] rounded bg-neutral-800 object-contain p-0.5" />
+                  ) : (
+                    <ImagePlus className="size-3.5" />
+                  )}
+                  {draft.logo_light_url ? "Trocar logo clara" : "Carregar logo clara"}
+                </label>
+                {draft.logo_light_url ? (
+                  <button
+                    onClick={() => patch({ logo_light_url: null, logo_light_storage_path: null })}
+                    className="text-xs font-semibold text-tone-red hover:underline"
+                  >
+                    Remover logo clara
+                  </button>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    PNG transparente. Sem ela, o agente pinta a logo principal de branco quando o fundo é escuro.
+                  </p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Posição da logo no Agente</label>
+                <select
+                  value={draft.logo_position ?? "top-center"}
+                  onChange={(e) => patch({ logo_position: e.target.value as CarouselProfileDraft["logo_position"] })}
+                  className="h-10 w-full rounded-xl border border-border bg-input px-3.5 text-sm text-foreground outline-none transition-premium hover:border-border-strong focus-visible:border-primary/60 focus-visible:ring-3 focus-visible:ring-ring/20 [&>option]:bg-popover [&>option]:text-popover-foreground"
+                >
+                  <option value="top-center">Topo, centralizada</option>
+                  <option value="top-left">Topo, à esquerda</option>
+                  <option value="top-right">Topo, à direita</option>
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  A logo é colada por cima da arte, sempre no mesmo lugar. Use PNG transparente na logo principal.
+                </p>
               </div>
             </div>
 
@@ -504,7 +563,7 @@ function ProfileEditor({
 
           <div className="flex justify-end gap-2 border-t border-border bg-surface/60 px-6 py-4">
             <Button variant="ghost" size="sm" onClick={onClose}>Cancelar</Button>
-            <Button size="sm" onClick={handleSave} disabled={saving || uploading || uploadingIg}>
+            <Button size="sm" onClick={handleSave} disabled={saving || uploading || uploadingIg || uploadingLight}>
               {saving ? <Loader2 className="animate-spin" /> : null}
               Salvar perfil
             </Button>

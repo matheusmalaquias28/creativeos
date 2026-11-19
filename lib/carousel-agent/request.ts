@@ -19,6 +19,12 @@ export const createRunSchema = z
     cards: z.array(requestCardSchema).min(1).max(AGENT_MAX_CARDS).optional(),
     /** Direção de arte do pedido inteiro (fundo, foto ou não, estilo, o que evitar). */
     visualDirection: z.string().trim().max(4000).optional(),
+    /** Rodapé fixo da marca (barra de progresso, @, ícones) desenhado em código. Padrão: true. */
+    brandFrame: z.boolean().optional(),
+    /** Logo colada em código: "auto" (versão pelo contraste, padrão), "light", "dark" ou false (sem logo). */
+    logo: z.union([z.enum(["auto", "light", "dark"]), z.literal(false)]).optional(),
+    /** Posição da logo; sem isso, a do perfil de design. */
+    logoPosition: z.enum(["top-center", "top-left", "top-right"]).optional(),
     /** carousel (padrão): cards em imagem · single: arte única · tweet: carrossel "print de tweet". */
     format: z.enum(["carousel", "single", "tweet"]).default("carousel"),
     mode: z.enum(["ai", "manual"]).default("ai"),
@@ -56,7 +62,12 @@ export function runFieldsFromBody(body: CreateRunBody): {
   const isTweet = body.format === "tweet";
   const options: AgentRunOptions = isTweet
     ? { theme: body.theme ?? "light" }
-    : { visualDirection: body.visualDirection?.trim() || null };
+    : {
+        visualDirection: body.visualDirection?.trim() || null,
+        frame: body.brandFrame !== false,
+        ...(body.logo !== undefined ? { logo: body.logo } : {}),
+        ...(body.logoPosition ? { logoPosition: body.logoPosition } : {}),
+      };
 
   if (body.cards?.length) {
     const blocks = body.cards.map((c, i) => `Card ${i + 1}:\n${c.text.trim()}`).join("\n\n");

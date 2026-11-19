@@ -22,6 +22,12 @@ export type AgentRunOptions = {
   visualDirection?: string | null;
   /** Direção visual de cada card, na ordem (null = a IA decide pelas regras padrão). */
   cardVisuals?: (string | null)[] | null;
+  /** Rodapé fixo da marca aplicado em código (padrão: ligado; false desliga). */
+  frame?: boolean;
+  /** Versão da logo colada em código: auto (pelo contraste, padrão), light, dark ou false (sem logo). */
+  logo?: "auto" | "light" | "dark" | false;
+  /** Posição da logo (sem isso, a do perfil de design). */
+  logoPosition?: "top-center" | "top-left" | "top-right" | null;
 };
 
 /** Plano do carrossel: o que vai escrito em cada card e como ele deve parecer. */

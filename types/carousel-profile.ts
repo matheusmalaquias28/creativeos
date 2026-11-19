@@ -6,6 +6,8 @@ export type ProfileReferenceImage = {
   storage_path: string;
 };
 
+export type LogoPosition = "top-center" | "top-left" | "top-right";
+
 export type CarouselProfile = {
   id: string;
   user_id: string;
@@ -26,6 +28,11 @@ export type CarouselProfile = {
   /** Logo do perfil do Instagram (opcional). Foto do perfil no carrossel tweet. */
   instagram_avatar_url: string | null;
   instagram_avatar_storage_path: string | null;
+  /** Versão clara da logo (para fundo escuro). Sem ela, o agente gera a logo toda em branco. */
+  logo_light_url: string | null;
+  logo_light_storage_path: string | null;
+  /** Onde o Agente de Carrossel aplica a logo (em código, depois da arte). */
+  logo_position: LogoPosition;
   /** Raw business/brand context typed by the user. */
   business_context: string | null;
   /** AI-generated markdown context read by the Gerador Turbo. */
@@ -58,6 +65,9 @@ export function makeEmptyProfileDraft(): CarouselProfileDraft {
     instagram_handle: null,
     instagram_avatar_url: null,
     instagram_avatar_storage_path: null,
+    logo_light_url: null,
+    logo_light_storage_path: null,
+    logo_position: "top-center",
     business_context: null,
     context_md: null,
   };

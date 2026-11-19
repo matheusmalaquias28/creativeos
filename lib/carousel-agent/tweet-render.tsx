@@ -22,7 +22,7 @@ const THEMES: Record<TweetTheme, { bg: string; text: string; muted: string; ring
 
 const fontCache = new Map<number, Promise<ArrayBuffer | null>>();
 
-async function loadInter(weight: 400 | 700): Promise<ArrayBuffer | null> {
+export async function loadInter(weight: 400 | 700): Promise<ArrayBuffer | null> {
   if (!fontCache.has(weight)) {
     fontCache.set(
       weight,

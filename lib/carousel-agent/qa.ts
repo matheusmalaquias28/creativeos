@@ -31,7 +31,8 @@ Reprove (ok=false) se:
 NÃO conte como texto a mais o que faz parte da cena: telas de celular/computador, documentos, papéis, embalagens, placas, roupas. Só reprove texto de cena se ele estiver grande e competindo com o título.
 
 Não reprove por estilo, quebra de linha, maiúsculas/minúsculas ou pontuação final.
-IGNORE a logo da marca${brand ? ` (${brand})` : ""} e qualquer texto dentro dela: a logo faz parte da arte e não é texto a mais.`,
+IGNORE a logo da marca${brand ? ` (${brand})` : ""} e qualquer texto dentro dela: a logo faz parte da arte e não é texto a mais.
+IGNORE o rodapé da faixa de baixo (barra de progresso, ícones de redes sociais, @ do perfil e ícones de curtir/comentar/enviar/salvar): ele é aplicado automaticamente.`,
     input: [
       inputText(`Textos esperados:\n${expected.map((t) => `- "${t}"`).join("\n")}`),
       inputImage(imageUrl),
