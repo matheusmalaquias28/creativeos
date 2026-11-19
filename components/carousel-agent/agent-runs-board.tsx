@@ -11,6 +11,7 @@ import {
   Loader2,
   RefreshCw,
   Send,
+  Trash2,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -111,6 +112,8 @@ export function AgentRunsBoard({ initialRuns }: { initialRuns: AgentRun[] }) {
     );
   }
 
+  const removeRun = (id: string) => setRuns((prev) => prev.filter((r) => r.id !== id));
+
   const open = (run: AgentRun, index: number) => {
     const items = run.cards
       .filter((c) => c.url)
@@ -130,7 +133,9 @@ export function AgentRunsBoard({ initialRuns }: { initialRuns: AgentRun[] }) {
             Nada esperando aprovação.
           </p>
         ) : (
-          pending.map((run) => <RunCard key={run.id} run={run} onOpen={(i) => open(run, i)} />)
+          pending.map((run) => (
+            <RunCard key={run.id} run={run} onOpen={(i) => open(run, i)} onDeleted={removeRun} />
+          ))
         )}
       </section>
 
@@ -140,7 +145,7 @@ export function AgentRunsBoard({ initialRuns }: { initialRuns: AgentRun[] }) {
             Histórico <span className="text-muted-foreground">· {decided.length}</span>
           </h2>
           {decided.map((run) => (
-            <RunCard key={run.id} run={run} onOpen={(i) => open(run, i)} />
+            <RunCard key={run.id} run={run} onOpen={(i) => open(run, i)} onDeleted={removeRun} />
           ))}
         </section>
       )}
@@ -155,13 +160,42 @@ export function AgentRunsBoard({ initialRuns }: { initialRuns: AgentRun[] }) {
   );
 }
 
-function RunCard({ run, onOpen }: { run: AgentRun; onOpen: (index: number) => void }) {
+function RunCard({
+  run,
+  onOpen,
+  onDeleted,
+}: {
+  run: AgentRun;
+  onOpen: (index: number) => void;
+  onDeleted: (id: string) => void;
+}) {
+  const [deleting, setDeleting] = useState(false);
   const status = STATUS[run.status];
   const stale = isStale(run);
   const working = (run.status === "generating" || run.status === "queued") && !stale;
   const canAdjust = run.status === "awaiting_approval" || run.status === "failed";
   const qaWarnings = run.cards.filter((c) => c.qa && !c.qa.ok).length;
   const plannedCards = run.plan?.cards.length ?? run.card_count ?? 0;
+
+  async function remove() {
+    const name = run.plan?.title ?? FORMAT[run.format].label;
+    const note =
+      run.status === "approved"
+        ? "\n\nEle já foi aprovado: sai da lista, mas o post continua agendado/publicado no Instagram."
+        : "\n\nAs imagens geradas também serão apagadas. Não dá para desfazer.";
+    if (!confirm(`Excluir "${name}"?${note}`)) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/carousel-agent/runs/${run.id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Erro ao excluir");
+      onDeleted(run.id);
+      toast.success("Excluído");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao excluir");
+      setDeleting(false);
+    }
+  }
 
   return (
     <article className="overflow-hidden rounded-2xl border border-border bg-card">
@@ -193,6 +227,17 @@ function RunCard({ run, onOpen }: { run: AgentRun; onOpen: (index: number) => vo
             {working && <Loader2 className="animate-spin" />}
             {stale ? "Parou no meio" : status.label}
           </Badge>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Excluir"
+            title={working ? "Espere terminar de gerar para excluir" : "Excluir"}
+            disabled={working || deleting}
+            onClick={remove}
+            className="text-muted-foreground hover:text-tone-red"
+          >
+            {deleting ? <Loader2 className="animate-spin" /> : <Trash2 />}
+          </Button>
         </div>
       </header>
 
