@@ -18,10 +18,10 @@ Instagram que já existe cuida do resto ([lib/instagram](../instagram/README.md)
 
 ```
 agente ─POST /runs─▶ fila ─▶ plano (GPT: textos, guia de estilo, legenda + hashtags)
-                          ─▶ capa (GPT Image, referências do perfil)
-                          ─▶ demais cards em paralelo (GPT Image, capa como referência)
-                          ─▶ cada card: 1080×1350 + logo colada + JPEG
-                          ─▶ revisão do texto (modelo de visão; refaz 1x se achar erro)
+                          ─▶ capa (GPT Image medium; logo + referências do perfil)
+                          ─▶ demais cards em paralelo (capa + logo como referência)
+                          ─▶ cada card: 1080×1350 + JPEG
+                          ─▶ revisão do texto (só marca "para revisar"; NUNCA refaz sozinha)
                           ─▶ aguardando aprovação ─▶ [aprovar] ─▶ instagram_posts (agendado)
                                                    └▶ [reprovar] ─▶ motivo volta ao agente
 ```
@@ -30,11 +30,31 @@ agente ─POST /runs─▶ fila ─▶ plano (GPT: textos, guia de estilo, legen
 - **Tweet:** foto do perfil = "Logo do perfil do Instagram" do perfil de design
   (ou a logo normal), nome do perfil e o @. Fonte Inter (baixada do Google Fonts
   e guardada em memória); se falhar, cai na Noto Sans do `next/og`.
-- **Logo:** nunca é desenhada pela IA. O prompt deixa o canto superior esquerdo
-  livre e a logo do perfil é colada depois (`images.ts`).
+- **Logo:** vai como imagem de referência e a IA aplica na arte, no canto superior
+  esquerdo, sem o fundo branco do arquivo. Pode sair com uma leve diferença do
+  original. (Antes era colada por cima, e logos com fundo branco ficavam com um
+  retângulo branco.)
 - **Texto:** regras fixas dos prompts de arte ("A IMAGEM DEVE CONTER SOMENTE ESSES
-  TEXTOS, NADA MAIS:" e CTA como botão centralizado embaixo). Card com texto
-  suspeito depois da 2ª tentativa vai para aprovação marcado "para revisar".
+  TEXTOS, NADA MAIS:" e CTA como botão centralizado embaixo). A revisão por visão
+  ignora a logo e só marca o card "para revisar"; refazer é decisão humana.
+
+## Freios de gasto (`limits.ts`)
+
+| Freio | Padrão | Onde muda |
+| --- | --- | --- |
+| Imagens por 24h (janela móvel), todas as contas | 40 | `CAROUSEL_AGENT_DAILY_IMAGE_LIMIT` |
+| Pedidos gerando ao mesmo tempo | 2 | `CAROUSEL_AGENT_MAX_ACTIVE` |
+| Tentativas por card | 1 (sem retry automático) | código |
+| Tempo por geração | 190s sem começar imagem nova | código |
+| Qualidade | `medium` | `CAROUSEL_AGENT_IMAGE_QUALITY` |
+
+- Cada imagem reserva uma vaga no banco **antes** de chamar a API
+  (`reserve_carousel_agent_image`, atômico). Sem vaga, o card falha com
+  "Limite diário de imagens" e nada é gasto.
+- Pedido novo, refazer e retomar são recusados com **429** quando já há pedidos
+  demais gerando ou quando o teto do dia não comporta as imagens do pedido.
+- O carrossel tweet não gera imagem e não entra no teto.
+- A aba mostra quantas imagens já foram usadas nas últimas 24h.
 - **Conta:** sai do @ do perfil de design. Precisa ser uma conta conectada nas
   variáveis `INSTAGRAM_ACCESS_TOKEN*`. Se não for, o pedido é recusado na hora.
 - **Tempo:** a geração roda em `after()` com teto de 300s. Se a função morrer no
@@ -75,6 +95,10 @@ Base: `https://creative.energymidia.com.br`. Todas as chamadas usam
 Resposta `202` com o carrossel (`id`, `status: "queued"`, ...). Erros: `400`
 (pedido inválido), `401` (segredo), `404` (perfil), `409` (dois perfis com o
 mesmo @), `422` (perfil sem @ ou conta não conectada).
+
+**429** (limite de gasto): já há pedidos demais gerando ou o teto diário de imagens
+não comporta o pedido. Espere alguns minutos (ou peça um `tweet`, que não gasta
+imagem). Não reenvie em loop.
 
 ### `GET /api/carousel-agent/runs/{id}`: status
 
@@ -130,7 +154,9 @@ aprova o próprio carrossel.
 | `CAROUSEL_AGENT_SECRET` | Vercel + agente | Autentica o agente e assina o callback. |
 | `INSTAGRAM_CRON_SECRET` | Vercel + Vault (`instagram_publish_secret`) | Cron que publica os agendados a cada 5 min (pg_cron). |
 | `CREATIVEOS_APP_URL` | Vercel | Link `reviewUrl` nas respostas. |
-| `CAROUSEL_AGENT_IMAGE_QUALITY` | opcional | `low`/`medium`/`high` (padrão `high`). |
+| `CAROUSEL_AGENT_IMAGE_QUALITY` | opcional | `low`/`medium`/`high` (padrão `medium`). |
+| `CAROUSEL_AGENT_DAILY_IMAGE_LIMIT` | opcional | Imagens por 24h (padrão 40). |
+| `CAROUSEL_AGENT_MAX_ACTIVE` | opcional | Pedidos gerando ao mesmo tempo (padrão 2). |
 
 ## Arquivos
 
@@ -139,7 +165,8 @@ aprova o próprio carrossel.
 | `pipeline.ts` | Geração: plano, capa, cards em paralelo, revisão, retomada. |
 | `prompts.ts` | Prompts do plano e de cada card, legenda + hashtags (puros, testados). |
 | `qa.ts` | Revisão do texto de cada card com modelo de visão. |
-| `images.ts` | 1080×1350, logo colada, JPEG do feed. |
+| `images.ts` | 1080×1350 e JPEG do feed. |
+| `limits.ts` | Teto diário de imagens, pedidos simultâneos, tempo por geração. |
 | `tweet-render.tsx` / `tweet-layout.ts` | Card tweet desenhado no servidor e o cálculo do tamanho da fonte. |
 | `decide.ts` | Aprovar (vira `instagram_posts`) e reprovar. |
 | `runs.ts` | Banco, conta pelo @ do perfil, resposta pública e callback. |

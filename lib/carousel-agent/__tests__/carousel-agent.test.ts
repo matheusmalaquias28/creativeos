@@ -30,23 +30,27 @@ describe("buildCardPrompt", () => {
     expect(p).toContain("o ÚLTIMO card");
   });
 
-  it("reserva o canto da logo e nunca pede logo desenhada", () => {
+  it("a logo vai como referência para a IA aplicar, sem o fundo branco", () => {
     const p = buildCardPrompt({ plan, index: 0, hasLogo: true, coverAsReference: false, profileReferenceCount: 0 });
-    expect(p).toContain("canto superior esquerdo livre");
-    expect(p).toContain("NÃO desenhe nenhuma logo");
+    expect(p).toContain("Imagem 1 é a LOGO da marca: aplique exatamente esta logo");
+    expect(p).toContain("canto superior esquerdo");
+    expect(p).toContain("NÃO reproduza esse fundo");
+    expect(p).not.toContain("será aplicada ali depois");
     expect(p).toContain("a CAPA");
   });
 
-  it("numera as referências: capa primeiro, depois as do perfil", () => {
-    const withCover = buildCardPrompt({ plan, index: 1, hasLogo: false, coverAsReference: true, profileReferenceCount: 2 });
-    expect(withCover).toContain("Imagem 1 é a CAPA");
-    expect(withCover).toContain("Imagens 2 a 3 são referências");
+  it("numera as referências: capa, logo e depois as do perfil", () => {
+    const all = buildCardPrompt({ plan, index: 1, hasLogo: true, coverAsReference: true, profileReferenceCount: 2 });
+    expect(all).toContain("Imagem 1 é a CAPA");
+    expect(all).toContain("Imagem 2 é a LOGO");
+    expect(all).toContain("Imagens 3 a 4 são referências");
     const cover = buildCardPrompt({ plan, index: 0, hasLogo: false, coverAsReference: false, profileReferenceCount: 1 });
     expect(cover).not.toContain("é a CAPA deste");
+    expect(cover).not.toContain("LOGO");
     expect(cover).toContain("Imagem 1 é referência");
   });
 
-  it("leva o ajuste pedido e os erros da tentativa anterior", () => {
+  it("leva o ajuste pedido no refazer", () => {
     const p = buildCardPrompt({
       plan,
       index: 1,
@@ -54,10 +58,8 @@ describe("buildCardPrompt", () => {
       coverAsReference: true,
       profileReferenceCount: 0,
       instruction: "título maior",
-      previousIssues: ['escreveu "VENDSA"'],
     });
     expect(p).toContain("AJUSTE PEDIDO PARA ESTE CARD (prioridade): título maior");
-    expect(p).toContain('- escreveu "VENDSA"');
   });
 });
 
@@ -182,5 +184,32 @@ describe("card tweet", () => {
     const size = fitTweetFontSize(long);
     expect(size).toBeLessThan(46);
     expect(size).toBeGreaterThanOrEqual(24);
+  });
+});
+
+import { dailyImageLimit, estimatedImages, maxActiveRuns } from "../limits";
+
+describe("freios de gasto", () => {
+  it("tweet não gasta imagem; arte única gasta 1; carrossel o número de cards", () => {
+    expect(estimatedImages("tweet", 6)).toBe(0);
+    expect(estimatedImages("single", null)).toBe(1);
+    expect(estimatedImages("carousel", 5)).toBe(5);
+    expect(estimatedImages("carousel", null)).toBe(7);
+  });
+
+  it("limites vêm do env, com padrão seguro", () => {
+    const keep = { d: process.env.CAROUSEL_AGENT_DAILY_IMAGE_LIMIT, a: process.env.CAROUSEL_AGENT_MAX_ACTIVE };
+    delete process.env.CAROUSEL_AGENT_DAILY_IMAGE_LIMIT;
+    delete process.env.CAROUSEL_AGENT_MAX_ACTIVE;
+    expect(dailyImageLimit()).toBe(40);
+    expect(maxActiveRuns()).toBe(2);
+    process.env.CAROUSEL_AGENT_DAILY_IMAGE_LIMIT = "15";
+    process.env.CAROUSEL_AGENT_MAX_ACTIVE = "abc";
+    expect(dailyImageLimit()).toBe(15);
+    expect(maxActiveRuns()).toBe(2);
+    if (keep.d === undefined) delete process.env.CAROUSEL_AGENT_DAILY_IMAGE_LIMIT;
+    else process.env.CAROUSEL_AGENT_DAILY_IMAGE_LIMIT = keep.d;
+    if (keep.a === undefined) delete process.env.CAROUSEL_AGENT_MAX_ACTIVE;
+    else process.env.CAROUSEL_AGENT_MAX_ACTIVE = keep.a;
   });
 });

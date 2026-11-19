@@ -1600,6 +1600,12 @@ export type Database = {
         }>;
         Relationships: [];
       };
+      carousel_agent_image_usage: {
+        Row: { id: number; run_id: string | null; created_at: string };
+        Insert: { id?: number; run_id?: string | null; created_at?: string };
+        Update: Partial<{ run_id: string | null }>;
+        Relationships: [];
+      };
       carousel_agent_runs: {
         Row: {
           id: string;
@@ -1695,6 +1701,10 @@ export type Database = {
       };
     };
     Functions: {
+      reserve_carousel_agent_image: {
+        Args: { p_run_id: string; p_daily_limit: number };
+        Returns: boolean;
+      };
       assign_creative_demand_due_dates: {
         Args: { p_now?: string };
         Returns: {

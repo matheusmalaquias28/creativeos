@@ -12,8 +12,6 @@ import type { AgentFormat, AgentPlan, AgentRunMode } from "./types";
 
 export const EXACT_TEXT_RULE = "A IMAGEM DEVE CONTER SOMENTE ESSES TEXTOS, NADA MAIS:";
 
-/** Área reservada para a logo, colada depois por cima (nunca desenhada pela IA). */
-export const LOGO_AREA = { widthRatio: 0.2, heightRatio: 0.09, marginRatio: 0.055 } as const;
 
 type ProfileForPrompt = Pick<
   CarouselProfile,
@@ -86,7 +84,7 @@ REGRAS DOS TEXTOS
 GUIA DE ESTILO (styleGuide)
 - Um único guia que vale para TODOS os cards, para o carrossel parecer uma peça só: fundo, paleta, tipografia descrita, posição dos textos, elementos que se repetem, estilo de imagem.
 - Prefira pessoas, cenários e situações brasileiras quando houver foto.
-- Não peça logo da marca na arte: ela é aplicada depois.
+- A logo da marca vai anexada e é aplicada no canto superior esquerdo de todos os cards: não descreva logo no guia, só reserve esse canto.
 
 LEGENDA
 - caption: legenda pronta para o post, com quebra de linha entre parágrafos, sem hashtags.
@@ -161,17 +159,28 @@ export function buildCaption(plan: Pick<AgentPlan, "caption" | "hashtags">): str
   return caption.slice(0, 2200);
 }
 
+/**
+ * Ordem das imagens anexadas ao card (o prompt cita cada uma pelo número):
+ * capa (cards depois da capa) → logo da marca → referências do perfil.
+ */
+export function referenceOrder(input: { coverAsReference: boolean; hasLogo: boolean; profileReferenceCount: number }) {
+  let n = 1;
+  const cover = input.coverAsReference ? n++ : null;
+  const logo = input.hasLogo ? n++ : null;
+  const profile = input.profileReferenceCount > 0 ? { first: n, last: n + input.profileReferenceCount - 1 } : null;
+  return { cover, logo, profile };
+}
+
 export function buildCardPrompt(input: {
   plan: Pick<AgentPlan, "styleGuide" | "cards">;
   index: number;
   format?: AgentFormat;
+  /** A logo do perfil vai anexada para a IA aplicar na arte. */
   hasLogo: boolean;
-  /** Os cards depois da capa recebem a capa como Imagem 1. */
+  /** Os cards depois da capa recebem a capa como referência de estilo. */
   coverAsReference: boolean;
-  /** Quantas imagens de referência do perfil vão anexadas (depois da capa). */
+  /** Quantas imagens de referência do perfil vão anexadas. */
   profileReferenceCount: number;
-  /** Problemas que a revisão achou na tentativa anterior. */
-  previousIssues?: string[];
   /** Pedido feito na aprovação ("refazer com ..."). */
   instruction?: string | null;
 }): string {
@@ -185,15 +194,20 @@ export function buildCardPrompt(input: {
   const lines = texts.map((t) => `"${t}"`);
   if (card.cta?.trim()) lines.push(`"${stripTravessao(card.cta)}" (botão de CTA)`);
 
+  const order = referenceOrder(input);
   const refs: string[] = [];
-  if (input.coverAsReference) {
+  if (order.cover) {
     refs.push(
-      "Imagem 1 é a CAPA deste mesmo carrossel: siga exatamente o mesmo estilo (fundo, paleta, tipografia, tamanho e posição dos textos, elementos gráficos). Os cards precisam parecer da mesma peça. Não copie os textos nem a composição da capa."
+      `Imagem ${order.cover} é a CAPA deste mesmo carrossel: siga exatamente o mesmo estilo (fundo, paleta, tipografia, tamanho e posição dos textos, elementos gráficos, posição da logo). Os cards precisam parecer da mesma peça. Não copie os textos nem a composição da capa.`
     );
   }
-  if (input.profileReferenceCount > 0) {
-    const first = input.coverAsReference ? 2 : 1;
-    const last = first + input.profileReferenceCount - 1;
+  if (order.logo) {
+    refs.push(
+      `Imagem ${order.logo} é a LOGO da marca: aplique exatamente esta logo na arte, sem redesenhar, sem mudar formas, cores, letras ou proporção, pequena e discreta no canto superior esquerdo. Se a logo tiver fundo branco ou retângulo atrás, NÃO reproduza esse fundo: só o símbolo/letreiro, integrado à arte. Não invente outra logo.`
+    );
+  }
+  if (order.profile) {
+    const { first, last } = order.profile;
     const range = first === last ? `Imagem ${first} é referência` : `Imagens ${first} a ${last} são referências`;
     refs.push(`${range} de identidade visual do cliente: use só como inspiração de estilo e cores, não copie os textos delas.`);
   }
@@ -216,16 +230,11 @@ export function buildCardPrompt(input: {
     );
   }
 
-  if (input.hasLogo) {
-    const w = Math.round(LOGO_AREA.widthRatio * 100);
-    const h = Math.round(LOGO_AREA.heightRatio * 100);
-    parts.push(
-      `Deixe o canto superior esquerdo livre (cerca de ${w}% da largura por ${h}% da altura), sem texto nem elementos importantes: a logo da marca será aplicada ali depois. NÃO desenhe nenhuma logo, marca d'água, @ ou nome de perfil.`
-    );
-  } else {
-    parts.push("Não desenhe logo, marca d'água, @ ou nome de perfil.");
-  }
-
+  parts.push(
+    input.hasLogo
+      ? "Além da logo anexada, não escreva marca d'água, @ ou nome de perfil."
+      : "Não desenhe logo, marca d'água, @ ou nome de perfil."
+  );
   parts.push(
     single
       ? "Não escreva numeração nem setas de 'arraste': é um post único."
@@ -235,11 +244,6 @@ export function buildCardPrompt(input: {
 
   if (input.instruction?.trim()) {
     parts.push(`AJUSTE PEDIDO PARA ESTE CARD (prioridade): ${input.instruction.trim()}`);
-  }
-  if (input.previousIssues?.length) {
-    parts.push(
-      `A tentativa anterior saiu com estes problemas, corrija:\n${input.previousIssues.map((i) => `- ${i}`).join("\n")}`
-    );
   }
 
   return parts.join("\n\n");

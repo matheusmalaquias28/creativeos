@@ -23,6 +23,7 @@ import {
   resolveProfileAccount,
 } from "@/lib/carousel-agent/runs";
 import { runGeneration } from "@/lib/carousel-agent/pipeline";
+import { checkCanStart, estimatedImages } from "@/lib/carousel-agent/limits";
 
 export const maxDuration = 300;
 
@@ -63,6 +64,12 @@ export async function POST(request: Request) {
     if (!profile) throw new AgentRunError("Perfil de design não encontrado.", 404);
 
     const account = await resolveProfileAccount(profile.instagram_handle);
+
+    // Freios de gasto: pedidos gerando ao mesmo tempo e teto diário de imagens.
+    const cardCount = body.format === "single" ? 1 : body.cardCount ?? null;
+    const limit = await checkCanStart(admin, { images: estimatedImages(body.format, cardCount) });
+    if (limit) return NextResponse.json({ error: limit.message }, { status: limit.status });
+
     const run = await insertRun(admin, {
       profile,
       account,
@@ -70,7 +77,7 @@ export async function POST(request: Request) {
       format: body.format,
       options: body.format === "tweet" ? { theme: body.theme ?? "light" } : {},
       input: body.content,
-      cardCount: body.format === "single" ? 1 : body.cardCount ?? null,
+      cardCount,
       scheduledAt: body.scheduledAt ? new Date(body.scheduledAt).toISOString() : null,
       externalRef: body.externalRef ?? null,
       callbackUrl: body.callbackUrl ?? null,

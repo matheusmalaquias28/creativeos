@@ -31,10 +31,9 @@ import { reviewCardText } from "./qa";
 import { downloadImage, finalizeCard } from "./images";
 import { renderTweetCard } from "./tweet-render";
 import { getRun, notifyAgent, toAgentRun, type Admin } from "./runs";
+import { GENERATION_TIME_BUDGET_MS, reserveImage } from "./limits";
 import { agentPlanSchema, AGENT_MAX_CARDS, AGENT_MIN_CARDS, type AgentCard, type AgentPlan, type AgentRun } from "./types";
 
-/** Tentativas por card (a 2ª só quando a revisão acha erro ou a geração falha). */
-const MAX_ATTEMPTS = 2;
 /**
  * Todos os cards depois da capa de uma vez: a capa leva ~100s e cada card
  * ~80s, então em lotes um carrossel de 8 passaria do teto de 300s da função.
@@ -44,7 +43,8 @@ const MAX_PROFILE_REFERENCES = 3;
 
 function imageQuality(): OpenAIImageQuality {
   const q = process.env.CAROUSEL_AGENT_IMAGE_QUALITY?.trim().toLowerCase();
-  return q === "low" || q === "medium" || q === "high" ? q : "high";
+  // "medium", igual ao gerador de feed do Spaces; "high" custa ~4x por imagem.
+  return q === "low" || q === "medium" || q === "high" ? q : "medium";
 }
 
 function emptyCard(index: number): AgentCard {
@@ -138,6 +138,7 @@ export type GenerationOptions = {
 
 /** Roda (ou continua) a geração. Nunca lança: erro vira status `failed`. */
 export async function runGeneration(runId: string, opts: GenerationOptions = {}): Promise<void> {
+  const startedAt = Date.now();
   const admin = createAdminClient();
   const claimed = await claim(admin, runId);
   if (!claimed) return;
@@ -202,7 +203,8 @@ export async function runGeneration(runId: string, opts: GenerationOptions = {})
     const theme = run.options.theme === "dark" ? "dark" : "light";
     const avatar =
       isTweet && tweetProfile.avatar_url ? await downloadImage(tweetProfile.avatar_url).catch(() => null) : null;
-    const logo = !isTweet && profile.logo_url ? await downloadImage(profile.logo_url).catch(() => null) : null;
+    // A logo vai como referência (a IA aplica); sem colagem por cima.
+    const logoRef = !isTweet && profile.logo_url ? [{ url: profile.logo_url }] : [];
     const profileRefs = (profile.reference_images ?? [])
       .slice(0, MAX_PROFILE_REFERENCES)
       .map((r) => ({ url: r.url }));
@@ -240,7 +242,7 @@ export async function runGeneration(runId: string, opts: GenerationOptions = {})
           avatar,
           theme,
         });
-        const { url, path } = await uploadCard(index, await finalizeCard(png, null));
+        const { url, path } = await uploadCard(index, await finalizeCard(png));
         run.cards[index] = { ...run.cards[index], status: "ready", url, path, prompt: null, qa: null, error: null };
       } catch (e) {
         const message = e instanceof Error ? e.message : "Erro ao desenhar o card";
@@ -255,52 +257,58 @@ export async function runGeneration(runId: string, opts: GenerationOptions = {})
       if (isTweet) return generateTweetCard(index);
       const cover = index > 0 && run.format === "carousel" ? run.cards[0] : null;
       const coverRef = cover?.status === "ready" && cover.url ? [{ url: cover.url }] : [];
-      let issues: string[] = [];
-      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-        if (fenced) return;
-        const prompt = buildCardPrompt({
-          plan,
-          index,
-          format: run.format,
-          hasLogo: !!logo,
-          coverAsReference: coverRef.length > 0,
-          profileReferenceCount: profileRefs.length,
-          previousIssues: issues,
-          instruction: run.cards[index].instruction,
-        });
-        run.cards[index] = { ...run.cards[index], status: "generating", prompt, attempts: attempt };
+      const fail = async (message: string) => {
+        run.cards[index] = { ...run.cards[index], status: "failed", error: message };
         await save();
-        try {
-          const { buffer } = await generateOpenAIImage({
-            prompt,
-            references: [...coverRef, ...profileRefs],
-            referencesInPrompt: true,
-            aspectRatio: "4:5",
-            resolution: "2K",
-            quality: imageQuality(),
-          });
-          const { url, path } = await uploadCard(index, await finalizeCard(buffer, logo));
+      };
 
-          const qa = await reviewCardText(url, expectedTexts(plan, index)).catch((e) => {
-            console.warn("[carousel-agent] revisão falhou", e instanceof Error ? e.message : e);
-            return null;
-          });
-          run.cards[index] = { ...run.cards[index], status: "ready", url, path, qa, error: null };
+      // Freios: tempo da função e teto diário de imagens (reservado antes de gastar).
+      if (Date.now() - startedAt > GENERATION_TIME_BUDGET_MS) {
+        return fail("Tempo da geração esgotado antes deste card. Use Retomar geração.");
+      }
+      if (!(await reserveImage(admin, run.id))) {
+        return fail("Limite diário de imagens do agente atingido. Tente mais tarde.");
+      }
+
+      const prompt = buildCardPrompt({
+        plan,
+        index,
+        format: run.format,
+        hasLogo: logoRef.length > 0,
+        coverAsReference: coverRef.length > 0,
+        profileReferenceCount: profileRefs.length,
+        instruction: run.cards[index].instruction,
+      });
+      run.cards[index] = { ...run.cards[index], status: "generating", prompt, attempts: run.cards[index].attempts + 1 };
+      await save();
+      try {
+        // Uma tentativa só: se falhar ou sair com erro de texto, quem decide
+        // refazer é a pessoa na aprovação ("Refazer").
+        const { buffer } = await generateOpenAIImage({
+          prompt,
+          references: [...coverRef, ...logoRef, ...profileRefs],
+          referencesInPrompt: true,
+          aspectRatio: "4:5",
+          resolution: "2K",
+          quality: imageQuality(),
+        });
+        const { url, path } = await uploadCard(index, await finalizeCard(buffer));
+        const qa = await reviewCardText(url, expectedTexts(plan, index), profile.name).catch((e) => {
+          console.warn("[carousel-agent] revisão falhou", e instanceof Error ? e.message : e);
+          return null;
+        });
+        run.cards[index] = { ...run.cards[index], status: "ready", url, path, qa, error: null };
+        await save();
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Erro ao gerar a imagem";
+        console.error(`[carousel-agent] card ${index + 1}`, message);
+        // "Refazer" que falhou mantém a versão anterior do card.
+        if (run.cards[index].url) {
+          run.cards[index] = { ...run.cards[index], status: "ready", error: message };
           await save();
-          if (!qa || qa.ok) return;
-          issues = qa.issues;
-        } catch (e) {
-          const message = e instanceof Error ? e.message : "Erro ao gerar a imagem";
-          console.error(`[carousel-agent] card ${index + 1} tentativa ${attempt}`, message);
-          // Se uma tentativa anterior já deixou o card pronto, ele fica como está.
-          if (run.cards[index].url && attempt > 1) {
-            run.cards[index] = { ...run.cards[index], status: "ready" };
-            await save();
-            return;
-          }
-          run.cards[index] = { ...run.cards[index], status: attempt < MAX_ATTEMPTS ? "generating" : "failed", error: message };
-          await save();
+          return;
         }
+        await fail(message);
       }
     };
 

@@ -4,11 +4,27 @@ import { layout } from "@/lib/design/tokens";
 import { isAdminRole } from "@/lib/auth/permissions";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { listRuns } from "@/lib/carousel-agent/runs";
+import { dailyImageLimit, imagesUsedLast24h, maxActiveRuns } from "@/lib/carousel-agent/limits";
 import { getCurrentUserProfile } from "@/services/users";
 
 export const metadata = {
   title: "Agente de Carrossel",
 };
+
+/** Teto de gasto: imagens do GPT Image nas últimas 24h (o tweet não conta). */
+async function UsageLine() {
+  const [used, limit, active] = [await imagesUsedLast24h(createAdminClient()), dailyImageLimit(), maxActiveRuns()];
+  const pct = limit > 0 ? used / limit : 1;
+  return (
+    <p className="text-xs text-muted-foreground">
+      Imagens geradas nas últimas 24h:{" "}
+      <span className={pct >= 1 ? "font-semibold text-tone-red" : pct >= 0.8 ? "font-semibold text-tone-amber" : "font-semibold text-foreground"}>
+        {used} de {limit}
+      </span>{" "}
+      · até {active} pedido{active > 1 ? "s" : ""} gerando ao mesmo tempo · cada card é gerado uma vez (refazer é manual)
+    </p>
+  );
+}
 
 export default async function CarouselAgentPage() {
   const user = await getCurrentUserProfile();
@@ -21,7 +37,10 @@ export default async function CarouselAgentPage() {
     >
       <div className={layout.sectionGap}>
         {admin ? (
-          <AgentRunsBoard initialRuns={await listRuns(createAdminClient())} />
+          <>
+            <UsageLine />
+            <AgentRunsBoard initialRuns={await listRuns(createAdminClient())} />
+          </>
         ) : (
           <p className="rounded-xl border border-dashed border-border-strong bg-surface p-4 text-sm text-muted-foreground">
             Só administradores aprovam os carrosséis do agente.

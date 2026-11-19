@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAgentOrAdmin } from "@/lib/carousel-agent/auth";
 import { getRun } from "@/lib/carousel-agent/runs";
 import { isStale, runGeneration } from "@/lib/carousel-agent/pipeline";
+import { checkCanStart } from "@/lib/carousel-agent/limits";
 
 export const maxDuration = 300;
 
@@ -33,6 +34,12 @@ export async function POST(request: Request, { params }: Params) {
     return NextResponse.json({ error: "Card inexistente." }, { status: 400 });
   }
   const instruction = typeof body.instruction === "string" ? body.instruction.trim().slice(0, 1000) : null;
+
+  // Mesmos freios do pedido novo (o tweet não gasta imagem).
+  const images =
+    run.format === "tweet" ? 0 : index !== null ? 1 : run.cards.filter((c) => c.status !== "ready").length || run.cards.length;
+  const limit = await checkCanStart(admin, { images, exceptRunId: run.id });
+  if (limit) return NextResponse.json({ error: limit.message }, { status: limit.status });
 
   after(() => runGeneration(id, index === null ? {} : { onlyIndexes: [index], instruction }));
   return NextResponse.json({ ok: true }, { status: 202 });
