@@ -322,10 +322,12 @@ describe("rodapé fixo da marca", () => {
   it("o prompt reserva a faixa de baixo só quando o rodapé está ligado", () => {
     const on = buildCardPrompt({ plan, index: 2, hasLogo: false, coverAsReference: true, profileReferenceCount: 1, reserveFooter: true });
     expect(on).toContain(FOOTER_RESERVED_RULE);
-    expect(on).toContain("logo acima da faixa reservada do rodapé");
+    expect(on).toContain("com margem da borda de baixo");
+    expect(on).toContain("formato 9:10");
     expect(on).toContain("Não reproduza o rodapé delas");
     const off = buildCardPrompt({ plan, index: 2, hasLogo: false, coverAsReference: true, profileReferenceCount: 0 });
-    expect(off).not.toContain("FAIXA RESERVADA");
+    expect(off).not.toContain("RODAPÉ:");
+    expect(off).toContain("formato vertical 4:5");
   });
 
   it("faixa lisa usa a média exata; faixa com conteúdo usa a dominante", () => {

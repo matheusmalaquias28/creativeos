@@ -13,18 +13,19 @@ import type { AgentFormat, AgentPlan, AgentRunMode } from "./types";
 export const EXACT_TEXT_RULE = "A IMAGEM DEVE CONTER SOMENTE ESSES TEXTOS, NADA MAIS:";
 
 /**
- * Faixa de baixo reservada: o rodapé da marca (barra de progresso, @, ícones)
- * é desenhado em código depois (brand-frame.tsx), igual em todos os cards.
+ * Rodapé da marca (barra de progresso, @, ícones): a arte é gerada só na área
+ * de cima (1080×1200) e o rodapé é encaixado EMBAIXO dela em código
+ * (images.ts + brand-frame.tsx). A IA não vê a faixa, então não tem como invadir.
  */
 export const FOOTER_RESERVED_RULE =
-  "FAIXA RESERVADA NO RODAPÉ: os últimos 11% da altura da arte (a faixa de baixo, de ponta a ponta) ficam VAZIOS, só com a cor de fundo lisa: sem textos, botões, ícones, barra de progresso, @, redes sociais, foto ou qualquer elemento. O rodapé da marca é aplicado ali depois, automaticamente. Todo o conteúdo, inclusive o CTA, fica acima dessa faixa.";
+  "RODAPÉ: a barra de progresso, o @ e os ícones de redes sociais são adicionados depois, numa faixa EMBAIXO desta arte. Não desenhe rodapé, barra de progresso, @, ícones de redes nem numeração. Deixe uma margem confortável embaixo: nenhum texto, caixa ou botão encosta na borda de baixo.";
 
 /**
  * Topo reservado: a logo da marca é colada em código depois (logo.ts), na
  * versão que contrasta com o fundo.
  */
 export const TOP_RESERVED_RULE =
-  "FAIXA RESERVADA NO TOPO: os primeiros 14% da altura da arte (a faixa de cima, de ponta a ponta) ficam sem textos, títulos, botões, molduras ou elementos gráficos; a foto ou o fundo podem continuar ali normalmente. A logo da marca é aplicada ali depois, automaticamente: NÃO desenhe logo nenhuma, nem copie a logo das imagens anexadas.";
+  "FAIXA RESERVADA NO TOPO: os primeiros 16% da altura da arte (a faixa de cima, de ponta a ponta) ficam sem textos, títulos, botões, molduras ou elementos gráficos; a foto ou o fundo podem continuar ali normalmente. A logo da marca é aplicada ali depois, automaticamente: NÃO desenhe logo nenhuma, nem copie a logo das imagens anexadas.";
 
 /** Vai em todo card de imagem: nada além do que foi descrito. */
 export const CLEAN_COMPOSITION_RULE =
@@ -126,9 +127,9 @@ REGRAS DOS TEXTOS
 GUIA DE ESTILO (styleGuide)
 - Um único guia que vale para TODOS os cards, para o carrossel parecer uma peça só: fundo, paleta, tipografia descrita, posição dos textos, o elemento de destaque que se repete e, se houver foto, o estilo dela.
 - Quando houver foto: pessoas, cenários e situações brasileiras, reais e ligadas ao tema.
-- A logo da marca é aplicada automaticamente depois, no topo de todos os cards: não descreva logo no guia nem nos cards, e não ponha textos no topo (os primeiros 14% da altura).${
+- A logo da marca é aplicada automaticamente depois, no topo de todos os cards: não descreva logo no guia nem nos cards, e não ponha textos no topo (os primeiros 16% da altura).${
     brandFrame
-      ? "\n- O rodapé (barra de progresso, @ e ícones de redes) é aplicado automaticamente depois, numa faixa lisa na parte de baixo de todos os cards: não descreva rodapé, barra de progresso, @ nem ícones de redes no guia nem nos cards, e não coloque nada nessa faixa."
+      ? "\n- O rodapé (barra de progresso, @ e ícones de redes) é aplicado automaticamente depois, numa faixa embaixo de todos os cards: não descreva rodapé, barra de progresso, @ nem ícones de redes no guia nem nos cards."
       : ""
   }
 
@@ -271,6 +272,10 @@ export function buildCardPrompt(input: {
   const lines = texts.map((t) => `"${t}"`);
   if (card.cta?.trim()) lines.push(`"${stripTravessao(card.cta)}" (botão de CTA)`);
 
+  // Com rodapé, a arte é só a parte de cima do card (1080×1200).
+  const format = input.reserveFooter
+    ? "9:10 (quase quadrado; o rodapé da marca entra embaixo depois)"
+    : "vertical 4:5";
   const order = referenceOrder(input);
   const refs: string[] = [];
   if (order.cover) {
@@ -301,8 +306,8 @@ export function buildCardPrompt(input: {
 
   const parts = [
     single
-      ? "Arte de post único de Instagram (feed), formato vertical 4:5. A peça precisa funcionar sozinha."
-      : `Arte de carrossel de Instagram, formato vertical 4:5. Esta é ${role} de um carrossel de ${total} cards.`,
+      ? `Arte de post único de Instagram (feed), formato ${format}. A peça precisa funcionar sozinha.`
+      : `Arte de carrossel de Instagram, formato ${format}. Esta é ${role} de um carrossel de ${total} cards.`,
     single
       ? `GUIA DE ESTILO:\n${plan.styleGuide.trim()}`
       : `GUIA DE ESTILO (vale para todos os cards):\n${plan.styleGuide.trim()}`,
@@ -320,7 +325,7 @@ export function buildCardPrompt(input: {
   if (card.cta?.trim()) {
     parts.push(
       `O CTA é um BOTÃO com fundo de cor sólida, SEMPRE centralizado na parte inferior da imagem${
-        input.reserveFooter ? ", logo acima da faixa reservada do rodapé" : ""
+        input.reserveFooter ? ", com margem da borda de baixo" : ""
       }, com o texto do CTA dentro dele.`
     );
   }

@@ -353,7 +353,8 @@ export async function runGeneration(runId: string, opts: GenerationOptions = {})
           prompt,
           references: [...coverRef, ...profileRefs],
           referencesInPrompt: true,
-          aspectRatio: "4:5",
+          // Com rodapé, a IA gera só a parte de cima do card (1080×1200 = 9:10).
+          aspectRatio: useFrame ? "9:10" : "4:5",
           resolution: "2K",
           quality: imageQuality(),
         });

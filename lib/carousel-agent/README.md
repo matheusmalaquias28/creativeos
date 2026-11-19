@@ -32,7 +32,7 @@ agente ─POST /runs─▶ fila ─▶ plano (GPT: textos, guia de estilo, legen
   e guardada em memória); se falhar, cai na Noto Sans do `next/og`.
 - **Logo (`logo.ts`):** colada em código depois da arte, sempre no mesmo lugar
   (posição do perfil de design: topo centralizado, à esquerda ou à direita). A IA
-  só deixa os primeiros 14% do topo sem texto e não desenha logo. Versões: a
+  só deixa os primeiros 16% do topo sem texto e não desenha logo. Versões: a
   logo principal e a "logo clara" do perfil (enviadas) + a logo toda branca e
   toda na cor escura da marca (geradas). Em cada card, o código mede o fundo
   embaixo da logo e escolhe a de mais contraste (prefere as enviadas); em foto
@@ -44,11 +44,12 @@ agente ─POST /runs─▶ fila ─▶ plano (GPT: textos, guia de estilo, legen
   todo prompt de card. O agente pode mandar `visualDirection` (pedido inteiro) e
   `cards[].visual` (por card); ver a API abaixo.
 - **Rodapé fixo (`brand-frame.tsx`):** a barra de progresso, o ícone do Instagram
-  com o @ e os ícones de curtir/comentar/enviar/salvar NÃO passam pela IA. O
-  prompt manda deixar os últimos 11% da arte vazios; depois a faixa (150px) é
-  pintada com a cor do próprio fundo e o rodapé é desenhado por cima, igual em
-  todos os cards. A barra enche card a card (cheia no último); arte única fica
-  sem barra. Desliga com `"brandFrame": false`.
+  com o @ e os ícones de curtir/comentar/enviar/salvar NÃO passam pela IA. Com o
+  rodapé ligado, a IA gera só a parte de cima do card (9:10, 1080×1200) e uma
+  faixa de 150px é acrescentada embaixo com a cor da borda de baixo da arte; o
+  rodapé é desenhado nela, igual em todos os cards. A IA não vê a faixa, então
+  não tem como invadir. A barra enche card a card (cheia no último); arte única
+  fica sem barra. Desliga com `"brandFrame": false` (aí a arte volta a ser 4:5).
 - **Modelo da marca:** as imagens de referência do perfil de design são tratadas
   como MODELO VISUAL (caixas de texto, botões, cores, tipografia, tratamento de
   foto): a capa segue o modelo e os outros cards seguem a capa, variando só o

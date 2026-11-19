@@ -1,7 +1,7 @@
 import sharp from "sharp";
 import { toInstagramJpeg } from "@/lib/instagram/jpeg";
 import { applyBrandFrame } from "./brand-frame";
-import type { BrandFrameInput } from "./brand-frame-layout";
+import { FOOTER_BAND_HEIGHT, type BrandFrameInput } from "./brand-frame-layout";
 import { applyLogo, type LogoApplyInput } from "./logo";
 import { AGENT_CARD_HEIGHT, AGENT_CARD_WIDTH } from "./types";
 
@@ -15,10 +15,12 @@ export async function finalizeCard(
   opts: { frame?: BrandFrameInput | null; logo?: LogoApplyInput | null } = {}
 ): Promise<Buffer> {
   const { frame, logo } = opts;
-  let canvas: Buffer = await sharp(art)
-    .resize(AGENT_CARD_WIDTH, AGENT_CARD_HEIGHT, { fit: "cover", position: "centre" })
-    .png()
-    .toBuffer();
+  let canvas: Buffer = frame
+    ? await withFooterBand(art)
+    : await sharp(art)
+        .resize(AGENT_CARD_WIDTH, AGENT_CARD_HEIGHT, { fit: "cover", position: "centre" })
+        .png()
+        .toBuffer();
   if (logo) {
     // Logo colada em código, versão escolhida pela cor do fundo embaixo dela.
     canvas = await applyLogo(canvas, logo).catch((e) => {
@@ -35,6 +37,26 @@ export async function finalizeCard(
   }
   const { buffer } = await toInstagramJpeg(canvas, 90);
   return buffer;
+}
+
+/**
+ * Com rodapé: a arte (gerada em 9:10) ocupa a parte de cima, 1080×1200, e a
+ * faixa do rodapé é acrescentada embaixo com a cor da borda de baixo da arte.
+ */
+async function withFooterBand(art: Buffer): Promise<Buffer> {
+  const artHeight = AGENT_CARD_HEIGHT - FOOTER_BAND_HEIGHT;
+  const top = await sharp(art)
+    .resize(AGENT_CARD_WIDTH, artHeight, { fit: "cover", position: "centre" })
+    .png()
+    .toBuffer();
+  const edge = await sharp(top)
+    .extract({ left: 0, top: artHeight - 6, width: AGENT_CARD_WIDTH, height: 6 })
+    .stats();
+  const [r, g, b] = edge.channels.map((c) => Math.round(c.mean));
+  return sharp(top)
+    .extend({ bottom: FOOTER_BAND_HEIGHT, background: { r, g, b, alpha: 1 } })
+    .png()
+    .toBuffer();
 }
 
 export async function downloadImage(url: string): Promise<Buffer> {
