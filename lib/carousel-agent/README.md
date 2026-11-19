@@ -153,7 +153,7 @@ imagem). Não reenvie em loop.
   "id": "…",
   "status": "awaiting_approval",
   "title": "5 erros que fazem o INSS negar",
-  "profile": "Previtas | Conteúdo orgânico",
+  "profile": "Previtas",
   "instagram": "@previtasbrasil_",
   "scheduledAt": "2026-11-20T21:00:00.000Z",
   "caption": "…\n\n#inss #aposentadoria",
