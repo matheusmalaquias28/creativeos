@@ -12,7 +12,7 @@ import { after, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { CarouselProfile } from "@/types/carousel-profile";
 import { agentErrorResponse, requireAgentOrAdmin } from "@/lib/carousel-agent/auth";
-import { createRunSchema, scheduledAtProblem, zodMessage } from "@/lib/carousel-agent/request";
+import { createRunSchema, runFieldsFromBody, scheduledAtProblem, zodMessage } from "@/lib/carousel-agent/request";
 import {
   AgentRunError,
   appUrl,
@@ -66,18 +66,18 @@ export async function POST(request: Request) {
     const account = await resolveProfileAccount(profile.instagram_handle);
 
     // Freios de gasto: pedidos gerando ao mesmo tempo e teto diário de imagens.
-    const cardCount = body.format === "single" ? 1 : body.cardCount ?? null;
-    const limit = await checkCanStart(admin, { images: estimatedImages(body.format, cardCount) });
+    const fields = runFieldsFromBody(body);
+    const limit = await checkCanStart(admin, { images: estimatedImages(body.format, fields.cardCount) });
     if (limit) return NextResponse.json({ error: limit.message }, { status: limit.status });
 
     const run = await insertRun(admin, {
       profile,
       account,
-      mode: body.mode,
+      mode: fields.mode,
       format: body.format,
-      options: body.format === "tweet" ? { theme: body.theme ?? "light" } : {},
-      input: body.content,
-      cardCount,
+      options: fields.options,
+      input: fields.input,
+      cardCount: fields.cardCount,
       scheduledAt: body.scheduledAt ? new Date(body.scheduledAt).toISOString() : null,
       externalRef: body.externalRef ?? null,
       callbackUrl: body.callbackUrl ?? null,

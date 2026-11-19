@@ -26,7 +26,14 @@ import { stripTravessao } from "@/lib/text/strip-dash";
 import { designProfileToTweetProfile } from "@/types/tweet-carousel";
 import { generateOpenAIImage, type OpenAIImageQuality } from "@/lib/ai/imagegen/openai";
 import { INSTAGRAM_POSTS_BUCKET } from "@/lib/instagram/posts";
-import { buildCaption, buildCardPrompt, buildPlanInput, buildPlanSystemPrompt, expectedTexts } from "./prompts";
+import {
+  applyCardVisuals,
+  buildCaption,
+  buildCardPrompt,
+  buildPlanInput,
+  buildPlanSystemPrompt,
+  expectedTexts,
+} from "./prompts";
 import { reviewCardText } from "./qa";
 import { downloadImage, finalizeCard } from "./images";
 import { renderTweetCard } from "./tweet-render";
@@ -74,15 +81,24 @@ async function claim(admin: Admin, runId: string): Promise<{ run: AgentRun; gene
 
 async function makePlan(profile: CarouselProfile, run: AgentRun): Promise<AgentPlan> {
   const plan = await openaiStructured({
-    system: buildPlanSystemPrompt(profile, run.mode, run.format === "single" ? 1 : run.card_count, run.format),
-    input: buildPlanInput(run.mode, run.input, run.format),
+    system: buildPlanSystemPrompt(
+      profile,
+      run.mode,
+      run.format === "single" ? 1 : run.card_count,
+      run.format,
+      run.options.visualDirection
+    ),
+    input: buildPlanInput(run.mode, run.input, run.format, run.options.cardVisuals),
     schemaName: "carousel_plan",
     schema: agentPlanSchema,
     reasoningEffort: "medium",
     maxOutputTokens: 12_000,
     timeoutMs: 120_000,
   });
-  let cards = plan.cards.filter((c) => c.texts.some((t) => t.trim()) || c.cta?.trim());
+  let cards = applyCardVisuals(
+    plan.cards.filter((c) => c.texts.some((t) => t.trim()) || c.cta?.trim()),
+    run.format === "tweet" ? null : run.options.cardVisuals
+  );
   if (run.format === "tweet") {
     // Card tweet = um texto só; sem CTA desenhado nem guia visual.
     cards = cards.map((c) => ({
@@ -278,6 +294,7 @@ export async function runGeneration(runId: string, opts: GenerationOptions = {})
         coverAsReference: coverRef.length > 0,
         profileReferenceCount: profileRefs.length,
         instruction: run.cards[index].instruction,
+        visualDirection: run.options.visualDirection,
       });
       run.cards[index] = { ...run.cards[index], status: "generating", prompt, attempts: run.cards[index].attempts + 1 };
       await save();

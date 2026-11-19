@@ -12,6 +12,10 @@ import type { AgentFormat, AgentPlan, AgentRunMode } from "./types";
 
 export const EXACT_TEXT_RULE = "A IMAGEM DEVE CONTER SOMENTE ESSES TEXTOS, NADA MAIS:";
 
+/** Vai em todo card de imagem: nada além do que foi descrito. */
+export const CLEAN_COMPOSITION_RULE =
+  "COMPOSIÇÃO LIMPA: a arte tem só os textos, a logo e o que está descrito acima. Não acrescente ícones, formas, setas, adesivos, objetos ou enfeites que não foram pedidos. Se houver foto ou ilustração, ela mostra literalmente o assunto do card; nada de foto genérica de fundo ou cena sem relação com o texto. Se o card diz \"Sem imagem\", não coloque imagem: fundo da marca e tipografia.";
+
 
 type ProfileForPrompt = Pick<
   CarouselProfile,
@@ -34,11 +38,33 @@ function paletteOf(p: ProfileForPrompt): string[] {
   return [...new Set([...base, ...extra])].filter(Boolean);
 }
 
+/**
+ * Regras de direção visual do plano. O padrão é editorial/tipográfico: a IA
+ * colocava imagem em todo card e inventava cena genérica a partir da copy
+ * (elementos soltos, fundo sem relação com o tema).
+ */
+export function visualRules(visualDirection?: string | null): string {
+  const rules = `DIREÇÃO VISUAL
+- Padrão: layout editorial e tipográfico. Fundo da marca (cor sólida ou gradiente sutil da paleta), título forte, hierarquia clara e no máximo UM elemento de destaque por card.
+- Foto ou ilustração só quando mostrar LITERALMENTE o assunto daquele card (ex.: card sobre carteira de trabalho → foto de uma carteira de trabalho). Se não dá para dizer numa frase concreta o que a imagem mostra e por que ela tem a ver com o texto, o card fica sem imagem.
+- Proibido: ícones, formas, setas, adesivos, objetos 3D ou enfeites soltos; foto genérica de fundo (escritório, aperto de mão, pessoa sorrindo sem contexto); cena sem relação direta com o texto; estilos de imagem diferentes entre os cards.
+- Bom uso: capa com uma foto forte e concreta do tema; cards do meio tipográficos; número ou dado em destaque grande no lugar de ilustração.
+- No campo "visual" de cada card, descreva a composição concreta: onde fica o título, o que está em destaque e, se tiver imagem, o que ela mostra exatamente. Se for só tipografia, comece com "Sem imagem" e descreva o destaque tipográfico.`;
+  const direction = visualDirection?.trim();
+  if (!direction) return rules;
+  return `${rules}
+
+DIREÇÃO DE ARTE DO PEDIDO (obrigatória; quando conflitar com as regras acima, ela vence):
+${direction}
+O styleGuide e o "visual" de cada card precisam seguir esta direção.`;
+}
+
 export function buildPlanSystemPrompt(
   profile: ProfileForPrompt,
   mode: AgentRunMode,
   cardCount: number | null,
-  format: AgentFormat = "carousel"
+  format: AgentFormat = "carousel",
+  visualDirection?: string | null
 ): string {
   if (format === "tweet") return buildTweetPlanSystemPrompt(profile, mode, cardCount);
   const single = format === "single";
@@ -82,20 +108,45 @@ REGRAS DOS TEXTOS
 - CTA só no último card e só se fizer sentido (ex.: "Salve este post").${single ? "\n- Numa arte única, \"último card\" é o próprio card." : ""}
 
 GUIA DE ESTILO (styleGuide)
-- Um único guia que vale para TODOS os cards, para o carrossel parecer uma peça só: fundo, paleta, tipografia descrita, posição dos textos, elementos que se repetem, estilo de imagem.
-- Prefira pessoas, cenários e situações brasileiras quando houver foto.
+- Um único guia que vale para TODOS os cards, para o carrossel parecer uma peça só: fundo, paleta, tipografia descrita, posição dos textos, o elemento de destaque que se repete e, se houver foto, o estilo dela.
+- Quando houver foto: pessoas, cenários e situações brasileiras, reais e ligadas ao tema.
 - A logo da marca vai anexada e é aplicada no canto superior esquerdo de todos os cards: não descreva logo no guia, só reserve esse canto.
+
+${visualRules(visualDirection)}
 
 LEGENDA
 - caption: legenda pronta para o post, com quebra de linha entre parágrafos, sem hashtags.
 - hashtags: de 5 a 15, sem o #.`;
 }
 
-export function buildPlanInput(mode: AgentRunMode, input: string, format: AgentFormat = "carousel"): string {
+export function buildPlanInput(
+  mode: AgentRunMode,
+  input: string,
+  format: AgentFormat = "carousel",
+  cardVisuals?: (string | null)[] | null
+): string {
   const what = format === "single" ? "da arte" : "do carrossel";
-  return mode === "manual"
-    ? `Conteúdo ${what} (organize, sem reescrever):\n"""\n${input}\n"""`
-    : `Tema ${what}:\n"""\n${input}\n"""`;
+  const base =
+    mode === "manual"
+      ? `Conteúdo ${what} (organize, sem reescrever):\n"""\n${input}\n"""`
+      : `Tema ${what}:\n"""\n${input}\n"""`;
+  if (format === "tweet" || !cardVisuals?.some((v) => v?.trim())) return base;
+  const list = cardVisuals
+    .map((v, i) => `Card ${i + 1}: ${v?.trim() || "(livre: siga a direção visual)"}`)
+    .join("\n");
+  return `${base}\n\nDireção visual de cada card, mandada por quem pediu (use no campo "visual" do card correspondente, sem trocar o que foi pedido; só complete a composição):\n${list}`;
+}
+
+/**
+ * Depois do plano: o "visual" que o agente mandou para um card vale ao pé da
+ * letra (a IA de planejamento não pode trocar por outra cena).
+ */
+export function applyCardVisuals<T extends { visual: string }>(cards: T[], cardVisuals?: (string | null)[] | null): T[] {
+  if (!cardVisuals?.length) return cards;
+  return cards.map((c, i) => {
+    const wanted = cardVisuals[i]?.trim();
+    return wanted ? { ...c, visual: wanted } : c;
+  });
 }
 
 /**
@@ -183,6 +234,8 @@ export function buildCardPrompt(input: {
   profileReferenceCount: number;
   /** Pedido feito na aprovação ("refazer com ..."). */
   instruction?: string | null;
+  /** Direção de arte mandada pelo agente para o pedido inteiro. */
+  visualDirection?: string | null;
 }): string {
   const { plan, index } = input;
   const card = plan.cards[index];
@@ -209,7 +262,7 @@ export function buildCardPrompt(input: {
   if (order.profile) {
     const { first, last } = order.profile;
     const range = first === last ? `Imagem ${first} é referência` : `Imagens ${first} a ${last} são referências`;
-    refs.push(`${range} de identidade visual do cliente: use só como inspiração de estilo e cores, não copie os textos delas.`);
+    refs.push(`${range} de identidade visual do cliente: use só como inspiração de estilo, cores e tipografia; não copie os textos, as fotos nem os elementos delas.`);
   }
 
   const parts = [
@@ -219,7 +272,11 @@ export function buildCardPrompt(input: {
     single
       ? `GUIA DE ESTILO:\n${plan.styleGuide.trim()}`
       : `GUIA DE ESTILO (vale para todos os cards):\n${plan.styleGuide.trim()}`,
+    ...(input.visualDirection?.trim()
+      ? [`DIREÇÃO DE ARTE DO PEDIDO (prioridade sobre o guia de estilo):\n${input.visualDirection.trim()}`]
+      : []),
     `${single ? "A ARTE" : "ESTE CARD"}:\n${card.visual.trim()}`,
+    CLEAN_COMPOSITION_RULE,
     `${EXACT_TEXT_RULE}\n${lines.join("\n")}`,
     "Escreva os textos exatamente como estão, em português do Brasil, com acentuação correta, sem inventar, traduzir ou repetir palavras. Textos grandes, nítidos e legíveis no celular, com bom contraste.",
   ];

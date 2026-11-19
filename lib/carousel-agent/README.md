@@ -34,6 +34,11 @@ agente ─POST /runs─▶ fila ─▶ plano (GPT: textos, guia de estilo, legen
   esquerdo, sem o fundo branco do arquivo. Pode sair com uma leve diferença do
   original. (Antes era colada por cima, e logos com fundo branco ficavam com um
   retângulo branco.)
+- **Visual:** o padrão é editorial e tipográfico (fundo da marca, título forte,
+  um destaque por card). Foto só quando mostra literalmente o assunto do card;
+  ícones/enfeites soltos e foto genérica de fundo são proibidos no plano e em
+  todo prompt de card. O agente pode mandar `visualDirection` (pedido inteiro) e
+  `cards[].visual` (por card); ver a API abaixo.
 - **Texto:** regras fixas dos prompts de arte ("A IMAGEM DEVE CONTER SOMENTE ESSES
   TEXTOS, NADA MAIS:" e CTA como botão centralizado embaixo). A revisão por visão
   ignora a logo e só marca o card "para revisar"; refazer é decisão humana.
@@ -87,13 +92,34 @@ Base: `https://creative.energymidia.com.br`. Todas as chamadas usam
 | --- | --- | --- |
 | `instagram` ou `profileId` | um dos dois | `@` do perfil de design (Carrosséis → Perfis) ou o id dele. |
 | `format` | não | `"carousel"` (padrão), `"single"` ou `"tweet"`. |
-| `content` | sim | Tema (`mode: "ai"`) ou o texto pronto (`mode: "manual"`, a IA só divide em cards, sem reescrever). Até 20 mil caracteres. |
+| `content` | sim, sem `cards` | Tema (`mode: "ai"`) ou o texto pronto (`mode: "manual"`, a IA só divide em cards, sem reescrever). Até 20 mil caracteres. Com `cards`, é opcional e vira só contexto para a legenda. |
+| `visualDirection` | não | Direção de arte do pedido inteiro, até 4 mil caracteres: fundo, se tem foto ou não (e em quais cards), estilo da foto, o que evitar. Vale acima das regras visuais padrão. Ignorado no `tweet`. |
+| `cards` | não | Cards prontos, na ordem: `[{ "text": "…", "visual": "…" }]`. O texto não é reescrito (vira `mode: "manual"`, 1 card por item; `cardCount` é ignorado). `visual` (opcional, até 2 mil caracteres) é a direção daquele card e é usada ao pé da letra; sem ele, a IA decide pelas regras padrão. `carousel`: 2 a 10 cards; `single`: exatamente 1. No `tweet`, `visual` é ignorado. |
 | `theme` | não | Só no `tweet`: `"light"` (padrão) ou `"dark"`. |
 | `mode` | não | `"ai"` (padrão) ou `"manual"`. |
 | `cardCount` | não | 2 a 10. Sem isso, a IA decide. Ignorado no `single`. |
 | `scheduledAt` | não | ISO 8601 com fuso. Horário sugerido do post; quem aprova confirma ou troca. |
 | `externalRef` | não | Volta igual nas respostas e no callback. |
 | `callbackUrl` | não | HTTPS. Recebe os avisos de status (abaixo). |
+
+Com direção visual (recomendado para a Previtas):
+
+```json
+{
+  "instagram": "@previtasbrasil_",
+  "visualDirection": "Fundo azul-marinho liso da marca, tipografia grande. Foto só na capa: aposentado(a) brasileiro(a) real, luz natural. Nada de ícones, setas ou enfeites.",
+  "cards": [
+    { "text": "5 erros que fazem o INSS negar sua aposentadoria", "visual": "Foto de uma senhora brasileira de 60 anos lendo uma carta do INSS na cozinha, título em cima." },
+    { "text": "1. Tempo de contribuição sem comprovante
+Carteira sem registro não conta sozinha.", "visual": "Sem imagem. Número 1 gigante em amarelo à esquerda." },
+    { "text": "Salve este post e fale com a Previtas", "visual": "Sem imagem. Título centralizado, botão de CTA embaixo." }
+  ]
+}
+```
+
+Escreva o `visual` como composição concreta: o que aparece, onde fica e, se
+tiver foto, o que ela mostra exatamente. "Sem imagem" é uma resposta válida e
+costuma ficar melhor que uma foto genérica.
 
 Resposta `202` com o carrossel (`id`, `status: "queued"`, ...). Erros: `400`
 (pedido inválido), `401` (segredo), `404` (perfil), `409` (dois perfis com o

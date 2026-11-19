@@ -213,3 +213,90 @@ describe("freios de gasto", () => {
     else process.env.CAROUSEL_AGENT_MAX_ACTIVE = keep.a;
   });
 });
+
+import { applyCardVisuals, buildPlanInput, CLEAN_COMPOSITION_RULE, visualRules } from "../prompts";
+import { runFieldsFromBody } from "../request";
+
+describe("direção visual", () => {
+  const profile = {
+    name: "Previtas",
+    color_background: "#0b2545",
+    color_title: "#ffffff",
+    color_subtitle: "#cfd8e3",
+    color_accent: "#f2b134",
+    palette: [],
+    font_title: null,
+    font_body: null,
+    context_md: null,
+    business_context: null,
+    instagram_handle: "@previtas",
+  };
+
+  it("o plano tem padrão editorial e proíbe elemento solto", () => {
+    const sys = buildPlanSystemPrompt(profile, "ai", 6, "carousel");
+    expect(sys).toContain("layout editorial e tipográfico");
+    expect(sys).toContain("LITERALMENTE o assunto");
+    expect(sys).not.toContain("DIREÇÃO DE ARTE DO PEDIDO");
+  });
+
+  it("a direção do pedido entra no plano e em cada card", () => {
+    const sys = buildPlanSystemPrompt(profile, "ai", 6, "carousel", "Fundo azul liso, sem foto.");
+    expect(sys).toContain("DIREÇÃO DE ARTE DO PEDIDO");
+    expect(sys).toContain("Fundo azul liso, sem foto.");
+    expect(visualRules("  ")).not.toContain("DIREÇÃO DE ARTE DO PEDIDO");
+    const card = buildCardPrompt({
+      plan,
+      index: 1,
+      hasLogo: false,
+      coverAsReference: false,
+      profileReferenceCount: 0,
+      visualDirection: "Fundo azul liso, sem foto.",
+    });
+    expect(card).toContain("DIREÇÃO DE ARTE DO PEDIDO (prioridade sobre o guia de estilo):\nFundo azul liso, sem foto.");
+    expect(card).toContain(CLEAN_COMPOSITION_RULE);
+  });
+
+  it("visual por card vai no input do plano e vale ao pé da letra", () => {
+    const input = buildPlanInput("manual", "Card 1:\nA\n\nCard 2:\nB", "carousel", ["Foto de carteira de trabalho", null]);
+    expect(input).toContain("Card 1: Foto de carteira de trabalho");
+    expect(input).toContain("Card 2: (livre");
+    expect(buildPlanInput("manual", "x", "tweet", ["foto"])).not.toContain("Direção visual");
+    const cards = applyCardVisuals(
+      [
+        { texts: ["A"], cta: null, visual: "Foto genérica de escritório" },
+        { texts: ["B"], cta: null, visual: "Sem imagem, número grande" },
+      ],
+      ["Foto de carteira de trabalho", null]
+    );
+    expect(cards[0].visual).toBe("Foto de carteira de trabalho");
+    expect(cards[1].visual).toBe("Sem imagem, número grande");
+  });
+
+  it("pedido com cards vira manual, 1 card por item", () => {
+    const body = createRunSchema.parse({
+      instagram: "@previtas",
+      cards: [{ text: "Capa", visual: "Foto de um aposentado brasileiro" }, { text: "Fim" }],
+      visualDirection: "Sem ícones.",
+      content: "Pauta: INSS",
+    });
+    const f = runFieldsFromBody(body);
+    expect(f.mode).toBe("manual");
+    expect(f.cardCount).toBe(2);
+    expect(f.input).toContain("Card 1:\nCapa");
+    expect(f.input).toContain("Contexto do pedido");
+    expect(f.options).toEqual({
+      visualDirection: "Sem ícones.",
+      cardVisuals: ["Foto de um aposentado brasileiro", null],
+    });
+  });
+
+  it("valida cards e content", () => {
+    expect(createRunSchema.safeParse({ instagram: "@x" }).success).toBe(false);
+    expect(createRunSchema.safeParse({ instagram: "@x", cards: [{ text: "só um" }] }).success).toBe(false);
+    expect(createRunSchema.safeParse({ instagram: "@x", format: "single", cards: [{ text: "só um" }] }).success).toBe(true);
+    const tweet = runFieldsFromBody(
+      createRunSchema.parse({ instagram: "@x", format: "tweet", content: "tema", visualDirection: "ignorado" })
+    );
+    expect(tweet.options).toEqual({ theme: "light" });
+  });
+});

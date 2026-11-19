@@ -15,7 +15,14 @@ export type AgentFormat = "carousel" | "single" | "tweet";
 export const AGENT_FORMATS: AgentFormat[] = ["carousel", "single", "tweet"];
 
 export type TweetTheme = "light" | "dark";
-export type AgentRunOptions = { theme?: TweetTheme };
+export type AgentRunOptions = {
+  /** Só no tweet. */
+  theme?: TweetTheme;
+  /** Direção de arte do pedido, mandada pelo agente (vale para todos os cards). */
+  visualDirection?: string | null;
+  /** Direção visual de cada card, na ordem (null = a IA decide pelas regras padrão). */
+  cardVisuals?: (string | null)[] | null;
+};
 
 /** Plano do carrossel: o que vai escrito em cada card e como ele deve parecer. */
 export const agentPlanSchema = z.object({
@@ -23,7 +30,7 @@ export const agentPlanSchema = z.object({
   styleGuide: z
     .string()
     .describe(
-      "Guia visual ÚNICO do carrossel, valendo para todos os cards: fundo, paleta (hex do perfil), tipografia descrita, hierarquia, alinhamento, elementos gráficos que se repetem, estilo de foto/ilustração."
+      "Guia visual ÚNICO do carrossel, valendo para todos os cards: fundo, paleta (hex do perfil), tipografia descrita, hierarquia, alinhamento, o único elemento de destaque que se repete e, se houver foto, o estilo dela e em quais cards ela aparece."
     ),
   cards: z
     .array(
@@ -37,7 +44,9 @@ export const agentPlanSchema = z.object({
           .describe("Texto do botão de CTA. Só no último card, quando fizer sentido; senão null."),
         visual: z
           .string()
-          .describe("O que este card mostra além dos textos: composição, imagem/ilustração, destaque."),
+          .describe(
+            "Composição concreta deste card: posição do título, o destaque e, só se fizer sentido, a imagem que mostra LITERALMENTE o assunto do card. \"Sem imagem\" é uma resposta válida e muitas vezes a melhor."
+          ),
       })
     )
     .describe("Cards na ordem do carrossel. O primeiro é a capa."),
