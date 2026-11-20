@@ -13,6 +13,7 @@ import {
   Download,
   ImagePlus,
   Loader2,
+  Megaphone,
   Moon,
   Plus,
   Sun,
@@ -34,6 +35,7 @@ import {
 import { cn } from "@/lib/utils";
 import { TweetCardCanvas, TweetCardPreview } from "@/components/carousel/tweet/tweet-card-canvas";
 import { TweetTextEditor } from "@/components/carousel/tweet/tweet-text-editor";
+import { TweetInstagramPublishDialog } from "@/components/instagram/tweet-publish-dialog";
 import { useTweetAutosave, type SaveStatus } from "@/components/carousel/tweet/use-tweet-autosave";
 import {
   deliverFiles,
@@ -112,6 +114,7 @@ export function TweetCarouselEditor({
   const [busy, setBusy] = useState<string | null>(null); // card id | "all"
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [pendingFiles, setPendingFiles] = useState<File[] | null>(null);
+  const [instagramOpen, setInstagramOpen] = useState(false);
   // No servidor sempre "Baixar"; no celular vira "Salvar" (share sheet → Fotos).
   const [mobile, setMobile] = useState(false);
   useEffect(() => setMobile(prefersShareSheet()), []);
@@ -199,6 +202,13 @@ export function TweetCarouselEditor({
     }
   }
 
+  /** PNG do card em tamanho real (mesmo render do "Baixar"), para o Instagram. */
+  async function renderCardForInstagram(cardId: string): Promise<Blob> {
+    const node = exportRefs.current.get(cardId);
+    if (!node) throw new Error("Card não renderizado");
+    return renderCardFile(node, `${cardId}.png`);
+  }
+
   const usableDesignProfiles = designProfiles.filter((p) => p.handle);
 
   function changeProfile(profileId: string) {
@@ -243,8 +253,17 @@ export function TweetCarouselEditor({
           />
           <StatusPill status={status} />
           <Button
+            variant="outline"
             size="sm"
             className="ml-auto"
+            onClick={() => setInstagramOpen(true)}
+            disabled={cards.length === 0}
+          >
+            <Megaphone />
+            <span className="max-sm:sr-only">Publicar no Instagram</span>
+          </Button>
+          <Button
+            size="sm"
             onClick={() => download(cards, "all")}
             disabled={!!busy || cards.length === 0}
           >
@@ -477,6 +496,16 @@ export function TweetCarouselEditor({
           />
         ))}
       </div>
+
+      <TweetInstagramPublishDialog
+        open={instagramOpen}
+        onOpenChange={setInstagramOpen}
+        tweetCarouselId={carousel.id}
+        cards={cards}
+        profile={profile}
+        theme={theme}
+        renderCard={renderCardForInstagram}
+      />
 
       {/* iOS: a ativação do toque expira durante a renderização — pede um novo toque. */}
       <Dialog open={!!pendingFiles} onOpenChange={(o) => !o && setPendingFiles(null)}>

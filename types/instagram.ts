@@ -14,7 +14,7 @@ export const INSTAGRAM_POST_STATUS_LABEL: Record<InstagramPostStatus, string> = 
 export type InstagramPostItem = {
   url: string;
   path: string;
-  /** Página do Studio de onde o card saiu (só referência). */
+  /** Página do Studio (ou card do carrossel tweet) de onde o card saiu (só referência). */
   page_id?: string | null;
   /** Arte da entrega da demanda de onde o card saiu (só referência). */
   export_file_id?: string | null;
@@ -23,6 +23,8 @@ export type InstagramPostItem = {
 export type InstagramPost = {
   id: string;
   studio_carousel_id: string | null;
+  /** Carrossel estilo tweet de onde os cards saíram. */
+  tweet_carousel_id: string | null;
   demand_id: string | null;
   client_id: string | null;
   ig_user_id: string;

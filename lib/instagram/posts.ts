@@ -51,6 +51,15 @@ export function cardPath(carouselId: string, postId: string, index: number): str
   return `${postFolder(carouselId, postId)}/card-${String(index + 1).padStart(2, "0")}.jpg`;
 }
 
+/** Posts do carrossel tweet: `tweet/<tweetCarouselId>/<postId>/`. */
+export function tweetPostFolder(tweetCarouselId: string, postId: string): string {
+  return `tweet/${tweetCarouselId}/${postId}`;
+}
+
+export function tweetCardPath(tweetCarouselId: string, postId: string, index: number): string {
+  return `${tweetPostFolder(tweetCarouselId, postId)}/card-${String(index + 1).padStart(2, "0")}.jpg`;
+}
+
 /** Posts de demanda normal: `demand/<demandId>/<postId>/card-NN.jpg`. */
 export function demandCardPath(demandId: string, postId: string, index: number): string {
   return `demand/${demandId}/${postId}/card-${String(index + 1).padStart(2, "0")}.jpg`;
@@ -74,13 +83,19 @@ export class InstagramPostError extends Error {
  */
 export async function verifyUploadedItems(
   admin: Admin,
-  params: { carouselId: string; postId: string; items: { path: string; page_id?: string | null }[] }
+  params: {
+    carouselId: string;
+    postId: string;
+    items: { path: string; page_id?: string | null }[];
+    /** Pasta esperada dos cards; padrão = pasta do Studio (`postFolder`). */
+    folder?: string;
+  }
 ): Promise<InstagramPostItem[]> {
   const { carouselId, postId, items } = params;
   if (items.length < CAROUSEL_MIN_ITEMS || items.length > CAROUSEL_MAX_ITEMS) {
     throw new InstagramPostError(`Escolha de ${CAROUSEL_MIN_ITEMS} a ${CAROUSEL_MAX_ITEMS} cards (vieram ${items.length}).`);
   }
-  const prefix = `${postFolder(carouselId, postId)}/`;
+  const prefix = `${params.folder ?? postFolder(carouselId, postId)}/`;
   const seen = new Set<string>();
   const out: InstagramPostItem[] = [];
   for (const [i, item] of items.entries()) {
@@ -168,6 +183,7 @@ export async function createPost(
   input: {
     id: string;
     carouselId: string | null;
+    tweetCarouselId?: string | null;
     demandId: string | null;
     clientId: string | null;
     account: Pick<InstagramCredentials, "igUserId" | "username">;
@@ -187,6 +203,7 @@ export async function createPost(
     .insert({
       id: input.id,
       studio_carousel_id: input.carouselId,
+      tweet_carousel_id: input.tweetCarouselId ?? null,
       demand_id: input.demandId,
       client_id: input.clientId,
       ig_user_id: input.account.igUserId,

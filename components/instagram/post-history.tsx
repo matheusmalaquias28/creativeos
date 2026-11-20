@@ -19,7 +19,7 @@ const STATUS_VARIANT: Record<InstagramPostStatus, "secondary" | "blue" | "amber"
 };
 
 /** Posts do carrossel ou da demanda (agendados e publicados), ao vivo via Realtime. */
-export function useInstagramPosts(scope: { carouselId: string } | { demandId: string }) {
+export function useInstagramPosts(scope: { carouselId: string } | { tweetCarouselId: string } | { demandId: string }) {
   const [posts, setPosts] = useState<InstagramPost[] | null>(null);
   // O cliente do navegador é único e reaproveita canais pelo nome: dois
   // componentes com o mesmo nome (botão + histórico da demanda) fariam o
@@ -29,7 +29,9 @@ export function useInstagramPosts(scope: { carouselId: string } | { demandId: st
   const [param, column, id] =
     "carouselId" in scope
       ? (["carouselId", "studio_carousel_id", scope.carouselId] as const)
-      : (["demandId", "demand_id", scope.demandId] as const);
+      : "tweetCarouselId" in scope
+        ? (["tweetCarouselId", "tweet_carousel_id", scope.tweetCarouselId] as const)
+        : (["demandId", "demand_id", scope.demandId] as const);
 
   const reload = useCallback(async () => {
     const res = await fetch(`/api/instagram/posts?${param}=${id}`);

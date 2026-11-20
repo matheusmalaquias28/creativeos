@@ -10,7 +10,11 @@ const MAX_WIDTH = 1440;
  * converte para JPEG no canvas, com fundo branco no lugar da transparência.
  */
 export async function renderNodeToJpeg(node: HTMLElement, width: number, height: number, quality = 0.92): Promise<Blob> {
-  const png = await renderFrameToBlob(node, width, height);
+  return imageToInstagramJpeg(await renderFrameToBlob(node, width, height), quality);
+}
+
+/** Converte uma imagem já renderizada (PNG) no JPEG que o Instagram aceita. */
+export async function imageToInstagramJpeg(png: Blob, quality = 0.92): Promise<Blob> {
   const bitmap = await createImageBitmap(png);
   const scale = Math.min(1, MAX_WIDTH / bitmap.width);
   const canvas = document.createElement("canvas");

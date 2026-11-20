@@ -1560,6 +1560,7 @@ export type Database = {
         Row: {
           id: string;
           studio_carousel_id: string | null;
+          tweet_carousel_id: string | null;
           demand_id: string | null;
           client_id: string | null;
           ig_user_id: string;
@@ -1580,6 +1581,7 @@ export type Database = {
         Insert: {
           id?: string;
           studio_carousel_id?: string | null;
+          tweet_carousel_id?: string | null;
           demand_id?: string | null;
           client_id?: string | null;
           ig_user_id: string;
