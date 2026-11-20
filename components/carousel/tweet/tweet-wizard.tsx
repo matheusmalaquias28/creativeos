@@ -8,7 +8,9 @@ import {
   ArrowLeft,
   Camera,
   FileText,
+  Check,
   Loader2,
+  Pencil,
   Plus,
   Sparkles,
   Trash2,
@@ -18,7 +20,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { VerifiedBadge } from "@/components/carousel/tweet/tweet-card-canvas";
-import { createTweetProfileAction, deleteTweetProfileAction } from "@/actions/tweet-carousels";
+import {
+  createTweetProfileAction,
+  deleteTweetProfileAction,
+  updateTweetProfileAction,
+} from "@/actions/tweet-carousels";
 import { normalizeHandle, type TweetProfile } from "@/types/tweet-carousel";
 
 type Step = "profile" | "new-profile" | "mode" | "input" | "generating";
@@ -86,6 +92,8 @@ export function TweetWizard({
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [creating, setCreating] = useState(false);
+  /** Perfil salvo sendo editado no formulário (null = criando um novo). */
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const selected =
     profiles.find((p) => p.id === profileId) ?? designProfiles.find((p) => p.id === profileId) ?? null;
@@ -109,19 +117,36 @@ export function TweetWizard({
     }
   }
 
-  async function createProfile() {
+  function openProfileForm(p: TweetProfile | null) {
+    setEditingId(p?.id ?? null);
+    setNewName(p?.name ?? "");
+    setNewHandle(p?.handle ?? "");
+    setAvatarUrl(p?.avatar_url ?? null);
+    setStep("new-profile");
+  }
+
+  async function saveProfile() {
     setCreating(true);
-    const res = await createTweetProfileAction({ name: newName, handle: newHandle, avatarUrl });
+    const input = { name: newName, handle: newHandle, avatarUrl };
+    const res = editingId ? await updateTweetProfileAction(editingId, input) : await createTweetProfileAction(input);
     setCreating(false);
     if (res.error || !res.profile) {
-      toast.error(res.error ?? "Erro ao criar o perfil");
+      toast.error(res.error ?? "Erro ao salvar o perfil");
       return;
     }
-    setProfiles((p) => [res.profile!, ...p]);
-    setProfileId(res.profile.id);
+    const saved = res.profile;
     setNewName("");
     setNewHandle("");
     setAvatarUrl(null);
+    if (editingId) {
+      setProfiles((list) => list.map((x) => (x.id === saved.id ? saved : x)));
+      setEditingId(null);
+      toast.success("Perfil atualizado");
+      setStep("profile");
+      return;
+    }
+    setProfiles((p) => [saved, ...p]);
+    setProfileId(saved.id);
     setStep("mode");
   }
 
@@ -198,6 +223,15 @@ export function TweetWizard({
                 <Button
                   variant="ghost"
                   size="icon-sm"
+                  aria-label={`Editar perfil ${p.name}`}
+                  onClick={() => openProfileForm(p)}
+                  className="opacity-60 group-hover:opacity-100"
+                >
+                  <Pencil />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
                   aria-label={`Excluir perfil ${p.name}`}
                   onClick={() => removeProfile(p)}
                   className="opacity-60 group-hover:opacity-100"
@@ -239,7 +273,7 @@ export function TweetWizard({
               </div>
             </>
           )}
-          <Button variant="outline" className="w-full" onClick={() => setStep("new-profile")}>
+          <Button variant="outline" className="w-full" onClick={() => openProfileForm(null)}>
             <Plus />
             Criar novo perfil
           </Button>
@@ -249,10 +283,16 @@ export function TweetWizard({
       {/* Passo 1b — novo perfil */}
       {step === "new-profile" && (
         <>
-          <BackLink onClick={() => (hasAnyProfile ? setStep("profile") : onBack())}>
+          <BackLink
+            onClick={() => {
+              setEditingId(null);
+              if (hasAnyProfile) setStep("profile");
+              else onBack();
+            }}
+          >
             {hasAnyProfile ? "Perfis salvos" : "Tipo de carrossel"}
           </BackLink>
-          <p className="text-sm font-semibold text-foreground">Novo perfil</p>
+          <p className="text-sm font-semibold text-foreground">{editingId ? "Editar perfil" : "Novo perfil"}</p>
 
           <div className="flex items-center gap-4">
             <label className="relative cursor-pointer" aria-label="Enviar foto do perfil">
@@ -300,15 +340,19 @@ export function TweetWizard({
               />
             </div>
           </div>
-          <p className="text-xs text-muted-foreground">O selo de verificado sai sempre. O perfil fica salvo para os próximos carrosséis.</p>
+          <p className="text-xs text-muted-foreground">
+            {editingId
+              ? "Vale para os próximos carrosséis. Os já criados mudam pelo botão Editar perfil, dentro de cada um."
+              : "O selo de verificado sai sempre. O perfil fica salvo para os próximos carrosséis."}
+          </p>
 
           <Button
             className="w-full"
-            onClick={createProfile}
+            onClick={saveProfile}
             disabled={creating || uploading || !newName.trim() || !normalizeHandle(newHandle)}
           >
-            {creating ? <Loader2 className="animate-spin" /> : <Plus />}
-            Salvar perfil e continuar
+            {creating ? <Loader2 className="animate-spin" /> : editingId ? <Check /> : <Plus />}
+            {editingId ? "Salvar alterações" : "Salvar perfil e continuar"}
           </Button>
         </>
       )}

@@ -7,6 +7,7 @@ import {
   ArrowDown,
   ArrowLeft,
   ArrowUp,
+  Camera,
   Check,
   CloudOff,
   Copy,
@@ -15,6 +16,7 @@ import {
   Loader2,
   Megaphone,
   Moon,
+  Pencil,
   Plus,
   Sun,
   Trash2,
@@ -33,7 +35,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { TweetCardCanvas, TweetCardPreview } from "@/components/carousel/tweet/tweet-card-canvas";
+import { TweetCardCanvas, TweetCardPreview, VerifiedBadge } from "@/components/carousel/tweet/tweet-card-canvas";
+import { updateTweetProfileAction } from "@/actions/tweet-carousels";
 import { TweetTextEditor } from "@/components/carousel/tweet/tweet-text-editor";
 import { TweetInstagramPublishDialog } from "@/components/instagram/tweet-publish-dialog";
 import { useTweetAutosave, type SaveStatus } from "@/components/carousel/tweet/use-tweet-autosave";
@@ -46,9 +49,11 @@ import {
 import { TWEET_FONT_MAX, TWEET_FONT_MIN } from "@/lib/carousel/tweet/format";
 import {
   makeTweetCard,
+  normalizeHandle,
   type TweetCard,
   type TweetCarousel,
   type TweetProfile,
+  type TweetProfileSnapshot,
 } from "@/types/tweet-carousel";
 
 function slug(text: string) {
@@ -88,9 +93,147 @@ async function uploadImage(file: File, kind: "avatar" | "card"): Promise<string>
   return data.url as string;
 }
 
+/** Edita o perfil (foto, nome, @) que aparece nos cards deste carrossel. */
+function ProfileEditDialog({
+  open,
+  onOpenChange,
+  initial,
+  linkedToSaved,
+  onSave,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initial: TweetProfileSnapshot;
+  /** O carrossel usa um perfil tweet salvo: a edição atualiza ele também. */
+  linkedToSaved: boolean;
+  onSave: (snapshot: TweetProfileSnapshot) => Promise<boolean>;
+}) {
+  const [name, setName] = useState(initial.name);
+  const [handle, setHandle] = useState(initial.handle);
+  const [avatarUrl, setAvatarUrl] = useState(initial.avatarUrl);
+  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setName(initial.name);
+    setHandle(initial.handle);
+    setAvatarUrl(initial.avatarUrl);
+    // Só ao abrir.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  async function handleAvatar(file: File | undefined) {
+    if (!file) return;
+    setUploading(true);
+    try {
+      setAvatarUrl(await uploadImage(file, "avatar"));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha no upload");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function save() {
+    setSaving(true);
+    const ok = await onSave({ name: name.trim(), handle: normalizeHandle(handle), avatarUrl });
+    setSaving(false);
+    if (ok) onOpenChange(false);
+  }
+
+  const valid = name.trim() !== "" && normalizeHandle(handle) !== "";
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Editar perfil</DialogTitle>
+          <DialogDescription>
+            {linkedToSaved
+              ? "Muda os cards deste carrossel e o perfil salvo, que vale para os próximos carrosséis."
+              : "Muda só os cards deste carrossel."}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogBody className="space-y-4">
+          <div className="flex items-center gap-4">
+            <label className="relative shrink-0 cursor-pointer" aria-label="Trocar foto do perfil">
+              {avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={avatarUrl} alt="" className="size-[72px] rounded-full object-cover" />
+              ) : (
+                <span className="flex size-[72px] items-center justify-center rounded-full bg-muted text-lg font-bold text-muted-foreground">
+                  {name.trim().charAt(0).toUpperCase() || "?"}
+                </span>
+              )}
+              <span className="absolute -bottom-1 -right-1 flex size-7 items-center justify-center rounded-full border-2 border-popover bg-primary text-primary-foreground">
+                {uploading ? <Loader2 className="size-3.5 animate-spin" /> : <Camera className="size-3.5" />}
+              </span>
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="sr-only"
+                onChange={(e) => {
+                  handleAvatar(e.target.files?.[0]);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            <div className="min-w-0">
+              <p className="flex items-center gap-1 truncate text-base font-bold text-foreground">
+                {name.trim() || "Seu nome"}
+                <VerifiedBadge size={18} />
+              </p>
+              <p className="truncate text-sm text-muted-foreground">{normalizeHandle(handle) || "@seuperfil"}</p>
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <label htmlFor="edit-tweet-name" className="text-[0.8125rem] font-semibold text-foreground">
+                Nome
+              </label>
+              <Input id="edit-tweet-name" value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="edit-tweet-handle" className="text-[0.8125rem] font-semibold text-foreground">
+                @ do perfil
+              </label>
+              <Input
+                id="edit-tweet-handle"
+                value={handle}
+                onChange={(e) => setHandle(e.target.value)}
+                autoCapitalize="none"
+                autoCorrect="off"
+              />
+            </div>
+          </div>
+          {avatarUrl ? (
+            <button
+              type="button"
+              onClick={() => setAvatarUrl(null)}
+              className="text-xs font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+            >
+              Remover foto
+            </button>
+          ) : null}
+        </DialogBody>
+        <DialogFooter>
+          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
+            Cancelar
+          </Button>
+          <Button size="sm" onClick={save} disabled={!valid || saving || uploading}>
+            {saving ? <Loader2 className="animate-spin" /> : <Check />}
+            Salvar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function TweetCarouselEditor({
   carousel,
-  profiles,
+  profiles: initialProfiles,
   designProfiles = [],
 }: {
   carousel: TweetCarousel;
@@ -115,6 +258,8 @@ export function TweetCarouselEditor({
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [pendingFiles, setPendingFiles] = useState<File[] | null>(null);
   const [instagramOpen, setInstagramOpen] = useState(false);
+  const [profileEditOpen, setProfileEditOpen] = useState(false);
+  const [profiles, setProfiles] = useState(initialProfiles);
   // No servidor sempre "Baixar"; no celular vira "Salvar" (share sheet → Fotos).
   const [mobile, setMobile] = useState(false);
   useEffect(() => setMobile(prefersShareSheet()), []);
@@ -232,6 +377,23 @@ export function TweetCarouselEditor({
     )?.id ??
     "";
   const profileInList = selectedProfileValue !== "";
+  const linkedSavedProfile =
+    draft.profileId ? (profiles.find((p) => p.id === draft.profileId) ?? null) : null;
+
+  async function saveProfileEdit(snapshot: TweetProfileSnapshot): Promise<boolean> {
+    if (linkedSavedProfile) {
+      const res = await updateTweetProfileAction(linkedSavedProfile.id, snapshot);
+      if (res.error || !res.profile) {
+        toast.error(res.error ?? "Erro ao salvar o perfil");
+        return false;
+      }
+      const saved = res.profile;
+      setProfiles((list) => list.map((p) => (p.id === saved.id ? saved : p)));
+    }
+    update((d) => ({ ...d, profile: snapshot }));
+    toast.success("Perfil atualizado");
+    return true;
+  }
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 pb-24 sm:px-6">
@@ -308,6 +470,10 @@ export function TweetCarouselEditor({
               ))
             )}
           </select>
+          <Button variant="outline" size="sm" onClick={() => setProfileEditOpen(true)}>
+            <Pencil />
+            Editar perfil
+          </Button>
 
           <SegmentedControl
             size="sm"
@@ -496,6 +662,14 @@ export function TweetCarouselEditor({
           />
         ))}
       </div>
+
+      <ProfileEditDialog
+        open={profileEditOpen}
+        onOpenChange={setProfileEditOpen}
+        initial={profile}
+        linkedToSaved={!!linkedSavedProfile}
+        onSave={saveProfileEdit}
+      />
 
       <TweetInstagramPublishDialog
         open={instagramOpen}

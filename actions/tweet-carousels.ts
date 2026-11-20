@@ -38,6 +38,37 @@ export async function createTweetProfileAction(input: {
   return { success: true, profile: data as TweetProfile };
 }
 
+/** Edita um perfil tweet salvo (vale para os próximos carrosséis; os já criados guardam o próprio snapshot). */
+export async function updateTweetProfileAction(
+  id: string,
+  input: { name: string; handle: string; avatarUrl: string | null }
+): Promise<TweetActionState> {
+  const name = input.name.trim();
+  const handle = normalizeHandle(input.handle);
+  if (!name) return { error: "Informe o nome do perfil" };
+  if (!handle) return { error: "Informe o @ do perfil" };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Não autenticado" };
+
+  const { data, error } = await supabase
+    .from("tweet_profiles")
+    .update({ name, handle, avatar_url: input.avatarUrl, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .select("*")
+    .maybeSingle();
+
+  if (error) return { error: "Erro ao salvar o perfil" };
+  if (!data) return { error: "Perfil não encontrado" };
+
+  revalidatePath("/carousel");
+  return { success: true, profile: data as TweetProfile };
+}
+
 export async function deleteTweetProfileAction(id: string): Promise<TweetActionState> {
   const supabase = await createClient();
   const {
